@@ -1,0 +1,169 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CommunityRole {
+  ADMIN
+  MODERATOR
+  MEMBER
+}
+
+model User {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  email        String   @unique
+  passwordHash String
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+
+  posts        Post[]
+  likes        Like[]
+  communityMemberships CommunityMember[]
+  sentInvitations     CommunityInvitation[] @relation("InvitedBy")
+  receivedInvitations CommunityInvitation[] @relation("InvitedUser")
+
+
+}
+model Post {
+  id           String   @id @default(uuid())
+  userId       String
+  type         PostType
+  caption      String?
+  mediaUrl     String?
+  watermarkUrl String?
+  createdAt    DateTime @default(now())
+
+  scope        FeedScope
+
+  user         User     @relation(fields: [userId], references: [id])
+  likes        Like[]
+  categories   PostCategory[]
+  @@index([userId])
+  @@index([scope])
+}
+model Like {
+  id        String   @id @default(uuid())
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+}
+enum PostType {
+  TEXT
+  IMAGE
+  VIDEO
+  MEME
+}
+model Community {
+  id          String   @id @default(uuid())
+  name        String
+  intention   String
+  scope       CommunityScope
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  categories  CommunityCategory[]
+  members CommunityMember[]
+  invitations CommunityInvitation[]
+
+
+}
+model CommunityMember {
+  id          String        @id @default(uuid())
+  communityId String
+  userId      String
+  role        CommunityRole @default(MEMBER)
+  joinedAt    DateTime      @default(now())
+
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([communityId, userId])
+  @@index([communityId])
+  @@index([userId])
+}
+
+model CommunityInvitation {
+  id            String            @id @default(uuid())
+  communityId   String
+  invitedById   String
+  invitedUserId String
+  status        InvitationStatus  @default(PENDING)
+  createdAt     DateTime          @default(now())
+  respondedAt   DateTime?
+
+  community     Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  invitedBy     User      @relation("InvitedBy", fields: [invitedById], references: [id])
+  invitedUser   User      @relation("InvitedUser", fields: [invitedUserId], references: [id])
+
+  @@unique([communityId, invitedUserId])
+  @@index([invitedUserId])
+  @@index([status])
+}
+
+
+model CommunityCategory {
+  id           String   @id @default(uuid())
+  communityId  String
+  categoryKey  String
+
+  community    Community @relation(fields: [communityId], references: [id])
+
+  @@index([categoryKey])
+}
+
+enum CommunityScope {
+  LOCAL
+  COUNTRY
+  GLOBAL
+}
+
+enum FeedScope {
+  LOCAL
+  COUNTRY
+  GLOBAL
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  REVOKED
+  EXPIRED
+}
+
+
+model Category {
+  key         String   @id
+  label       String
+  description String?
+
+  posts       PostCategory[]
+}
+
+model PostCategory {
+  id         String   @id @default(uuid())
+  postId     String
+  categoryKey String
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryKey], references: [key])
+
+  @@unique([postId, categoryKey])
+  @@index([categoryKey])
+}
