@@ -27,14 +27,13 @@ model User {
   avatarUrl    String?
   createdAt    DateTime @default(now())
 
-  posts        Post[]
-  likes        Like[]
+  posts                Post[]
+  likes                Like[]
   communityMemberships CommunityMember[]
-  sentInvitations     CommunityInvitation[] @relation("InvitedBy")
-  receivedInvitations CommunityInvitation[] @relation("InvitedUser")
-
-
+  sentInvitations      CommunityInvitation[] @relation("InvitedBy")
+  receivedInvitations  CommunityInvitation[] @relation("InvitedUser")
 }
+
 model Post {
   id           String   @id @default(uuid())
   userId       String
@@ -44,14 +43,17 @@ model Post {
   watermarkUrl String?
   createdAt    DateTime @default(now())
 
-  scope        FeedScope
+  scope FeedScope
 
-  user         User     @relation(fields: [userId], references: [id])
-  likes        Like[]
-  categories   PostCategory[]
+  user               User                @relation(fields: [userId], references: [id])
+  likes              Like[]
+  categories         PostCategory[]
+  communityFeedItems CommunityFeedItem[]
+
   @@index([userId])
   @@index([scope])
 }
+
 model Like {
   id        String   @id @default(uuid())
   userId    String
@@ -63,26 +65,46 @@ model Like {
 
   @@unique([userId, postId])
 }
+
 enum PostType {
   TEXT
   IMAGE
   VIDEO
   MEME
 }
+
 model Community {
+  id        String         @id @default(uuid())
+  name      String
+  intention String
+  scope     CommunityScope
+  createdBy String
+  createdAt DateTime       @default(now())
+
+  categories         CommunityCategory[]
+  members            CommunityMember[]
+  invitations        CommunityInvitation[]
+  communityFeedItems CommunityFeedItem[]
+}
+
+model CommunityFeedItem {
   id          String   @id @default(uuid())
-  name        String
-  intention   String
-  scope       CommunityScope
-  createdBy   String
+  communityId String
+  postId      String
+  feedDate    DateTime
+  rank        Int
+  score       Int
+  reason      Json?
   createdAt   DateTime @default(now())
 
-  categories  CommunityCategory[]
-  members CommunityMember[]
-  invitations CommunityInvitation[]
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
 
-
+  @@unique([communityId, postId, feedDate])
+  @@index([communityId, feedDate])
+  @@index([communityId, feedDate, rank])
 }
+
 model CommunityMember {
   id          String        @id @default(uuid())
   communityId String
@@ -90,39 +112,48 @@ model CommunityMember {
   role        CommunityRole @default(MEMBER)
   joinedAt    DateTime      @default(now())
 
-  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([communityId, userId])
   @@index([communityId])
   @@index([userId])
+  @@index([communityId, role])
+
 }
 
 model CommunityInvitation {
-  id            String            @id @default(uuid())
+  id            String   @id @default(uuid())
   communityId   String
   invitedById   String
   invitedUserId String
-  status        InvitationStatus  @default(PENDING)
-  createdAt     DateTime          @default(now())
-  respondedAt   DateTime?
+
+  status        InvitationStatus @default(PENDING)
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
 
   community     Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
   invitedBy     User      @relation("InvitedBy", fields: [invitedById], references: [id])
   invitedUser   User      @relation("InvitedUser", fields: [invitedUserId], references: [id])
 
   @@unique([communityId, invitedUserId])
-  @@index([invitedUserId])
-  @@index([status])
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  REVOKED
 }
 
 
 model CommunityCategory {
-  id           String   @id @default(uuid())
-  communityId  String
-  categoryKey  String
+  id          String @id @default(uuid())
+  communityId String
+  categoryKey String
 
-  community    Community @relation(fields: [communityId], references: [id])
+  community Community @relation(fields: [communityId], references: [id])
 
   @@index([categoryKey])
 }
@@ -139,30 +170,22 @@ enum FeedScope {
   GLOBAL
 }
 
-enum InvitationStatus {
-  PENDING
-  ACCEPTED
-  DECLINED
-  REVOKED
-  EXPIRED
-}
-
 
 model Category {
-  key         String   @id
+  key         String  @id
   label       String
   description String?
 
-  posts       PostCategory[]
+  posts PostCategory[]
 }
 
 model PostCategory {
-  id         String   @id @default(uuid())
-  postId     String
+  id          String @id @default(uuid())
+  postId      String
   categoryKey String
 
-  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
-  category   Category @relation(fields: [categoryKey], references: [key])
+  post     Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryKey], references: [key])
 
   @@unique([postId, categoryKey])
   @@index([categoryKey])

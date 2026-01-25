@@ -7,6 +7,8 @@ import postRoutes from "./routes/post.routes.js"
 import userRoutes from "./routes/user.routes.js"
 import communityRoutes from "./routes/community.routes.js"
 import invitationRoutes from "./routes/invitation.routes.js"
+import { startCommunityFeedCron } from "./jobs/communityFeed.cron.js"
+
 
 
 
@@ -26,6 +28,7 @@ app.use("/likes", likeRoutes)
 app.use("/users", userRoutes)
 app.use("/invitations", invitationRoutes)
 
+startCommunityFeedCron()
 
 
 
