@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:4000"
+const API_URL = "http://localhost:4000/api/v1"
 
 export const api = async (path, options = {}) => {
   const token = localStorage.getItem("token")
@@ -15,10 +15,10 @@ export const api = async (path, options = {}) => {
   })
 
   if (!res.ok) {
-    const err = await res.json()
-    throw err
+    const text = await res.text()
+    throw new Error(text)
   }
 
-  return res.json()
+  const text = await res.text()
+  return text ? JSON.parse(text) : null
 }
-

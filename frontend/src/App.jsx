@@ -1,127 +1,184 @@
 import { useEffect, useState } from "react"
+import { Routes, Route, Navigate } from "react-router-dom"
+
 import Login from "./pages/Login"
 import Feed from "./components/Feed"
 import PostComposer from "./components/PostComposer"
-import { api } from "./api/client"
-import { Routes, Route } from "react-router-dom"
 import Profile from "./pages/Profile"
 import MemeEditor from "./components/MemeEditor"
 
-
+import { api } from "./api/client"
 
 export default function App() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [posts, setPosts] = useState(null)
+
+  const [posts, setPosts] = useState([])
   const [feedScope, setFeedScope] = useState("GLOBAL")
+  const [memePost, setMemePost] = useState(null)
 
-
-  const loadFeed = async () => {
-  const data = await api(`/posts/feed/${feedScope}`)
-  setPosts(data)
-}
-
-
+  // 🔐 Auth bootstrap (single source of truth)
   useEffect(() => {
-    api("/users/me")
-      .then(setUser)
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [])
+  api("/users/me")
+    .then((u) => {
+      if (u) setUser(u)
+    })
+    .catch(() => {})
+    .finally(() => setLoading(false))
+}, [])
 
+
+  // 📰 Feed loader
+  const loadFeed = async () => {
+    const data = await api(`/posts/feed/${feedScope}`)
+    setPosts(data)
+  }
+
+  // 🔁 Reload feed when auth or scope changes
   useEffect(() => {
     if (user) loadFeed()
   }, [user, feedScope])
-  const [memePost, setMemePost] = useState(null)
+
+  // ❤️ Like handler
   const handleLike = async (postId) => {
+  // optimistic toggle
+  setPosts((prev) =>
+    prev.map((p) =>
+      p.id === postId
+        ? {
+            ...p,
+            _count: {
+              ...p._count,
+              likes: p._count.likes + 1,
+            },
+          }
+        : p
+    )
+  )
+
+  try {
     await api(`/likes/${postId}`, { method: "POST" })
+
+    // 🔑 re-sync with backend truth
+    loadFeed()
+  } catch (err) {
+    console.error("Like failed", err)
     loadFeed()
   }
+}
 
-  if (loading) return <p>Loading...</p>
-  if (!user) return <Login onLogin={setUser} />
+
+
+  // ⏳ Auth still resolving
+  if (loading) {
+    return <p style={{ textAlign: "center", marginTop: 40 }}>Loading…</p>
+  }
 
   return (
-  <Routes>
-    <Route
-  path="/"
-  element={
-    <>
-      <header
-        style={{
-          padding: "12px 20px",
-          borderBottom: "1px solid #eee",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <strong>🌱 Social</strong>
-        <span>@{user.username}</span>
-      </header>
+    <Routes>
+      {/* 🔓 Login */}
+      <Route
+        path="/login"
+        element={
+          user ? <Navigate to="/" /> : <Login onLogin={setUser} />
+        }
+      />
 
-      <main
-  style={{
-    maxWidth: 720,
-    margin: "0 auto",
-    padding: 20,
-    background: "#f9fafb",
-    minHeight: "100vh",
-  }}
->
-        <PostComposer onPostCreated={loadFeed} />
+      {/* 🔒 Home / Feed */}
+      <Route
+        path="/"
+        element={
+          !user ? (
+            <Navigate to="/login" />
+          ) : (
+            <>
+              <header
+                style={{
+                  padding: "12px 20px",
+                  borderBottom: "1px solid #eee",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <strong>🌱 Social</strong>
+                <span>@{user.username}</span>
+              </header>
 
-        <div
-  style={{
-    display: "flex",
-    gap: 8,
-    marginBottom: 16,
-  }}
->
-  {["GLOBAL", "COUNTRY", "LOCAL"].map((scope) => (
-    <button
-      key={scope}
-      onClick={() => setFeedScope(scope)}
-      style={{
-        padding: "6px 12px",
-        borderRadius: 6,
-        border: "1px solid #d1d5db",
-        background:
-          feedScope === scope ? "#111827" : "#f3f4f6",
-        color:
-          feedScope === scope ? "#fff" : "#111827",
-        cursor: "pointer",
-      }}
-    >
-      {scope === "GLOBAL" && "🌍 Global"}
-      {scope === "COUNTRY" && "🏳️ Country"}
-      {scope === "LOCAL" && "📍 Local"}
-    </button>
-  ))}
-</div>
+              <main
+                style={{
+                  maxWidth: 720,
+                  margin: "0 auto",
+                  padding: 20,
+                  background: "#f9fafb",
+                  minHeight: "100vh",
+                }}
+              >
+                <PostComposer onPostCreated={loadFeed} />
 
-        <Feed
-          posts={posts}
-          onLike={handleLike}
-          onMeme={(post) => setMemePost(post)}
-        />
-      </main>
+                {/* 🌍 Feed scope selector */}
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    marginBottom: 16,
+                  }}
+                >
+                  {["GLOBAL", "COUNTRY", "LOCAL"].map((scope) => (
+                    <button
+                      key={scope}
+                      onClick={() => setFeedScope(scope)}
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: 6,
+                        border: "1px solid #d1d5db",
+                        background:
+                          feedScope === scope
+                            ? "#111827"
+                            : "#f3f4f6",
+                        color:
+                          feedScope === scope
+                            ? "#fff"
+                            : "#111827",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {scope === "GLOBAL" && "🌍 Global"}
+                      {scope === "COUNTRY" && "🏳️ Country"}
+                      {scope === "LOCAL" && "📍 Local"}
+                    </button>
+                  ))}
+                </div>
 
-      {memePost && (
-  <MemeEditor
-    post={memePost}
-    onClose={() => setMemePost(null)}
-    onPosted={() => {
-      setMemePost(null)
-      loadFeed()
-    }}
-  />
-)}
-    </>
-  }
-/>
+                <Feed
+                  posts={posts}
+                  onLike={handleLike}
+                  onMeme={(post) => setMemePost(post)}
+                />
+              </main>
 
-    <Route path="/profile/:id" element={<Profile />} />
-  </Routes>
-)
+              {memePost && (
+                <MemeEditor
+                  post={memePost}
+                  onClose={() => setMemePost(null)}
+                  onPosted={() => {
+                    setMemePost(null)
+                    loadFeed()
+                  }}
+                />
+              )}
+            </>
+          )
+        }
+      />
+
+      {/* 👤 Profile */}
+      <Route
+        path="/profile/:id"
+        element={
+          user ? <Profile /> : <Navigate to="/login" />
+        }
+      />
+    </Routes>
+  )
 }

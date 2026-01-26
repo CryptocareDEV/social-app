@@ -1,3 +1,4 @@
+import { api } from "../api/client"
 import { useState, useRef } from "react"
 
 export default function MemeEditor({ post, onClose, onPosted }) {
@@ -88,18 +89,16 @@ const postMeme = async () => {
 
     const memeDataUrl = canvas.toDataURL("image/png")
 
-    await fetch("http://localhost:4000/posts", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-      body: JSON.stringify({
-        type: "MEME",
-        caption: `${topText} / ${bottomText}`,
-        mediaUrl: memeDataUrl,
-      }),
-    })
+    await api("/posts", {
+  method: "POST",
+  body: JSON.stringify({
+    type: "MEME",
+    caption: `${topText} / ${bottomText}`,
+    mediaUrl: memeDataUrl,
+    scope: post.scope, 
+  }),
+})
+
 
     setSaving(false)
     onPosted()

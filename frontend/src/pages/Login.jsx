@@ -7,19 +7,24 @@ export default function Login({ onLogin }) {
   const [error, setError] = useState("")
 
   const submit = async (e) => {
-    e.preventDefault()
-    setError("")
-    try {
-      const res = await api("/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ email, password }),
-      })
-      localStorage.setItem("token", res.token)
-      onLogin(res.user)
-    } catch (err) {
-      setError(err.error || "Login failed")
-    }
+  e.preventDefault()
+  setError("")
+  try {
+    const res = await api("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    })
+
+    const token = res.data.token
+    const user = res.data.user
+
+    localStorage.setItem("token", token)
+    onLogin(user)
+  } catch (err) {
+    setError(err.error || "Login failed")
   }
+}
+
 
   return (
     <div style={{ maxWidth: 320, margin: "80px auto" }}>

@@ -47,10 +47,16 @@ export const createPost = async (req, res) => {
 
 
 
-export const getFeed = async (_req, res) => {
+export const getFeed = async (req, res) => {
   try {
+    const page = parseInt(req.query.page || "1", 10)
+    const limit = parseInt(req.query.limit || "10", 10)
+    const skip = (page - 1) * limit
+
     const posts = await prisma.post.findMany({
       orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
       include: {
         user: {
           select: {
@@ -65,12 +71,28 @@ export const getFeed = async (_req, res) => {
       },
     })
 
-    return res.json(posts)
+    return res.json({
+      success: true,
+      data: {
+        items: posts,
+        page,
+        hasMore: posts.length === limit,
+      },
+      error: null,
+    })
   } catch (err) {
-    console.error(err)
-    return res.status(500).json({ error: "Failed to fetch feed" })
+    console.error("getFeed error:", err)
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: {
+        code: "FEED_ERROR",
+        message: err.message,
+      },
+    })
   }
 }
+
 export const getScopedFeed = async (req, res) => {
   try {
     const { scope } = req.params
