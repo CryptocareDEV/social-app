@@ -11,15 +11,28 @@ export const createPost = async (req, res) => {
     const { type, caption, mediaUrl, scope, categories } = req.body
     const userId = req.user.userId
 
-    if (!type || !scope) {
-      return res.status(400).json({ error: "Post type and scope required" })
-    }
+    // ✅ Validation
+if (!type || !scope) {
+  return res.status(400).json({
+    error: "Post type and scope required",
+  })
+}
 
-    if (type !== "TEXT" && !mediaUrl) {
-      return res.status(400).json({
-        error: "mediaUrl is required for IMAGE and VIDEO posts",
-      })
-    }
+if (type === "TEXT" && !caption?.trim()) {
+  return res.status(400).json({
+    error: "Text posts require a caption",
+  })
+}
+
+if (
+  (type === "IMAGE" || type === "VIDEO" || type === "MEME") &&
+  !mediaUrl?.trim()
+) {
+  return res.status(400).json({
+    error: "Media posts require a mediaUrl",
+  })
+}
+
 
     const post = await prisma.post.create({
       data: {
