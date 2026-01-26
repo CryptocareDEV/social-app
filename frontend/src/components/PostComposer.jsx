@@ -20,10 +20,18 @@ export default function PostComposer({ onPostCreated }) {
     boxSizing: "border-box",
     fontSize: 14,
   }
+  const isInvalid =
+  (type === "TEXT" && !caption.trim()) ||
+  ((type === "IMAGE" || type === "VIDEO") && !mediaUrl.trim())
+
 
   const submit = async (e) => {
     e.preventDefault()
     setError("")
+    if (isInvalid) {
+  setError("Please add some content before posting.")
+  return
+}
     setLoading(true)
 
     try {
@@ -126,14 +134,16 @@ export default function PostComposer({ onPostCreated }) {
       >
         <button
   type="submit"
-  disabled={loading}
+  disabled={loading || isInvalid}
   style={{
     ...primaryButton,
-    opacity: loading ? 0.6 : 1,
+    opacity: loading || isInvalid ? 0.4 : 1,
+    cursor: loading || isInvalid ? "not-allowed" : "pointer",
   }}
 >
   {loading ? "Posting…" : "Post"}
 </button>
+
       </div>
     </form>
   )
