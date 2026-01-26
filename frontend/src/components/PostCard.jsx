@@ -114,20 +114,21 @@ export default function PostCard({ post, onLike, onMeme }) {
 
       {/* Actions */}
       <footer style={{ marginTop: 14 }}>
-        <button
-          type="button"
-          onClick={() => onLike(post.id)}
-          style={{
-            fontSize: 14,
-            border: "none",
-            background: "transparent",
-            cursor: "pointer",
-            color: "#111827",
-          }}
-        >
-          ❤️ {post._count.likes}
-        </button>
-      </footer>
+  <button
+    type="button"
+    onClick={() => onLike(post.id)}
+    style={{
+      fontSize: 14,
+      border: "none",
+      background: "transparent",
+      cursor: "pointer",
+      color: post.likedByMe ? "#dc2626" : "#111827",
+      fontWeight: post.likedByMe ? 600 : 400,
+    }}
+  >
+    ❤️ {post.likesCount}
+  </button>
+</footer>
     </article>
   )
 }

@@ -41,31 +41,11 @@ export default function App() {
 
   // ❤️ Like handler
   const handleLike = async (postId) => {
-  // optimistic toggle
-  setPosts((prev) =>
-    prev.map((p) =>
-      p.id === postId
-        ? {
-            ...p,
-            _count: {
-              ...p._count,
-              likes: p._count.likes + 1,
-            },
-          }
-        : p
-    )
-  )
-
-  try {
-    await api(`/likes/${postId}`, { method: "POST" })
-
-    // 🔑 re-sync with backend truth
-    loadFeed()
-  } catch (err) {
-    console.error("Like failed", err)
-    loadFeed()
-  }
+  // 🔑 App does NOT manage optimistic state
+  // Feed handles it
+  return await api(`/likes/${postId}`, { method: "POST" })
 }
+
 
 
 
