@@ -9,24 +9,14 @@ export default function PostComposer({ onPostCreated }) {
   const [loading, setLoading] = useState(false)
   const [scope, setScope] = useState("GLOBAL")
 
-
-  // 🔹 shared styles
   const inputStyle = {
-  width: "100%",
-  padding: "8px 10px",
-  marginTop: 8,
-  borderRadius: 6,
-  border: "1px solid #d1d5db",
-  boxSizing: "border-box",
-}
-  const buttonStyle = {
-    marginTop: 12,
-    padding: "8px 14px",
-    borderRadius: 6,
+    width: "100%",
+    padding: "10px 12px",
+    marginTop: 10,
+    borderRadius: 8,
     border: "1px solid #d1d5db",
-    background: "#111827",
-    color: "#fff",
-    cursor: "pointer",
+    boxSizing: "border-box",
+    fontSize: 14,
   }
 
   const submit = async (e) => {
@@ -38,13 +28,12 @@ export default function PostComposer({ onPostCreated }) {
       await api("/posts", {
         method: "POST",
         body: JSON.stringify({
-  type,
-  caption,
-  mediaUrl: type === "TEXT" ? undefined : mediaUrl,
-  categories: ["reflection"],
-  scope,
-}),
-
+          type,
+          caption,
+          mediaUrl: type === "TEXT" ? undefined : mediaUrl,
+          categories: ["reflection"],
+          scope,
+        }),
       })
 
       setCaption("")
@@ -63,19 +52,25 @@ export default function PostComposer({ onPostCreated }) {
     <form
       onSubmit={submit}
       style={{
-        border: "1px solid #e5e7eb",
-        borderRadius: 8,
+        marginBottom: 28,
         padding: 16,
-        marginBottom: 24,
-        background: "#fff",
-        overflow: "hidden",
-
+        borderRadius: 12,
+        background: "#ffffff",
+        border: "1px solid #e5e7eb",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
       }}
     >
-      <h3 style={{ marginBottom: 8 }}>Create Post</h3>
+      <h3 style={{ marginBottom: 10, color: "#111827" }}>
+        Create post
+      </h3>
 
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      {error && (
+        <p style={{ color: "#b91c1c", marginBottom: 8 }}>
+          {error}
+        </p>
+      )}
 
+      {/* Post type */}
       <select
         value={type}
         onChange={(e) => setType(e.target.value)}
@@ -86,42 +81,64 @@ export default function PostComposer({ onPostCreated }) {
         <option value="VIDEO">Video</option>
       </select>
 
+      {/* Scope */}
       <select
-  value={scope}
-  onChange={(e) => setScope(e.target.value)}
-  style={{
-    width: "100%",
-    padding: "8px 10px",
-    marginTop: 8,
-    borderRadius: 6,
-    border: "1px solid #d1d5db",
-    boxSizing: "border-box",
-  }}
->
-  <option value="GLOBAL">🌍 Global</option>
-  <option value="COUNTRY">🏳️ Country</option>
-  <option value="LOCAL">📍 Local</option>
-</select>
+        value={scope}
+        onChange={(e) => setScope(e.target.value)}
+        style={inputStyle}
+      >
+        <option value="GLOBAL">🌍 Global</option>
+        <option value="COUNTRY">🏳️ Country</option>
+        <option value="LOCAL">📍 Local</option>
+      </select>
 
+      {/* Caption */}
       <textarea
-        placeholder="Write something..."
+        placeholder="What’s on your mind?"
         value={caption}
         onChange={(e) => setCaption(e.target.value)}
-        style={{ ...inputStyle, minHeight: 80, resize: "vertical", maxWidth: "100%"}}
+        style={{
+          ...inputStyle,
+          minHeight: 90,
+          resize: "vertical",
+        }}
       />
 
+      {/* Media URL */}
       {type !== "TEXT" && (
         <input
-          placeholder="Media URL"
+          placeholder="Paste media URL"
           value={mediaUrl}
           onChange={(e) => setMediaUrl(e.target.value)}
           style={inputStyle}
         />
       )}
 
-      <button disabled={loading} style={buttonStyle}>
-        {loading ? "Posting..." : "Post"}
-      </button>
+      {/* Actions */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          marginTop: 14,
+        }}
+      >
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            padding: "8px 18px",
+            borderRadius: 999,
+            border: "none",
+            background: "#0284c7",
+            color: "#fff",
+            fontWeight: 500,
+            cursor: "pointer",
+            opacity: loading ? 0.6 : 1,
+          }}
+        >
+          {loading ? "Posting…" : "Post"}
+        </button>
+      </div>
     </form>
   )
 }
