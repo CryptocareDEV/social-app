@@ -1,9 +1,9 @@
 import PostCard from "./PostCard"
 
 export default function Feed({ posts, onLike, onMeme }) {
-  if (!Array.isArray(posts)) {
+  if (!posts) {
     return (
-      <p style={{ textAlign: "center", color: "#6b7280" }}>
+      <p style={{ textAlign: "center", color: "#6b7280", marginTop: 40 }}>
         Loading your feed…
       </p>
     )
@@ -13,7 +13,7 @@ export default function Feed({ posts, onLike, onMeme }) {
     return (
       <div
         style={{
-          padding: 24,
+          padding: 40,
           textAlign: "center",
           color: "#6b7280",
           fontStyle: "italic",
@@ -25,17 +25,19 @@ export default function Feed({ posts, onLike, onMeme }) {
   }
 
   return (
-    <div>
-      <h2>Feed</h2>
+    <section style={{ marginTop: 20 }}>
+      <h2 style={{ marginBottom: 16, color: "#111827" }}>Feed</h2>
 
-      {posts.map((post) => (
-        <PostCard
-          key={post.id}
-          post={post}
-          onLike={onLike}
-          onMeme={onMeme}
-        />
-      ))}
-    </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {posts.map((post) => (
+          <PostCard
+            key={post.id}
+            post={post}
+            onLike={onLike}
+            onMeme={onMeme}
+          />
+        ))}
+      </div>
+    </section>
   )
 }
