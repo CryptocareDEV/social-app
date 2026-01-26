@@ -2,80 +2,102 @@ import { Link } from "react-router-dom"
 
 export default function PostCard({ post, onLike, onMeme }) {
   return (
-    <div
+    <article
       style={{
         border: "1px solid #e5e7eb",
-        borderRadius: 8,
+        borderRadius: 12,
         padding: 16,
-        marginBottom: 20,
         background: "#fff",
-        boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
       }}
     >
       {/* Header */}
-      <div style={{ marginBottom: 8 }}>
-        <strong>
+      <header
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 10,
+        }}
+      >
+        <div>
           <Link
             to={`/profile/${post.user.id}`}
-            style={{ textDecoration: "none", color: "inherit" }}
+            style={{
+              fontWeight: 600,
+              textDecoration: "none",
+              color: "#111827",
+            }}
           >
             @{post.user.username}
           </Link>
-        </strong>
 
-        <span
+          <span
+            style={{
+              fontSize: 12,
+              padding: "2px 8px",
+              marginLeft: 8,
+              borderRadius: 999,
+              background:
+                post.scope === "GLOBAL"
+                  ? "#e5e7eb"
+                  : post.scope === "COUNTRY"
+                  ? "#dbeafe"
+                  : "#dcfce7",
+              color: "#111827",
+            }}
+          >
+            {post.scope.toLowerCase()}
+          </span>
+        </div>
+      </header>
+
+      {/* Caption */}
+      {post.caption && post.type !== "MEME" && (
+        <p
           style={{
-            fontSize: 12,
-            padding: "2px 6px",
-            marginLeft: 8,
-            borderRadius: 4,
-            background:
-              post.scope === "GLOBAL"
-                ? "#e5e7eb"
-                : post.scope === "COUNTRY"
-                ? "#dbeafe"
-                : "#dcfce7",
-            color: "#111827",
+            marginBottom: 12,
+            lineHeight: 1.5,
+            color: "#1f2937",
           }}
         >
-          {post.scope}
-        </span>
-      </div>
-
-      {/* Caption (not for MEME) */}
-      {post.caption && post.type !== "MEME" && (
-        <p style={{ marginBottom: 12, lineHeight: 1.4 }}>
           {post.caption}
         </p>
       )}
 
-      {/* Image / Meme */}
-      {(post.type === "IMAGE" || post.type === "MEME") &&
-        post.mediaUrl && (
-          <div style={{ marginTop: 8 }}>
-            <img
-              src={post.mediaUrl}
-              alt=""
+      {/* Media */}
+      {(post.type === "IMAGE" || post.type === "MEME") && post.mediaUrl && (
+        <div style={{ marginTop: 8 }}>
+          <img
+            src={post.mediaUrl}
+            alt=""
+            style={{
+              maxWidth: "100%",
+              borderRadius: 10,
+              display: "block",
+              margin: "0 auto",
+            }}
+          />
+
+          {post.type === "IMAGE" && (
+            <button
+              type="button"
+              onClick={() => onMeme(post)}
               style={{
-                maxWidth: "100%",
-                display: "block",
-                margin: "0 auto",
-                borderRadius: 6,
+                marginTop: 8,
+                fontSize: 13,
+                padding: "4px 10px",
+                borderRadius: 999,
+                border: "1px solid #d1d5db",
+                background: "#f9fafb",
+                cursor: "pointer",
               }}
-            />
-
-            {post.type === "IMAGE" && (
-              <button
-  type="button"
-  style={{ marginTop: 6 }}
-  onClick={() => onMeme(post)}
->
-  Meme
-</button>
-
-            )}
-          </div>
-        )}
+            >
+              Create meme
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Video */}
       {post.type === "VIDEO" && (
@@ -84,25 +106,28 @@ export default function PostCard({ post, onLike, onMeme }) {
           controls
           style={{
             maxWidth: "100%",
-            display: "block",
-            margin: "8px auto 0",
-            borderRadius: 6,
+            borderRadius: 10,
+            marginTop: 8,
           }}
         />
       )}
 
       {/* Actions */}
-      <div style={{ marginTop: 12 }}>
+      <footer style={{ marginTop: 14 }}>
         <button
-  type="button"
-  onClick={() => {
-    onLike(post.id)
-  }}
->
-  ❤️ {post._count.likes}{" "}
-  {post._count.likes === 1 ? "like" : "likes"}
-</button>
-      </div>
-    </div>
+          type="button"
+          onClick={() => onLike(post.id)}
+          style={{
+            fontSize: 14,
+            border: "none",
+            background: "transparent",
+            cursor: "pointer",
+            color: "#111827",
+          }}
+        >
+          ❤️ {post._count.likes}
+        </button>
+      </footer>
+    </article>
   )
 }
