@@ -5,6 +5,11 @@ export const toggleLike = async (req, res) => {
   try {
     const { postId } = req.params
     const userId = req.user.userId
+    
+    if (!postId) {
+      return res.status(400).json({ error: "Post ID required" })
+    }
+
 
     const existing = await prisma.like.findUnique({
       where: {
