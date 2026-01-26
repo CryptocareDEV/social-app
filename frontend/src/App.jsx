@@ -41,10 +41,14 @@ export default function App() {
 
   // ❤️ Like handler
   const handleLike = async (postId) => {
-  // 🔑 App does NOT manage optimistic state
-  // Feed handles it
-  return await api(`/likes/${postId}`, { method: "POST" })
+  try {
+    await api(`/likes/${postId}`, { method: "POST" })
+    await loadFeed() // single source of truth
+  } catch (err) {
+    console.error("Like failed", err)
+  }
 }
+
 
 
 
@@ -131,10 +135,11 @@ export default function App() {
                 </div>
 
                 <Feed
-                  posts={posts}
-                  onLike={handleLike}
-                  onMeme={(post) => setMemePost(post)}
-                />
+  posts={posts}
+  onLike={handleLike}
+  onMeme={(post) => setMemePost(post)}
+  currentUserId={user.id}
+/>
               </main>
 
               {memePost && (

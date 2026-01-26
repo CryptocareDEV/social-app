@@ -1,23 +1,7 @@
-import { useEffect, useState } from "react"
 import PostCard from "./PostCard"
 
-export default function Feed({ posts, onLike }) {
-  const [localPosts, setLocalPosts] = useState([])
-
-  // Sync when backend posts change
-  useEffect(() => {
-  if (posts) {
-    setLocalPosts(
-      posts.map((p) => ({
-        ...p,
-        likesCount: p._count.likes,
-        likedByMe: false, // ✅ initialize
-      }))
-    )
-  }
-}, [posts])
-
-  if (!posts) {
+export default function Feed({ posts, onLike, onMeme, currentUserId }) {
+  if (!Array.isArray(posts)) {
     return (
       <p style={{ textAlign: "center", color: "#6b7280" }}>
         Loading your feed…
@@ -25,7 +9,7 @@ export default function Feed({ posts, onLike }) {
     )
   }
 
-  if (localPosts.length === 0) {
+  if (posts.length === 0) {
     return (
       <div
         style={{
@@ -40,61 +24,15 @@ export default function Feed({ posts, onLike }) {
     )
   }
 
-  const handleLikeOptimistic = async (postId) => {
-    // 1️⃣ Optimistic update
-    setLocalPosts((prev) =>
-      prev.map((p) =>
-        p.id === postId
-          ? {
-              ...p,
-              likesCount: p.likedByMe
-                ? p.likesCount - 1
-                : p.likesCount + 1,
-              likedByMe: !p.likedByMe,
-            }
-          : p
-      )
-    )
-
-    try {
-      // 2️⃣ Backend call
-      const res = await onLike(postId)
-
-      // 3️⃣ Align with backend truth
-      setLocalPosts((prev) =>
-        prev.map((p) =>
-          p.id === postId
-            ? { ...p, likedByMe: res.liked }
-            : p
-        )
-      )
-    } catch (err) {
-      // 4️⃣ Rollback on failure
-      setLocalPosts((prev) =>
-        prev.map((p) =>
-          p.id === postId
-            ? {
-                ...p,
-                likesCount: p.likedByMe
-                  ? p.likesCount + 1
-                  : p.likesCount - 1,
-                likedByMe: !p.likedByMe,
-              }
-            : p
-        )
-      )
-    }
-  }
-
   return (
-    <div>
-      <h2>Feed</h2>
-
-      {localPosts.map((post) => (
+    <div style={{ display: "grid", gap: 16 }}>
+      {posts.map((post) => (
         <PostCard
           key={post.id}
           post={post}
-          onLike={handleLikeOptimistic}
+          onLike={onLike}
+          onMeme={onMeme}
+          currentUserId={currentUserId}
         />
       ))}
     </div>

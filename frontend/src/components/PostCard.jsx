@@ -79,23 +79,24 @@ export default function PostCard({ post, onLike, onMeme }) {
             }}
           />
 
-          {post.type === "IMAGE" && (
-            <button
-              type="button"
-              onClick={() => onMeme(post)}
-              style={{
-                marginTop: 8,
-                fontSize: 13,
-                padding: "4px 10px",
-                borderRadius: 999,
-                border: "1px solid #d1d5db",
-                background: "#f9fafb",
-                cursor: "pointer",
-              }}
-            >
-              Create meme
-            </button>
-          )}
+          {post.type === "IMAGE" && typeof onMeme === "function" && (
+  <button
+    type="button"
+    onClick={() => onMeme(post)}
+    style={{
+      marginTop: 8,
+      fontSize: 13,
+      padding: "4px 10px",
+      borderRadius: 999,
+      border: "1px solid #d1d5db",
+      background: "#f9fafb",
+      cursor: "pointer",
+    }}
+  >
+    Create meme
+  </button>
+)}
+
         </div>
       )}
 
