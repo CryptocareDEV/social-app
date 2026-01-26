@@ -1,32 +1,33 @@
-import { api } from "../api/client"
 import { useState, useRef } from "react"
+import { api } from "../api/client"
+
 
 export default function MemeEditor({ post, onClose, onPosted }) {
   const [topText, setTopText] = useState("")
   const [bottomText, setBottomText] = useState("")
   const [saving, setSaving] = useState(false)
-  const inputStyle = {
-  width: "100%",
-  padding: "8px 10px",
-  marginTop: 8,
-  borderRadius: 6,
-  border: "1px solid #d1d5db",
-  boxSizing: "border-box",
-}
-
-const buttonStyle = {
-  padding: "8px 14px",
-  borderRadius: 6,
-  border: "1px solid #d1d5db",
-  background: "#111827",
-  color: "#fff",
-  cursor: "pointer",
-  marginRight: 6,
-}
 
   const canvasRef = useRef(null)
 
-  const saveMeme = () => {
+  const inputStyle = {
+    width: "100%",
+    padding: "10px 12px",
+    marginTop: 10,
+    borderRadius: 8,
+    border: "1px solid #d1d5db",
+    fontSize: 14,
+    boxSizing: "border-box",
+  }
+
+  const buttonBase = {
+    padding: "8px 16px",
+    borderRadius: 999,
+    fontSize: 14,
+    cursor: "pointer",
+  }
+
+  const drawMemeToCanvas = () => {
+  return new Promise((resolve) => {
     const canvas = canvasRef.current
     const ctx = canvas.getContext("2d")
     const img = new Image()
@@ -38,56 +39,43 @@ const buttonStyle = {
       canvas.height = img.height
 
       ctx.drawImage(img, 0, 0)
-
       ctx.font = "bold 48px Impact"
       ctx.fillStyle = "white"
       ctx.strokeStyle = "black"
       ctx.lineWidth = 4
       ctx.textAlign = "center"
 
-      // Top text
       ctx.fillText(topText, canvas.width / 2, 60)
       ctx.strokeText(topText, canvas.width / 2, 60)
 
-      // Bottom text
       ctx.fillText(bottomText, canvas.width / 2, canvas.height - 20)
       ctx.strokeText(bottomText, canvas.width / 2, canvas.height - 20)
 
-      const link = document.createElement("a")
-      link.download = "meme.png"
-      link.href = canvas.toDataURL("image/png")
-      link.click()
+      resolve(canvas)
     }
-  }
+  })
+}
+
+const saveMeme = async () => {
+  const canvas = await drawMemeToCanvas()
+  const link = document.createElement("a")
+  link.download = "meme.png"
+  link.href = canvas.toDataURL("image/png")
+  link.click()
+}
+
 const postMeme = async () => {
+  console.log("POST MEME CLICKED")
+
   if (saving) return
   setSaving(true)
 
-  const canvas = canvasRef.current
-  const ctx = canvas.getContext("2d")
-  const img = new Image()
-  img.crossOrigin = "anonymous"
-  img.src = post.mediaUrl
-
-  img.onload = async () => {
-    canvas.width = img.width
-    canvas.height = img.height
-
-    ctx.drawImage(img, 0, 0)
-
-    ctx.font = "bold 48px Impact"
-    ctx.fillStyle = "white"
-    ctx.strokeStyle = "black"
-    ctx.lineWidth = 4
-    ctx.textAlign = "center"
-
-    ctx.fillText(topText, canvas.width / 2, 60)
-    ctx.strokeText(topText, canvas.width / 2, 60)
-
-    ctx.fillText(bottomText, canvas.width / 2, canvas.height - 20)
-    ctx.strokeText(bottomText, canvas.width / 2, canvas.height - 20)
+  try {
+    const canvas = await drawMemeToCanvas()
+    console.log("CANVAS READY", canvas)
 
     const memeDataUrl = canvas.toDataURL("image/png")
+    console.log("DATA URL LENGTH", memeDataUrl.length)
 
     await api("/posts", {
   method: "POST",
@@ -95,32 +83,64 @@ const postMeme = async () => {
     type: "MEME",
     caption: `${topText} / ${bottomText}`,
     mediaUrl: memeDataUrl,
-    scope: post.scope, 
+    scope: post.scope, // ✅ inherit scope
   }),
 })
 
 
-    setSaving(false)
+    console.log("POST SUCCESS")
     onPosted()
+  } catch (err) {
+    console.error("POST FAILED", err)
+  } finally {
+    setSaving(false)
   }
 }
+
+
+
   return (
     <div
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(0,0,0,0.8)",
+        background: "rgba(0,0,0,0.55)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         zIndex: 1000,
       }}
     >
-      <div style={{ background: "#fff", padding: 16, maxWidth: 600 }}>
-        <h3>Meme Editor</h3>
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 640,
+          background: "#ffffff",
+          borderRadius: 16,
+          padding: 20,
+          boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+        }}
+      >
+        <h3 style={{ marginBottom: 12, color: "#111827" }}>
+          Create meme
+        </h3>
 
-        <div style={{ position: "relative", textAlign: "center" }}>
-          <img src={post.mediaUrl} alt="" style={{ maxWidth: "100%" }} />
+        {/* Preview */}
+        <div
+          style={{
+            position: "relative",
+            textAlign: "center",
+            marginBottom: 12,
+          }}
+        >
+          <img
+            src={post.mediaUrl}
+            alt=""
+            style={{
+              maxWidth: "100%",
+              borderRadius: 12,
+            }}
+          />
 
           <div
             style={{
@@ -153,39 +173,71 @@ const postMeme = async () => {
           </div>
         </div>
 
+        {/* Inputs */}
         <input
-  placeholder="Top text"
-  value={topText}
-  onChange={(e) => setTopText(e.target.value)}
-  style={inputStyle}
-/>
+          placeholder="Top text"
+          value={topText}
+          onChange={(e) => setTopText(e.target.value)}
+          style={inputStyle}
+        />
 
-<input
-  placeholder="Bottom text"
-  value={bottomText}
-  onChange={(e) => setBottomText(e.target.value)}
-  style={inputStyle}
-/>
-        <div style={{ marginTop: 12 }}>
-  <button style={buttonStyle} onClick={saveMeme}>
-    Download
-  </button>
+        <input
+          placeholder="Bottom text"
+          value={bottomText}
+          onChange={(e) => setBottomText(e.target.value)}
+          style={inputStyle}
+        />
 
-  <button
-    style={buttonStyle}
-    onClick={postMeme}
-    disabled={saving}
-  >
-    {saving ? "Posting…" : "Post Meme"}
-  </button>
+        {/* Actions */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            marginTop: 16,
+          }}
+        >
+          <div>
+            <button
+              type="button"
+              onClick={saveMeme}
+              style={{
+                ...buttonBase,
+                background: "#f3f4f6",
+                border: "1px solid #d1d5db",
+                marginRight: 8,
+              }}
+            >
+              Download
+            </button>
 
-  <button
-    style={{ ...buttonStyle, background: "#f3f4f6", color: "#111" }}
-    onClick={onClose}
-  >
-    Close
-  </button>
-</div>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                ...buttonBase,
+                background: "transparent",
+                border: "none",
+                color: "#374151",
+              }}
+            >
+              Close
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={postMeme}
+            disabled={saving}
+            style={{
+              ...buttonBase,
+              background: "#0284c7",
+              color: "#fff",
+              opacity: saving ? 0.6 : 1,
+            }}
+          >
+            {saving ? "Posting…" : "Post meme"}
+          </button>
+        </div>
 
         {/* Hidden canvas */}
         <canvas ref={canvasRef} style={{ display: "none" }} />
