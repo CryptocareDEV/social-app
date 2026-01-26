@@ -1,5 +1,7 @@
 import { useState } from "react"
 import { api } from "../api/client"
+import { primaryButton } from "../ui/buttonStyles"
+
 
 export default function PostComposer({ onPostCreated }) {
   const [type, setType] = useState("TEXT")
@@ -123,21 +125,15 @@ export default function PostComposer({ onPostCreated }) {
         }}
       >
         <button
-          type="submit"
-          disabled={loading}
-          style={{
-            padding: "8px 18px",
-            borderRadius: 999,
-            border: "none",
-            background: "#0284c7",
-            color: "#fff",
-            fontWeight: 500,
-            cursor: "pointer",
-            opacity: loading ? 0.6 : 1,
-          }}
-        >
-          {loading ? "Posting…" : "Post"}
-        </button>
+  type="submit"
+  disabled={loading}
+  style={{
+    ...primaryButton,
+    opacity: loading ? 0.6 : 1,
+  }}
+>
+  {loading ? "Posting…" : "Post"}
+</button>
       </div>
     </form>
   )
