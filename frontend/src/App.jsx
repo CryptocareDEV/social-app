@@ -6,6 +6,8 @@ import Feed from "./components/Feed"
 import PostComposer from "./components/PostComposer"
 import Profile from "./pages/Profile"
 import MemeEditor from "./components/MemeEditor"
+import { theme } from "./styles/theme"
+
 
 import { api } from "./api/client"
 
@@ -29,10 +31,23 @@ export default function App() {
 
 
   // 📰 Feed loader
-  const loadFeed = async () => {
+const loadFeed = async () => {
+  try {
     const data = await api(`/posts/feed/${feedScope}`)
-    setPosts(data)
+
+    // normalize posts for optimistic likes
+    setPosts(
+      data.map((p) => ({
+        ...p,
+        likedByMe: p.likedByMe ?? false,
+      }))
+    )
+  } catch (err) {
+    console.error("Failed to load feed", err)
   }
+}
+
+
 
   // 🔁 Reload feed when auth or scope changes
   useEffect(() => {
@@ -41,13 +56,50 @@ export default function App() {
 
   // ❤️ Like handler
   const handleLike = async (postId) => {
+  let wasLiked = false
+
+  // optimistic toggle
+  setPosts((prev) =>
+    prev.map((p) => {
+      if (p.id !== postId) return p
+
+      wasLiked = p.likedByMe
+
+      return {
+        ...p,
+        likedByMe: !p.likedByMe,
+        _count: {
+          ...p._count,
+          likes: p._count.likes + (p.likedByMe ? -1 : 1),
+        },
+      }
+    })
+  )
+
   try {
     await api(`/likes/${postId}`, { method: "POST" })
-    await loadFeed() // single source of truth
   } catch (err) {
     console.error("Like failed", err)
+
+    // rollback on failure
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === postId
+          ? {
+              ...p,
+              likedByMe: wasLiked,
+              _count: {
+                ...p._count,
+                likes: p._count.likes + (wasLiked ? 1 : -1),
+              },
+            }
+          : p
+      )
+    )
   }
 }
+
+
 
 
 
@@ -77,27 +129,34 @@ export default function App() {
           ) : (
             <>
               <header
-                style={{
-                  padding: "12px 20px",
-                  borderBottom: "1px solid #eee",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <strong>🌱 Social</strong>
-                <span>@{user.username}</span>
-              </header>
+  style={{
+    padding: "14px 24px",
+    borderBottom: `1px solid ${theme.colors.border}`,
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    background: theme.colors.card,
+    color: theme.colors.text,
+  }}
+>
+  <strong style={{ color: theme.colors.primary }}>
+    🌱 Social
+  </strong>
+  <span style={{ color: theme.colors.muted }}>
+    @{user.username}
+  </span>
+</header>
+
 
               <main
-                style={{
-                  maxWidth: 720,
-                  margin: "0 auto",
-                  padding: 20,
-                  background: "#f9fafb",
-                  minHeight: "100vh",
-                }}
-              >
+  style={{
+    maxWidth: 720,
+    margin: "0 auto",
+    padding: 20,
+    background: theme.colors.bg,
+    minHeight: "100vh",
+  }}
+>
                 <PostComposer onPostCreated={loadFeed} />
 
                 {/* 🌍 Feed scope selector */}
@@ -110,23 +169,28 @@ export default function App() {
                 >
                   {["GLOBAL", "COUNTRY", "LOCAL"].map((scope) => (
                     <button
-                      key={scope}
-                      onClick={() => setFeedScope(scope)}
-                      style={{
-                        padding: "6px 12px",
-                        borderRadius: 6,
-                        border: "1px solid #d1d5db",
-                        background:
-                          feedScope === scope
-                            ? "#111827"
-                            : "#f3f4f6",
-                        color:
-                          feedScope === scope
-                            ? "#fff"
-                            : "#111827",
-                        cursor: "pointer",
-                      }}
-                    >
+  key={scope}
+  onClick={() => setFeedScope(scope)}
+  style={{
+    padding: "8px 14px",
+    borderRadius: 999,
+    border: `1px solid ${theme.colors.border}`,
+    background:
+      feedScope === scope
+        ? theme.colors.primary
+        : theme.colors.card,
+    color:
+      feedScope === scope
+        ? "#fff"
+        : theme.colors.text,
+    cursor: "pointer",
+    fontWeight: 500,
+    boxShadow:
+      feedScope === scope
+        ? theme.shadow.sm
+        : "none",
+  }}
+>
                       {scope === "GLOBAL" && "🌍 Global"}
                       {scope === "COUNTRY" && "🏳️ Country"}
                       {scope === "LOCAL" && "📍 Local"}

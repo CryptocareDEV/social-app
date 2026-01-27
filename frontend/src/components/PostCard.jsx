@@ -122,15 +122,13 @@ export default function PostCard({ post, onLike, onMeme, currentUserId }) {
       <footer style={{ marginTop: 14 }}>
   <button
   type="button"
-  disabled={isOwnPost}
   onClick={() => onLike(post.id)}
   style={{
+    fontSize: 14,
     border: "none",
     background: "transparent",
-    cursor: isOwnPost ? "not-allowed" : "pointer",
-    color: theme.colors.primary,
-    fontWeight: 500,
-    opacity: isOwnPost ? 0.4 : 1,
+    cursor: "pointer",
+    color: "#111827",
   }}
 >
   ❤️ {post._count.likes}
