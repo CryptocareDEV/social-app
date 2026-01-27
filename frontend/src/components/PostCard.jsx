@@ -1,16 +1,21 @@
 import { Link } from "react-router-dom"
+import { theme } from "../styles/theme"
 
-export default function PostCard({ post, onLike, onMeme }) {
+
+export default function PostCard({ post, onLike, onMeme, currentUserId }) {
+  const isOwnPost = post.user.id === currentUserId
+
   return (
     <article
-      style={{
-        border: "1px solid #e5e7eb",
-        borderRadius: 12,
-        padding: 16,
-        background: "#fff",
-        boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
-      }}
-    >
+  style={{
+    border: `1px solid ${theme.colors.border}`,
+    borderRadius: theme.radius.lg,
+    padding: 16,
+    background: theme.colors.card,
+    boxShadow: theme.shadow.sm,
+  }}
+>
+
       {/* Header */}
       <header
         style={{
@@ -116,19 +121,20 @@ export default function PostCard({ post, onLike, onMeme }) {
       {/* Actions */}
       <footer style={{ marginTop: 14 }}>
   <button
-    type="button"
-    onClick={() => onLike(post.id)}
-    style={{
-      fontSize: 14,
-      border: "none",
-      background: "transparent",
-      cursor: "pointer",
-      color: post.likedByMe ? "#dc2626" : "#111827",
-      fontWeight: post.likedByMe ? 600 : 400,
-    }}
-  >
-    ❤️ {post.likesCount}
-  </button>
+  type="button"
+  disabled={isOwnPost}
+  onClick={() => onLike(post.id)}
+  style={{
+    border: "none",
+    background: "transparent",
+    cursor: isOwnPost ? "not-allowed" : "pointer",
+    color: theme.colors.primary,
+    fontWeight: 500,
+    opacity: isOwnPost ? 0.4 : 1,
+  }}
+>
+  ❤️ {post._count.likes}
+</button>
 </footer>
     </article>
   )
