@@ -5,137 +5,148 @@ import { theme } from "../styles/theme"
 export default function PostCard({ post, onLike, onMeme, isLiking }) {
 
   return (
-    <article
-  style={{
-    border: `1px solid ${theme.colors.border}`,
-    borderRadius: theme.radius.lg,
-    padding: 16,
-    background: theme.colors.card,
-    boxShadow: theme.shadow.sm,
-  }}
->
+  <article
+    style={{
+      background: "#ffffff",
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 16,
+      boxShadow: "0 4px 12px rgba(0,0,0,0.04)",
+      border: "1px solid #e5e7eb",
+    }}
+  >
+    {/* Header */}
+    <header
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: 10,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <Link
+          to={`/profile/${post.user.id}`}
+          style={{
+            fontWeight: 600,
+            fontSize: 14,
+            color: "#0f172a",
+            textDecoration: "none",
+          }}
+        >
+          @{post.user.username}
+        </Link>
 
-      {/* Header */}
-      <header
+        <span
+          style={{
+            fontSize: 11,
+            padding: "2px 10px",
+            borderRadius: 999,
+            background:
+              post.scope === "GLOBAL"
+                ? "#e0f2fe"
+                : post.scope === "COUNTRY"
+                ? "#ede9fe"
+                : "#dcfce7",
+            color: "#0f172a",
+            textTransform: "lowercase",
+          }}
+        >
+          {post.scope}
+        </span>
+      </div>
+    </header>
+
+    {/* Caption */}
+    {post.caption && post.type !== "MEME" && (
+      <p
+        style={{
+          fontSize: 14,
+          lineHeight: 1.6,
+          color: "#1f2937",
+          marginBottom: 12,
+          whiteSpace: "pre-wrap",
+        }}
+      >
+        {post.caption}
+      </p>
+    )}
+
+    {/* Media */}
+    {(post.type === "IMAGE" || post.type === "MEME") && post.mediaUrl && (
+      <div style={{ marginTop: 8 }}>
+        <img
+          src={post.mediaUrl}
+          alt=""
+          style={{
+            width: "100%",
+            borderRadius: 14,
+            display: "block",
+          }}
+        />
+
+        {post.type === "IMAGE" && (
+          <button
+            type="button"
+            onClick={() => onMeme(post)}
+            style={{
+              marginTop: 10,
+              fontSize: 12,
+              padding: "6px 14px",
+              borderRadius: 999,
+              border: "1px solid #dbeafe",
+              background: "#eff6ff",
+              color: "#0284c7",
+              cursor: "pointer",
+            }}
+          >
+            Create meme
+          </button>
+        )}
+      </div>
+    )}
+
+    {/* Video */}
+    {post.type === "VIDEO" && (
+      <video
+        src={post.mediaUrl}
+        controls
+        style={{
+          width: "100%",
+          borderRadius: 14,
+          marginTop: 8,
+        }}
+      />
+    )}
+
+    {/* Actions */}
+    <footer
+      style={{
+        display: "flex",
+        alignItems: "center",
+        marginTop: 14,
+      }}
+    >
+      <button
+        type="button"
+        disabled={isLiking}
+        onClick={() => onLike(post.id)}
         style={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 10,
+          gap: 6,
+          fontSize: 14,
+          border: "none",
+          background: "transparent",
+          cursor: isLiking ? "not-allowed" : "pointer",
+          color: post.likedByMe ? "#0284c7" : "#475569",
+          opacity: isLiking ? 0.6 : 1,
+          transition: "color 0.15s ease",
         }}
       >
-        <div>
-          <Link
-            to={`/profile/${post.user.id}`}
-            style={{
-              fontWeight: 600,
-              textDecoration: "none",
-              color: "#111827",
-            }}
-          >
-            @{post.user.username}
-          </Link>
-
-          <span
-            style={{
-              fontSize: 12,
-              padding: "2px 8px",
-              marginLeft: 8,
-              borderRadius: 999,
-              background:
-                post.scope === "GLOBAL"
-                  ? "#e5e7eb"
-                  : post.scope === "COUNTRY"
-                  ? "#dbeafe"
-                  : "#dcfce7",
-              color: "#111827",
-            }}
-          >
-            {post.scope.toLowerCase()}
-          </span>
-        </div>
-      </header>
-
-      {/* Caption */}
-      {post.caption && post.type !== "MEME" && (
-        <p
-          style={{
-            marginBottom: 12,
-            lineHeight: 1.5,
-            color: "#1f2937",
-          }}
-        >
-          {post.caption}
-        </p>
-      )}
-
-      {/* Media */}
-      {(post.type === "IMAGE" || post.type === "MEME") && post.mediaUrl && (
-        <div style={{ marginTop: 8 }}>
-          <img
-            src={post.mediaUrl}
-            alt=""
-            style={{
-              maxWidth: "100%",
-              borderRadius: 10,
-              display: "block",
-              margin: "0 auto",
-            }}
-          />
-
-          {post.type === "IMAGE" && typeof onMeme === "function" && (
-  <button
-    type="button"
-    onClick={() => onMeme(post)}
-    style={{
-      marginTop: 8,
-      fontSize: 13,
-      padding: "4px 10px",
-      borderRadius: 999,
-      border: "1px solid #d1d5db",
-      background: "#f9fafb",
-      cursor: "pointer",
-    }}
-  >
-    Create meme
-  </button>
-)}
-
-        </div>
-      )}
-
-      {/* Video */}
-      {post.type === "VIDEO" && (
-        <video
-          src={post.mediaUrl}
-          controls
-          style={{
-            maxWidth: "100%",
-            borderRadius: 10,
-            marginTop: 8,
-          }}
-        />
-      )}
-
-      {/* Actions */}
-      <footer style={{ marginTop: 14 }}>
-  <button
-  type="button"
-  disabled={isLiking}
-  onClick={() => onLike(post.id)}
-  style={{
-    fontSize: 14,
-    border: "none",
-    background: "transparent",
-    cursor: isLiking ? "not-allowed" : "pointer",
-    color: post.likedByMe ? "#0284c7" : "#111827",
-    opacity: isLiking ? 0.6 : 1,
-    transition: "color 0.15s ease",
-  }}
->
-  {post.likedByMe ? "💙" : "🤍"} {post._count.likes}
-</button>
-</footer>
-    </article>
-  )
+        {post.likedByMe ? "💙" : "🤍"} {post._count.likes}
+      </button>
+    </footer>
+  </article>
+)
 }
