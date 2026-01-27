@@ -1,6 +1,6 @@
 import PostCard from "./PostCard"
 
-export default function Feed({ posts, onLike, onMeme, currentUserId }) {
+export default function Feed({ posts, onLike, onMeme, likingIds }) {
   if (!Array.isArray(posts)) {
     return (
       <p style={{ textAlign: "center", color: "#6b7280" }}>
@@ -28,12 +28,12 @@ export default function Feed({ posts, onLike, onMeme, currentUserId }) {
     <div style={{ display: "grid", gap: 16 }}>
       {posts.map((post) => (
         <PostCard
-          key={post.id}
-          post={post}
-          onLike={onLike}
-          onMeme={onMeme}
-          currentUserId={currentUserId}
-        />
+  key={post.id}
+  post={post}
+  onLike={onLike}
+  onMeme={onMeme}
+  isLiking={likingIds.has(post.id)}
+/>
       ))}
     </div>
   )

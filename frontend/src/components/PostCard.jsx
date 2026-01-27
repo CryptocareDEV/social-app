@@ -2,8 +2,7 @@ import { Link } from "react-router-dom"
 import { theme } from "../styles/theme"
 
 
-export default function PostCard({ post, onLike, onMeme, currentUserId }) {
-  const isOwnPost = post.user.id === currentUserId
+export default function PostCard({ post, onLike, onMeme, isLiking }) {
 
   return (
     <article
@@ -122,16 +121,19 @@ export default function PostCard({ post, onLike, onMeme, currentUserId }) {
       <footer style={{ marginTop: 14 }}>
   <button
   type="button"
+  disabled={isLiking}
   onClick={() => onLike(post.id)}
   style={{
     fontSize: 14,
     border: "none",
     background: "transparent",
-    cursor: "pointer",
-    color: "#111827",
+    cursor: isLiking ? "not-allowed" : "pointer",
+    color: post.likedByMe ? "#0284c7" : "#111827",
+    opacity: isLiking ? 0.6 : 1,
+    transition: "color 0.15s ease",
   }}
 >
-  ❤️ {post._count.likes}
+  {post.likedByMe ? "💙" : "🤍"} {post._count.likes}
 </button>
 </footer>
     </article>

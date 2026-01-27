@@ -18,6 +18,8 @@ export default function App() {
   const [posts, setPosts] = useState([])
   const [feedScope, setFeedScope] = useState("GLOBAL")
   const [memePost, setMemePost] = useState(null)
+  const [likingIds, setLikingIds] = useState(new Set())
+
 
   // 🔐 Auth bootstrap (single source of truth)
   useEffect(() => {
@@ -56,24 +58,27 @@ const loadFeed = async () => {
 
   // ❤️ Like handler
   const handleLike = async (postId) => {
-  let wasLiked = false
+  // prevent double clicks
+  if (likingIds.has(postId)) return
 
-  // optimistic toggle
+  setLikingIds((prev) => new Set(prev).add(postId))
+
+  // optimistic update
   setPosts((prev) =>
-    prev.map((p) => {
-      if (p.id !== postId) return p
-
-      wasLiked = p.likedByMe
-
-      return {
-        ...p,
-        likedByMe: !p.likedByMe,
-        _count: {
-          ...p._count,
-          likes: p._count.likes + (p.likedByMe ? -1 : 1),
-        },
-      }
-    })
+    prev.map((p) =>
+      p.id === postId
+        ? {
+            ...p,
+            likedByMe: !p.likedByMe,
+            _count: {
+              ...p._count,
+              likes: p.likedByMe
+                ? Math.max(0, p._count.likes - 1)
+                : p._count.likes + 1,
+            },
+          }
+        : p
+    )
   )
 
   try {
@@ -81,23 +86,32 @@ const loadFeed = async () => {
   } catch (err) {
     console.error("Like failed", err)
 
-    // rollback on failure
+    // rollback on error
     setPosts((prev) =>
       prev.map((p) =>
         p.id === postId
           ? {
               ...p,
-              likedByMe: wasLiked,
+              likedByMe: !p.likedByMe,
               _count: {
                 ...p._count,
-                likes: p._count.likes + (wasLiked ? 1 : -1),
+                likes: p.likedByMe
+                  ? p._count.likes + 1
+                  : Math.max(0, p._count.likes - 1),
               },
             }
           : p
       )
     )
+  } finally {
+    setLikingIds((prev) => {
+      const next = new Set(prev)
+      next.delete(postId)
+      return next
+    })
   }
 }
+
 
 
 
@@ -202,8 +216,9 @@ const loadFeed = async () => {
   posts={posts}
   onLike={handleLike}
   onMeme={(post) => setMemePost(post)}
-  currentUserId={user.id}
+  likingIds={likingIds}
 />
+
               </main>
 
               {memePost && (
