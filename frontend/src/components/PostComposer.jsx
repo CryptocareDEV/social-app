@@ -1,6 +1,8 @@
 import { useState } from "react"
 import { api } from "../api/client"
 import { primaryButton } from "../ui/buttonStyles"
+import { theme } from "../styles/theme"
+
 
 
 export default function PostComposer({ onPostCreated }) {
@@ -59,92 +61,133 @@ export default function PostComposer({ onPostCreated }) {
   }
 
   return (
-    <form
-      onSubmit={submit}
+  <form
+    onSubmit={submit}
+    style={{
+      background: "#ffffff",
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 24,
+      border: "1px solid #e5e7eb",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.04)",
+    }}
+  >
+    {/* Header */}
+    <h3
       style={{
-        marginBottom: 28,
-        padding: 16,
-        borderRadius: 12,
-        background: "#ffffff",
-        border: "1px solid #e5e7eb",
-        boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+        marginBottom: 12,
+        fontSize: 15,
+        fontWeight: 600,
+        color: "#0f172a",
       }}
     >
-      <h3 style={{ marginBottom: 10, color: "#111827" }}>
-        Create post
-      </h3>
+      Create post
+    </h3>
 
-      {error && (
-        <p style={{ color: "#b91c1c", marginBottom: 8 }}>
-          {error}
-        </p>
-      )}
+    {error && (
+      <p style={{ color: "#dc2626", fontSize: 13, marginBottom: 8 }}>
+        {error}
+      </p>
+    )}
 
-      {/* Post type */}
-      <select
-        value={type}
-        onChange={(e) => setType(e.target.value)}
-        style={inputStyle}
-      >
-        <option value="TEXT">Text</option>
-        <option value="IMAGE">Image</option>
-        <option value="VIDEO">Video</option>
-      </select>
+    {/* Type */}
+    <select
+      value={type}
+      onChange={(e) => setType(e.target.value)}
+      style={{
+        width: "100%",
+        padding: "10px 12px",
+        borderRadius: 10,
+        border: "1px solid #d1d5db",
+        fontSize: 14,
+        marginBottom: 8,
+      }}
+    >
+      <option value="TEXT">✍️ Text</option>
+      <option value="IMAGE">🖼 Image</option>
+      <option value="VIDEO">🎥 Video</option>
+    </select>
 
-      {/* Scope */}
-      <select
-        value={scope}
-        onChange={(e) => setScope(e.target.value)}
-        style={inputStyle}
-      >
-        <option value="GLOBAL">🌍 Global</option>
-        <option value="COUNTRY">🏳️ Country</option>
-        <option value="LOCAL">📍 Local</option>
-      </select>
+    {/* Scope */}
+    <select
+      value={scope}
+      onChange={(e) => setScope(e.target.value)}
+      style={{
+        width: "100%",
+        padding: "10px 12px",
+        borderRadius: 10,
+        border: "1px solid #d1d5db",
+        fontSize: 14,
+        marginBottom: 8,
+      }}
+    >
+      <option value="GLOBAL">🌍 Global</option>
+      <option value="COUNTRY">🏳️ Country</option>
+      <option value="LOCAL">📍 Local</option>
+    </select>
 
-      {/* Caption */}
-      <textarea
-        placeholder="What’s on your mind?"
-        value={caption}
-        onChange={(e) => setCaption(e.target.value)}
+    {/* Caption */}
+    <textarea
+      placeholder="What’s on your mind?"
+      value={caption}
+      onChange={(e) => setCaption(e.target.value)}
+      style={{
+  width: "100%",
+  maxWidth: "100%",
+  boxSizing: "border-box",
+  minHeight: 90,
+  padding: "10px 12px",
+  borderRadius: 12,
+  border: "1px solid #d1d5db",
+  fontSize: 14,
+  lineHeight: 1.5,
+  resize: "vertical",
+  marginBottom: 8,
+}}
+    />
+
+    {/* Media URL */}
+    {type !== "TEXT" && (
+      <input
+        placeholder="Media URL"
+        value={mediaUrl}
+        onChange={(e) => setMediaUrl(e.target.value)}
         style={{
-          ...inputStyle,
-          minHeight: 90,
-          resize: "vertical",
+          width: "100%",
+          padding: "10px 12px",
+          borderRadius: 10,
+          border: "1px solid #d1d5db",
+          fontSize: 14,
+          marginBottom: 8,
         }}
       />
+    )}
 
-      {/* Media URL */}
-      {type !== "TEXT" && (
-        <input
-          placeholder="Paste media URL"
-          value={mediaUrl}
-          onChange={(e) => setMediaUrl(e.target.value)}
-          style={inputStyle}
-        />
-      )}
-
-      {/* Actions */}
-      <div
+    {/* Actions */}
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "flex-end",
+        marginTop: 12,
+      }}
+    >
+      <button
+        type="submit"
+        disabled={loading}
         style={{
-          display: "flex",
-          justifyContent: "flex-end",
-          marginTop: 14,
+          padding: "8px 18px",
+          borderRadius: 999,
+          border: "none",
+          background: "#0284c7",
+          color: "#fff",
+          fontWeight: 500,
+          cursor: loading ? "not-allowed" : "pointer",
+          opacity: loading ? 0.6 : 1,
         }}
       >
-        <button
-  type="submit"
-  disabled={loading || isInvalid}
-  style={{
-    ...primaryButton,
-    opacity: loading || isInvalid ? 0.4 : 1,
-    cursor: loading || isInvalid ? "not-allowed" : "pointer",
-  }}
->
-  {loading ? "Posting…" : "Post"}
-</button>
-
-      </div>
-    </form>
-  )
+        {loading ? "Posting…" : "Post"}
+      </button>
+    </div>
+  </form>
+)
 }
