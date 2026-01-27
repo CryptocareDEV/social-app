@@ -14,6 +14,8 @@ import { api } from "./api/client"
 export default function App() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [selectedCommunity, setSelectedCommunity] = useState("GLOBAL")
+
 
   const [posts, setPosts] = useState([])
   const [feedScope, setFeedScope] = useState("GLOBAL")
@@ -35,6 +37,13 @@ export default function App() {
   // 📰 Feed loader
 const loadFeed = async () => {
   try {
+    console.log("Loading feed:", {
+      scope: feedScope,
+      community: selectedCommunity,
+    })
+
+    // For now, communities still use the global feed
+    // Later: this will branch to /communities/:id/feed
     const data = await api(`/posts/feed/${feedScope}`)
 
     // normalize posts for optimistic likes
@@ -51,10 +60,11 @@ const loadFeed = async () => {
 
 
 
+
   // 🔁 Reload feed when auth or scope changes
   useEffect(() => {
     if (user) loadFeed()
-  }, [user, feedScope])
+  }, [user, feedScope, selectedCommunity])
 
   // ❤️ Like handler
   const handleLike = async (postId) => {
@@ -191,14 +201,41 @@ const loadFeed = async () => {
     </div>
 
     {/* User */}
-    <div
-      style={{
-        fontSize: 13,
-        color: "#475569",
-      }}
-    >
-      @{user.username}
-    </div>
+    {/* Right side */}
+<div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+  }}
+>
+  {/* Community selector */}
+  <select
+    value={selectedCommunity}
+    onChange={(e) => setSelectedCommunity(e.target.value)}
+    style={{
+      padding: "6px 10px",
+      borderRadius: 999,
+      border: "1px solid #d1d5db",
+      fontSize: 13,
+      background: "#f8fafc",
+      cursor: "pointer",
+    }}
+  >
+    <option value="GLOBAL">🌍 Global</option>
+    {/* future communities go here */}
+  </select>
+
+  {/* User */}
+  <span
+    style={{
+      fontSize: 13,
+      color: "#475569",
+    }}
+  >
+    @{user.username}
+  </span>
+</div>
   </div>
 </header>
 
