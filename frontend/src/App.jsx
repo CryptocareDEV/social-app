@@ -144,22 +144,64 @@ const loadFeed = async () => {
             <>
               <header
   style={{
-    padding: "14px 24px",
-    borderBottom: `1px solid ${theme.colors.border}`,
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    background: theme.colors.card,
-    color: theme.colors.text,
+    position: "sticky",
+    top: 0,
+    zIndex: 10,
+    background: "#ffffff",
+    borderBottom: "1px solid #e5e7eb",
+    padding: "10px 20px",
   }}
 >
-  <strong style={{ color: theme.colors.primary }}>
-    🌱 Social
-  </strong>
-  <span style={{ color: theme.colors.muted }}>
-    @{user.username}
-  </span>
+  <div
+    style={{
+      maxWidth: 720,
+      margin: "0 auto",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+    }}
+  >
+    {/* Brand */}
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        fontWeight: 700,
+        fontSize: 15,
+        color: "#0f172a",
+      }}
+    >
+      <span
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: 8,
+          background: "#0284c7",
+          color: "#ffffff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 14,
+        }}
+      >
+        🌱
+      </span>
+      Social
+    </div>
+
+    {/* User */}
+    <div
+      style={{
+        fontSize: 13,
+        color: "#475569",
+      }}
+    >
+      @{user.username}
+    </div>
+  </div>
 </header>
+
 
 
               <main
