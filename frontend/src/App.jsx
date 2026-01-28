@@ -7,144 +7,122 @@ import PostComposer from "./components/PostComposer"
 import Profile from "./pages/Profile"
 import MemeEditor from "./components/MemeEditor"
 import { theme } from "./styles/theme"
-
-
 import { api } from "./api/client"
 
 export default function App() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [selectedCommunity, setSelectedCommunity] = useState("GLOBAL")
-
 
   const [posts, setPosts] = useState([])
+
+  // 🔁 FEED MODE (single source of truth)
+  // "GLOBAL" | "COMMUNITY" | "LABEL"
+  const [feedMode, setFeedMode] = useState("GLOBAL")
+
   const [feedScope, setFeedScope] = useState("GLOBAL")
+  const [selectedCommunity, setSelectedCommunity] = useState("GLOBAL")
+  const [activeLabel, setActiveLabel] = useState(null)
+
   const [memePost, setMemePost] = useState(null)
   const [likingIds, setLikingIds] = useState(new Set())
+  const [communities, setCommunities] = useState([])
 
-
-  // 🔐 Auth bootstrap (single source of truth)
+  // 🔐 Auth bootstrap
   useEffect(() => {
-  api("/users/me")
-    .then((u) => {
-      if (u) setUser(u)
-    })
-    .catch(() => {})
-    .finally(() => setLoading(false))
-}, [])
+    api("/users/me")
+      .then((u) => u && setUser(u))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
 
+  // 📰 FEED LOADER (CANONICAL)
+  const loadFeed = async () => {
+    try {
+      let endpoint
 
-  // 📰 Feed loader
-const loadFeed = async () => {
-  try {
-    console.log("Loading feed:", {
-      scope: feedScope,
-      community: selectedCommunity,
-    })
+      if (feedMode === "LABEL" && activeLabel) {
+        endpoint = `/posts/label/${activeLabel}`
+      } else if (
+        feedMode === "COMMUNITY" &&
+        selectedCommunity !== "GLOBAL"
+      ) {
+        endpoint = `/communities/${selectedCommunity}/feed`
+      } else {
+        endpoint = `/posts/feed/${feedScope}`
+      }
 
-    // For now, communities still use the global feed
-    // Later: this will branch to /communities/:id/feed
-    const data = await api(`/posts/feed/${feedScope}`)
+      const data = await api(endpoint)
 
-    // normalize posts for optimistic likes
-    setPosts(
-      data.map((p) => ({
-        ...p,
-        likedByMe: p.likedByMe ?? false,
-      }))
-    )
-  } catch (err) {
-    console.error("Failed to load feed", err)
-  }
-}
-
-
-
-
-  // 🔁 Reload feed when auth or scope changes
-  useEffect(() => {
-    if (user) loadFeed()
-  }, [user, feedScope, selectedCommunity])
-
-  // ❤️ Like handler
-  const handleLike = async (postId) => {
-  // prevent double clicks
-  if (likingIds.has(postId)) return
-
-  setLikingIds((prev) => new Set(prev).add(postId))
-
-  // optimistic update
-  setPosts((prev) =>
-    prev.map((p) =>
-      p.id === postId
-        ? {
-            ...p,
-            likedByMe: !p.likedByMe,
-            _count: {
-              ...p._count,
-              likes: p.likedByMe
-                ? Math.max(0, p._count.likes - 1)
-                : p._count.likes + 1,
-            },
-          }
-        : p
-    )
-  )
-
-  try {
-    await api(`/likes/${postId}`, { method: "POST" })
-  } catch (err) {
-    console.error("Like failed", err)
-
-    // rollback on error
-    setPosts((prev) =>
-      prev.map((p) =>
-        p.id === postId
-          ? {
-              ...p,
-              likedByMe: !p.likedByMe,
-              _count: {
-                ...p._count,
-                likes: p.likedByMe
-                  ? p._count.likes + 1
-                  : Math.max(0, p._count.likes - 1),
-              },
-            }
-          : p
+      setPosts(
+        (data.items ?? data).map((p) => ({
+          ...p,
+          likedByMe: !!p.likedByMe,
+        }))
       )
-    )
-  } finally {
-    setLikingIds((prev) => {
-      const next = new Set(prev)
-      next.delete(postId)
-      return next
-    })
+    } catch (err) {
+      console.error("Failed to load feed", err)
+    }
   }
-}
 
+  // 🏘 Communities
+  const loadCommunities = async () => {
+    try {
+      const data = await api("/communities/my")
+      setCommunities(data || [])
+    } catch (err) {
+      console.error("Failed to load communities", err)
+    }
+  }
 
+  // 🔁 Reload feed on mode changes only
+  useEffect(() => {
+    if (!user) return
+    loadFeed()
+    loadCommunities()
+  }, [user, feedMode, feedScope, selectedCommunity, activeLabel])
 
+  // ❤️ LIKE HANDLER (BACKEND TRUTH ONLY)
+  const handleLike = async (postId) => {
+    if (likingIds.has(postId)) return
 
+    setLikingIds((prev) => new Set(prev).add(postId))
 
+    try {
+      const res = await api(`/likes/${postId}`, { method: "POST" })
 
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId
+            ? {
+                ...p,
+                likedByMe: res.liked,
+                _count: { likes: res.likeCount },
+              }
+            : p
+        )
+      )
+    } catch (err) {
+      console.error("Like failed", err)
+    } finally {
+      setLikingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(postId)
+        return next
+      })
+    }
+  }
 
-
-  // ⏳ Auth still resolving
   if (loading) {
     return <p style={{ textAlign: "center", marginTop: 40 }}>Loading…</p>
   }
 
   return (
     <Routes>
-      {/* 🔓 Login */}
       <Route
         path="/login"
-        element={
-          user ? <Navigate to="/" /> : <Login onLogin={setUser} />
-        }
+        element={user ? <Navigate to="/" /> : <Login onLogin={setUser} />}
       />
 
-      {/* 🔒 Home / Feed */}
       <Route
         path="/"
         element={
@@ -152,152 +130,100 @@ const loadFeed = async () => {
             <Navigate to="/login" />
           ) : (
             <>
+              {/* Header */}
               <header
-  style={{
-    position: "sticky",
-    top: 0,
-    zIndex: 10,
-    background: "#ffffff",
-    borderBottom: "1px solid #e5e7eb",
-    padding: "10px 20px",
-  }}
->
-  <div
-    style={{
-      maxWidth: 720,
-      margin: "0 auto",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-    }}
-  >
-    {/* Brand */}
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        fontWeight: 700,
-        fontSize: 15,
-        color: "#0f172a",
-      }}
-    >
-      <span
-        style={{
-          width: 28,
-          height: 28,
-          borderRadius: 8,
-          background: "#0284c7",
-          color: "#ffffff",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 14,
-        }}
-      >
-        🌱
-      </span>
-      Social
-    </div>
-
-    {/* User */}
-    {/* Right side */}
-<div
-  style={{
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
-  }}
->
-  {/* Community selector */}
-  <select
-    value={selectedCommunity}
-    onChange={(e) => setSelectedCommunity(e.target.value)}
-    style={{
-      padding: "6px 10px",
-      borderRadius: 999,
-      border: "1px solid #d1d5db",
-      fontSize: 13,
-      background: "#f8fafc",
-      cursor: "pointer",
-    }}
-  >
-    <option value="GLOBAL">🌍 Global</option>
-    {/* future communities go here */}
-  </select>
-
-  {/* User */}
-  <span
-    style={{
-      fontSize: 13,
-      color: "#475569",
-    }}
-  >
-    @{user.username}
-  </span>
-</div>
-  </div>
-</header>
-
-
-
-              <main
-  style={{
-    maxWidth: 720,
-    margin: "0 auto",
-    padding: 20,
-    background: theme.colors.bg,
-    minHeight: "100vh",
-  }}
->
-                <PostComposer onPostCreated={loadFeed} />
-
-                {/* 🌍 Feed scope selector */}
+                style={{
+                  position: "sticky",
+                  top: 0,
+                  zIndex: 10,
+                  background: "#fff",
+                  borderBottom: "1px solid #e5e7eb",
+                  padding: "10px 20px",
+                }}
+              >
                 <div
                   style={{
+                    maxWidth: 720,
+                    margin: "0 auto",
                     display: "flex",
-                    gap: 8,
-                    marginBottom: 16,
+                    justifyContent: "space-between",
+                    alignItems: "center",
                   }}
                 >
-                  {["GLOBAL", "COUNTRY", "LOCAL"].map((scope) => (
+                  <strong>🌱 Social</strong>
+
+                  <div style={{ display: "flex", gap: 12 }}>
+                    <select
+                      value={selectedCommunity}
+                      onChange={(e) => {
+                        setFeedMode("COMMUNITY")
+                        setActiveLabel(null)
+                        setSelectedCommunity(e.target.value)
+                      }}
+                    >
+                      <option value="GLOBAL">🌍 Global</option>
+                      {communities.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          🏠 {c.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    <span>@{user.username}</span>
+                  </div>
+                </div>
+              </header>
+
+              <main
+                style={{
+                  maxWidth: 720,
+                  margin: "0 auto",
+                  padding: 20,
+                  background: theme.colors.bg,
+                  minHeight: "100vh",
+                }}
+              >
+                <PostComposer onPostCreated={loadFeed} />
+
+                {/* Scope selector */}
+                <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                  {["GLOBAL", "COUNTRY", "LOCAL"].map((s) => (
                     <button
-  key={scope}
-  onClick={() => setFeedScope(scope)}
-  style={{
-    padding: "8px 14px",
-    borderRadius: 999,
-    border: `1px solid ${theme.colors.border}`,
-    background:
-      feedScope === scope
-        ? theme.colors.primary
-        : theme.colors.card,
-    color:
-      feedScope === scope
-        ? "#fff"
-        : theme.colors.text,
-    cursor: "pointer",
-    fontWeight: 500,
-    boxShadow:
-      feedScope === scope
-        ? theme.shadow.sm
-        : "none",
-  }}
->
-                      {scope === "GLOBAL" && "🌍 Global"}
-                      {scope === "COUNTRY" && "🏳️ Country"}
-                      {scope === "LOCAL" && "📍 Local"}
+                      key={s}
+                      onClick={() => {
+                        setFeedMode("GLOBAL")
+                        setActiveLabel(null)
+                        setFeedScope(s)
+                      }}
+                    >
+                      {s}
                     </button>
                   ))}
                 </div>
 
-                <Feed
-  posts={posts}
-  onLike={handleLike}
-  onMeme={(post) => setMemePost(post)}
-  likingIds={likingIds}
-/>
+                {/* Active label */}
+                {feedMode === "LABEL" && activeLabel && (
+                  <button
+                    onClick={() => {
+                      setFeedMode("GLOBAL")
+                      setActiveLabel(null)
+                    }}
+                    style={{ marginBottom: 12 }}
+                  >
+                    ❌ Clear #{activeLabel}
+                  </button>
+                )}
 
+                <Feed
+                  posts={posts}
+                  onLike={handleLike}
+                  onMeme={(p) => setMemePost(p)}
+                  likingIds={likingIds}
+                  onLabelClick={(label) => {
+                    setFeedMode("LABEL")
+                    setActiveLabel(label)
+                  }}
+                />
               </main>
 
               {memePost && (
@@ -315,12 +241,9 @@ const loadFeed = async () => {
         }
       />
 
-      {/* 👤 Profile */}
       <Route
         path="/profile/:id"
-        element={
-          user ? <Profile /> : <Navigate to="/login" />
-        }
+        element={user ? <Profile /> : <Navigate to="/login" />}
       />
     </Routes>
   )
