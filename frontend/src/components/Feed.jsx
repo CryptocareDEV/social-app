@@ -1,4 +1,5 @@
 import PostCard from "./PostCard"
+import { getThemeColors } from "../ui/theme"
 
 export default function Feed({
   posts,
@@ -6,17 +7,51 @@ export default function Feed({
   onMeme,
   likingIds,
   onLabelClick,
+  theme,
 }) {
+  const colors = getThemeColors(theme)
+
+  // ⏳ Loading state
   if (!Array.isArray(posts)) {
-    return <p style={{ textAlign: "center" }}>Loading feed…</p>
+    return (
+      <div
+        style={{
+          textAlign: "center",
+          padding: "40px 0",
+          color: colors.textMuted,
+          fontSize: 14,
+        }}
+      >
+        Loading feed…
+      </div>
+    )
   }
 
+  // 🌱 Empty state
   if (posts.length === 0) {
-    return <p style={{ textAlign: "center" }}>Nothing here yet.</p>
+    return (
+      <div
+        style={{
+          textAlign: "center",
+          padding: "40px 0",
+          color: colors.textMuted,
+          fontSize: 14,
+        }}
+      >
+        Nothing here yet.
+      </div>
+    )
   }
 
+  // 📰 Feed
   return (
-    <>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 12, // consistent vertical rhythm
+      }}
+    >
       {posts.map((post) => (
         <PostCard
           key={post.id}
@@ -25,8 +60,9 @@ export default function Feed({
           onMeme={onMeme}
           isLiking={likingIds.has(post.id)}
           onLabelClick={onLabelClick}
+          theme={theme}
         />
       ))}
-    </>
+    </div>
   )
 }

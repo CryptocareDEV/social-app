@@ -9,15 +9,29 @@ import MemeEditor from "./components/MemeEditor"
 import CreateCommunityModal from "./components/CreateCommunityModal"
 import CommunityChat from "./components/CommunityChat"
 import Signup from "./pages/Signup"
+import {
+  primaryButton,
+  secondaryButton,
+  ghostButton,
+  headerPrimaryButton,
+  headerGhostButton,
+  headerSelect, // 👈 ADD THIS
+} from "./ui/buttonStyles"
 
 
 
-import { theme } from "./styles/theme"
+
+
+import { theme as baseTheme, getThemeColors } from "./ui/theme"
 import { api } from "./api/client"
 
 export default function App() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  // 🎨 Theme (Phase 1 foundation)
+  const [theme, setTheme] = useState(baseTheme)
+  const colors = getThemeColors(theme)
+
 
   const [posts, setPosts] = useState([])
   const [communities, setCommunities] = useState([])
@@ -251,7 +265,15 @@ useEffect(() => {
   }
 
   return (
+  <div
+    style={{
+      background: colors.bg,
+      color: colors.text,
+      minHeight: "100vh",
+    }}
+  >
     <Routes>
+
       <Route
   path="/login"
   element={
@@ -277,14 +299,18 @@ useEffect(() => {
       <Navigate to="/login" />
     ) : (
       <>
+      
+
+
+
         {/* HEADER */}
 <header
   style={{
     position: "sticky",
     top: 0,
     zIndex: 10,
-    background: "#fff",
-    borderBottom: "1px solid #e5e7eb",
+    background: colors.surface,
+    borderBottom: `1px solid ${colors.border}`,
     padding: "10px 20px",
   }}
 >
@@ -302,26 +328,49 @@ useEffect(() => {
 
     {/* Right side controls */}
     <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-      <button onClick={() => setShowCreateCommunity(true)}>
-        + Community
-      </button>
-
-      <select
-  value={selectedCommunity}
-  onChange={(e) => {
-    setFeedMode("COMMUNITY")
-    setActiveLabel(null)
-    setSelectedCommunity(e.target.value)
-  }}
+      <button
+  onClick={() => setShowCreateCommunity(true)}
+  style={headerPrimaryButton(theme)}
 >
-  {communities.map((c) => (
-    <option key={c.id} value={c.id}>
-      {c.scope === "GLOBAL" && "🌍"}
-      {c.scope === "COUNTRY" && "🏳️"}
-      {c.scope === "LOCAL" && "📍"} {c.name}
-    </option>
-  ))}
-</select>
+  + Community
+</button>
+
+
+      <div style={{ position: "relative" }}>
+  <select
+    value={selectedCommunity}
+    onChange={(e) => {
+      setFeedMode("COMMUNITY")
+      setActiveLabel(null)
+      setSelectedCommunity(e.target.value)
+    }}
+    style={headerSelect(theme)}
+  >
+    {communities.map((c) => (
+      <option key={c.id} value={c.id}>
+        {c.scope === "GLOBAL" && "🌍"}
+        {c.scope === "COUNTRY" && "🏳️"}
+        {c.scope === "LOCAL" && "📍"} {c.name}
+      </option>
+    ))}
+  </select>
+
+  {/* dropdown arrow */}
+  <span
+    style={{
+      position: "absolute",
+      right: 10,
+      top: "50%",
+      transform: "translateY(-50%)",
+      pointerEvents: "none",
+      fontSize: 10,
+      color: theme.colors[theme.mode].textMuted,
+    }}
+  >
+    ▼
+  </span>
+</div>
+
 
       {/* Username + Logout */}
       <div
@@ -342,20 +391,14 @@ useEffect(() => {
 
         <button
           onClick={handleLogout}
-          style={{
-            padding: "6px 12px",
-            borderRadius: 999,
-            border: "1px solid #e5e7eb",
-            background: "#f8fafc",
-            cursor: "pointer",
-            fontSize: 13,
-          }}
+          style={headerGhostButton(theme)}
         >
           Logout
         </button>
       </div>
     </div>
   </div>
+  
 </header>
 
 {cooldownInfo && (
@@ -457,18 +500,12 @@ useEffect(() => {
         setSelectedCommunity("GLOBAL")
         setActiveLabel(null)
       }}
-      style={{
-        padding: "6px 14px",
-        borderRadius: 999,
-        border: "1px solid #e5e7eb",
-        background: "#fff",
-        cursor: "pointer",
-        fontSize: 13,
-      }}
+      style={secondaryButton(theme)}
     >
       ← Back to Global feed
     </button>
   </div>
+  
 )}
 
 {isInCommunity && activeCommunity && (
@@ -508,7 +545,9 @@ useEffect(() => {
   setCooldownInfo={setCooldownInfo}
   activeCommunity={activeCommunity}
   feedMode={feedMode}
+  theme={theme}
 />
+
 
 
 
@@ -835,6 +874,7 @@ useEffect(() => {
                     setFeedMode("LABEL")
                     setActiveLabel(label)
                   }}
+                  theme={theme}
                 />
                 {feedMode === "COMMUNITY" &&
   selectedCommunity !== "GLOBAL" && (
@@ -875,5 +915,7 @@ useEffect(() => {
         element={user ? <Profile /> : <Navigate to="/login" />}
       />
     </Routes>
+     </div>
+
   )
 }

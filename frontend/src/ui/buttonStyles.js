@@ -1,33 +1,99 @@
 // frontend/src/ui/buttonStyles.js
+import { getThemeColors } from "./theme"
 
-export const primaryButton = {
-  padding: "8px 18px",
-  borderRadius: 999,
-  border: "none",
-  background: "#0284c7", // calm blue
-  color: "#fff",
-  fontWeight: 500,
-  fontSize: 14,
-  cursor: "pointer",
+export const buttonBase = (theme) => {
+  const c = getThemeColors(theme)
+
+  return {
+    padding: "8px 16px",
+    borderRadius: theme.radius.pill,
+    fontSize: 14,
+    fontWeight: 500,
+    cursor: "pointer",
+    transition: "all 0.15s ease",
+    outline: "none",
+  }
 }
 
-export const secondaryButton = {
-  padding: "8px 16px",
-  borderRadius: 999,
-  border: "1px solid #d1d5db",
-  background: "#f9fafb",
-  color: "#111827",
-  fontSize: 14,
-  cursor: "pointer",
+export const primaryButton = (theme) => {
+  const c = getThemeColors(theme)
+
+  return {
+    ...buttonBase(theme),
+    background: c.primary,
+    color: "#fff",
+    border: "none",
+  }
 }
 
-export const ghostButton = {
+export const secondaryButton = (theme) => {
+  const c = getThemeColors(theme)
+
+  return {
+    ...buttonBase(theme),
+    background: c.surface,
+    color: c.text,
+    border: `1px solid ${c.border}`,
+  }
+}
+
+export const ghostButton = (theme) => {
+  const c = getThemeColors(theme)
+
+  return {
+    ...buttonBase(theme),
+    background: "transparent",
+    color: c.textMuted,
+    border: "none",
+  }
+}
+
+export const dangerButton = (theme) => {
+  const c = getThemeColors(theme)
+
+  return {
+    ...buttonBase(theme),
+    background: c.danger,
+    color: "#fff",
+    border: "none",
+  }
+}
+
+export const headerSelect = (theme) => {
+  const c = theme.colors[theme.mode]
+
+  return {
+    padding: "6px 28px 6px 12px",
+    borderRadius: theme.radius.pill,
+    fontSize: 13,
+    background: c.surface,
+    color: c.text,
+    border: `1px solid ${c.border}`,
+    cursor: "pointer",
+    appearance: "none",
+    WebkitAppearance: "none",
+    MozAppearance: "none",
+  }
+}
+
+export const headerPrimaryButton = (theme) => ({
   padding: "6px 12px",
-  borderRadius: 999,
+  borderRadius: theme.radius.pill,
+  fontSize: 13,
+  fontWeight: 500,
+  background: theme.colors[theme.mode].primary,
+  color: "#fff",
   border: "none",
-  background: "transparent",
-  color: "#374151",
-  fontSize: 14,
   cursor: "pointer",
-}
+})
+
+export const headerGhostButton = (theme) => ({
+  padding: "6px 10px",
+  borderRadius: theme.radius.pill,
+  fontSize: 13,
+  background: "transparent",
+  color: theme.colors[theme.mode].textMuted,
+  border: "none",
+  cursor: "pointer",
+})
 

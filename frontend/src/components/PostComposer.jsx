@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { api } from "../api/client"
-import { theme } from "../styles/theme"
+import { getThemeColors } from "../ui/theme"
+
 
 export default function PostComposer({
   onPostCreated,
@@ -8,11 +9,47 @@ export default function PostComposer({
   activeCommunity = null,
   feedMode = "GLOBAL",
   cooldownInfo = null,
+  theme,
 }) {
+  const colors = getThemeColors(theme)
+  const inputStyle = {
+  width: "100%",
+  padding: "10px 12px",
+  marginTop: 8,
+  borderRadius: 10,
+  border: `1px solid ${colors.border}`,
+  fontSize: 14,
+  boxSizing: "border-box",
+}
+
+const textareaStyle = {
+  width: "100%",
+  minHeight: 90,
+  padding: "10px 12px",
+  borderRadius: 12,
+  border: `1px solid ${colors.border}`,
+  fontSize: 14,
+  lineHeight: 1.5,
+  resize: "vertical",
+  marginBottom: 8,
+  boxSizing: "border-box",
+}
+
+const selectStyle = {
+  width: "100%",
+  padding: "10px 12px",
+  borderRadius: 10,
+  border: `1px solid ${colors.border}`,
+  fontSize: 14,
+  marginBottom: 8,
+}
+
   const [type, setType] = useState("TEXT")
   const [caption, setCaption] = useState("")
   const [mediaUrl, setMediaUrl] = useState("")
   const [scope, setScope] = useState("GLOBAL")
+  
+
 
   const [availableLabels, setAvailableLabels] = useState([])
   const [selectedLabels, setSelectedLabels] = useState([])
@@ -159,13 +196,13 @@ const effectiveCommunityId =
     <form
       onSubmit={submit}
       style={{
-        background: "#ffffff",
-        borderRadius: 16,
-        padding: 16,
-        marginBottom: 24,
-        border: "1px solid #e5e7eb",
-        boxShadow: "0 4px 12px rgba(0,0,0,0.04)",
-      }}
+  background: colors.surface,
+  borderRadius: theme.radius.lg,
+  padding: 16,
+  marginBottom: 24,
+  border: `1px solid ${colors.border}`,
+  boxShadow: theme.shadow.sm,
+}}
     >
       <h3
         style={{
@@ -365,7 +402,7 @@ const effectiveCommunityId =
         padding: "8px 18px",
         borderRadius: 999,
         border: "none",
-        background: cooldownInfo ? "#94a3b8" : "#0284c7",
+        background: cooldownInfo ? colors.textMuted : colors.primary,
         color: "#fff",
         fontWeight: 500,
         cursor:
@@ -387,36 +424,3 @@ const effectiveCommunityId =
   )
 }
 
-/* ───────── styles ───────── */
-
-const inputStyle = {
-  width: "100%",
-  padding: "10px 12px",
-  marginTop: 8,
-  borderRadius: 10,
-  border: "1px solid #d1d5db",
-  fontSize: 14,
-  boxSizing: "border-box",
-}
-
-const textareaStyle = {
-  width: "100%",
-  minHeight: 90,
-  padding: "10px 12px",
-  borderRadius: 12,
-  border: "1px solid #d1d5db",
-  fontSize: 14,
-  lineHeight: 1.5,
-  resize: "vertical",
-  marginBottom: 8,
-  boxSizing: "border-box",
-}
-
-const selectStyle = {
-  width: "100%",
-  padding: "10px 12px",
-  borderRadius: 10,
-  border: "1px solid #d1d5db",
-  fontSize: 14,
-  marginBottom: 8,
-}
