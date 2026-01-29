@@ -1,43 +1,90 @@
 import { useState } from "react"
 import { api } from "../api/client"
+import { theme } from "../styles/theme"
 
 export default function Login({ onLogin }) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
 
   const submit = async (e) => {
-  e.preventDefault()
-  setError("")
-  try {
-    const res = await api("/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    })
+    e.preventDefault()
+    setError("")
+    setLoading(true)
 
-    const token = res.data.token
-    const user = res.data.user
+    try {
+      const res = await api("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      })
 
-    localStorage.setItem("token", token)
-    onLogin(user)
-  } catch (err) {
-    setError(err.error || "Login failed")
+      // 🔐 backend returns { token, user }
+      localStorage.setItem("token", res.token)
+      onLogin(res.user)
+    } catch (err) {
+      setError(
+        typeof err === "string"
+          ? err
+          : err?.message || "Login failed"
+      )
+    } finally {
+      setLoading(false)
+    }
   }
-}
 
+  const inputStyle = {
+    width: "100%",
+    padding: "10px 12px",
+    marginBottom: 12,
+    borderRadius: 8,
+    border: `1px solid ${theme.colors.border}`,
+    fontSize: 14,
+    boxSizing: "border-box",
+  }
 
   return (
-    <div style={{ maxWidth: 320, margin: "80px auto" }}>
-      <h2>Login</h2>
+    <div
+      style={{
+        maxWidth: 360,
+        margin: "120px auto",
+        padding: 24,
+        borderRadius: theme.radius.lg,
+        background: theme.colors.card,
+        boxShadow: theme.shadow.md,
+      }}
+    >
+      <h2
+        style={{
+          marginBottom: 16,
+          textAlign: "center",
+          color: theme.colors.text,
+        }}
+      >
+        Welcome back
+      </h2>
 
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      {error && (
+        <p
+          style={{
+            marginBottom: 12,
+            color: theme.colors.danger,
+            textAlign: "center",
+            fontSize: 14,
+          }}
+        >
+          {error}
+        </p>
+      )}
 
       <form onSubmit={submit}>
         <input
+          type="email"
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          style={{ display: "block", width: "100%", marginBottom: 8 }}
+          style={inputStyle}
+          required
         />
 
         <input
@@ -45,12 +92,28 @@ export default function Login({ onLogin }) {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          style={{ display: "block", width: "100%", marginBottom: 8 }}
+          style={inputStyle}
+          required
         />
 
-        <button style={{ width: "100%" }}>Login</button>
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            width: "100%",
+            padding: "10px 16px",
+            borderRadius: 999,
+            border: "none",
+            background: theme.colors.primary,
+            color: "#fff",
+            fontWeight: 500,
+            cursor: "pointer",
+            opacity: loading ? 0.6 : 1,
+          }}
+        >
+          {loading ? "Signing in…" : "Login"}
+        </button>
       </form>
     </div>
   )
 }
-

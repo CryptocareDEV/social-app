@@ -1,40 +1,32 @@
 import PostCard from "./PostCard"
 
-export default function Feed({ posts, onLike, onMeme, likingIds }) {
+export default function Feed({
+  posts,
+  onLike,
+  onMeme,
+  likingIds,
+  onLabelClick,
+}) {
   if (!Array.isArray(posts)) {
-    return (
-      <p style={{ textAlign: "center", color: "#6b7280" }}>
-        Loading your feed…
-      </p>
-    )
+    return <p style={{ textAlign: "center" }}>Loading feed…</p>
   }
 
   if (posts.length === 0) {
-    return (
-      <div
-        style={{
-          padding: 24,
-          textAlign: "center",
-          color: "#6b7280",
-          fontStyle: "italic",
-        }}
-      >
-        Nothing here yet.
-      </div>
-    )
+    return <p style={{ textAlign: "center" }}>Nothing here yet.</p>
   }
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <>
       {posts.map((post) => (
         <PostCard
-  key={post.id}
-  post={post}
-  onLike={onLike}
-  onMeme={onMeme}
-  isLiking={likingIds.has(post.id)}
-/>
+          key={post.id}
+          post={post}
+          onLike={onLike}
+          onMeme={onMeme}
+          isLiking={likingIds.has(post.id)}
+          onLabelClick={onLabelClick}
+        />
       ))}
-    </div>
+    </>
   )
 }

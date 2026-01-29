@@ -1,140 +1,406 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { api } from "../api/client"
-import { primaryButton } from "../ui/buttonStyles"
 import { theme } from "../styles/theme"
 
-
-
-export default function PostComposer({ onPostCreated }) {
+export default function PostComposer({
+  onPostCreated,
+  setCooldownInfo = () => {},
+  activeCommunity = null,
+  feedMode = "GLOBAL",
+  cooldownInfo = null,
+}) {
   const [type, setType] = useState("TEXT")
   const [caption, setCaption] = useState("")
   const [mediaUrl, setMediaUrl] = useState("")
-  const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
   const [scope, setScope] = useState("GLOBAL")
 
-  const inputStyle = {
-    width: "100%",
-    padding: "10px 12px",
-    marginTop: 10,
-    borderRadius: 8,
-    border: "1px solid #d1d5db",
-    boxSizing: "border-box",
-    fontSize: 14,
+  const [availableLabels, setAvailableLabels] = useState([])
+  const [selectedLabels, setSelectedLabels] = useState([])
+  const [labelInput, setLabelInput] = useState("")
+
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [rating, setRating] = useState("SAFE")
+  const [postInCommunity, setPostInCommunity] = useState(false)
+
+  // 🔹 Load global labels
+  useEffect(() => {
+    let mounted = true
+
+    api("/categories")
+      .then((res) => {
+        if (mounted) setAvailableLabels(res || [])
+      })
+      .catch(() => {
+        if (mounted) setAvailableLabels([])
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  // 🔹 Toggle existing label
+  const toggleLabel = (key) => {
+    setSelectedLabels((prev) => {
+      if (prev.includes(key)) {
+        return prev.filter((k) => k !== key)
+      }
+      if (prev.length >= 3) return prev
+      return [...prev, key]
+    })
   }
-  const isInvalid =
-  (type === "TEXT" && !caption.trim()) ||
-  ((type === "IMAGE" || type === "VIDEO") && !mediaUrl.trim())
 
+  // 🔹 Create/select label on Enter
+  const handleLabelInputKeyDown = async (e) => {
+    if (e.key !== "Enter") return
+    e.preventDefault()
 
+    const key = labelInput.toLowerCase().trim()
+    if (!key || selectedLabels.includes(key) || selectedLabels.length >= 3) {
+      return
+    }
+
+    const exists = availableLabels.find((l) => l.key === key)
+
+    if (!exists) {
+      try {
+        await api("/categories", {
+          method: "POST",
+          body: JSON.stringify({ key }),
+        })
+        setAvailableLabels((prev) => [...prev, { key }])
+      } catch {
+        // ignore duplicate creation errors
+      }
+    }
+
+    setSelectedLabels((prev) => [...prev, key])
+    setLabelInput("")
+  }
+
+  // 🔹 Submit post
   const submit = async (e) => {
     e.preventDefault()
     setError("")
-    if (isInvalid) {
-  setError("Please add some content before posting.")
-  return
-}
     setLoading(true)
 
     try {
-      await api("/posts", {
+      let labels = [...selectedLabels]
+
+      // 🔑 AUTO-PROMOTE typed label if present
+      const typed = labelInput.toLowerCase().trim()
+      if (typed && !labels.includes(typed) && labels.length < 3) {
+        try {
+          await api("/categories", {
+            method: "POST",
+            body: JSON.stringify({ key: typed }),
+          })
+        } catch {
+          // ignore if it already exists
+        }
+
+        labels.push(typed)
+
+        setAvailableLabels((prev) =>
+          prev.some((l) => l.key === typed)
+            ? prev
+            : [...prev, { key: typed }]
+        )
+      }
+
+      if (labels.length === 0) {
+        setError("Please add at least one label")
+        setLoading(false)
+        return
+      }
+const effectiveCommunityId =
+  feedMode === "COMMUNITY" && activeCommunity
+    ? activeCommunity.id
+    : null
+
+      const post = await api("/posts", {
         method: "POST",
         body: JSON.stringify({
           type,
           caption,
           mediaUrl: type === "TEXT" ? undefined : mediaUrl,
-          categories: ["reflection"],
           scope,
+          rating,
+          categories: labels,
+          communityId: postInCommunity
+  ? effectiveCommunityId
+  : null,
         }),
       })
 
       setCaption("")
       setMediaUrl("")
+      setSelectedLabels([])
+      setLabelInput("")
       setType("TEXT")
       setScope("GLOBAL")
-      onPostCreated()
+
+      onPostCreated?.(post)
     } catch (err) {
-      setError(err.error || "Failed to create post")
+      if (err?.cooldownUntil) {
+        setCooldownInfo({
+          cooldownUntil: err.cooldownUntil,
+        })
+      }
+
+      setError(err?.error || "Failed to create post")
     } finally {
       setLoading(false)
     }
   }
 
   return (
-  <form
-    onSubmit={submit}
-    style={{
-      background: "#ffffff",
-      borderRadius: 16,
-      padding: 16,
-      marginBottom: 24,
-      border: "1px solid #e5e7eb",
-      boxShadow: "0 4px 12px rgba(0,0,0,0.04)",
-    }}
-  >
-    {/* Header */}
-    <h3
+    <form
+      onSubmit={submit}
       style={{
-        marginBottom: 12,
-        fontSize: 15,
-        fontWeight: 600,
-        color: "#0f172a",
+        background: "#ffffff",
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 24,
+        border: "1px solid #e5e7eb",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.04)",
       }}
     >
-      Create post
-    </h3>
+      <h3
+        style={{
+          marginBottom: 12,
+          fontSize: 15,
+          fontWeight: 600,
+          color: "#0f172a",
+        }}
+      >
+        Create post
+      </h3>
 
-    {error && (
-      <p style={{ color: "#dc2626", fontSize: 13, marginBottom: 8 }}>
-        {error}
-      </p>
-    )}
+      {error && (
+        <p style={{ color: "#dc2626", fontSize: 13, marginBottom: 8 }}>
+          {error}
+        </p>
+      )}
 
-    {/* Type */}
-    <select
-      value={type}
-      onChange={(e) => setType(e.target.value)}
+      {/* Type */}
+      <select
+        value={type}
+        onChange={(e) => setType(e.target.value)}
+        style={selectStyle}
+      >
+        <option value="TEXT">✍️ Text</option>
+        <option value="IMAGE">🖼 Image</option>
+        <option value="VIDEO">🎥 Video</option>
+      </select>
+
+      {/* Scope */}
+      <select
+        value={scope}
+        onChange={(e) => setScope(e.target.value)}
+        style={selectStyle}
+      >
+        <option value="GLOBAL">🌍 Global</option>
+        <option value="COUNTRY">🏳️ Country</option>
+        <option value="LOCAL">📍 Local</option>
+      </select>
+
+      {/* Caption */}
+      <textarea
+        placeholder="What’s on your mind?"
+        value={caption}
+        onChange={(e) => setCaption(e.target.value)}
+        style={textareaStyle}
+      />
+
+      {/* Label input */}
+      <input
+        placeholder="Type a label and press Enter"
+        value={labelInput}
+        onChange={(e) => setLabelInput(e.target.value)}
+        onKeyDown={handleLabelInputKeyDown}
+        style={inputStyle}
+      />
+
+      {/* 🔍 Label suggestions */}
+      {labelInput && (
+        <div
+          style={{
+            marginTop: 6,
+            border: "1px solid #e5e7eb",
+            borderRadius: 12,
+            padding: 6,
+            background: "#ffffff",
+            boxShadow: "0 6px 20px rgba(0,0,0,0.08)",
+          }}
+        >
+          {availableLabels
+            .filter(
+              (l) =>
+                l.key.includes(labelInput.toLowerCase()) &&
+                !selectedLabels.includes(l.key)
+            )
+            .slice(0, 5)
+            .map((label) => (
+              <div
+                key={label.key}
+                onClick={() => toggleLabel(label.key)}
+                style={{
+                  padding: "6px 10px",
+                  fontSize: 13,
+                  cursor: "pointer",
+                  borderRadius: 8,
+                }}
+              >
+                #{label.key}
+              </div>
+            ))}
+        </div>
+      )}
+
+      {/* Labels */}
+      <div
+        style={{
+          marginTop: 10,
+          padding: 10,
+          borderRadius: 12,
+          background: "#f8fafc",
+          border: "1px solid #e5e7eb",
+        }}
+      >
+        <p style={{ fontSize: 12, color: "#475569", marginBottom: 6 }}>
+          Select up to 3 labels
+        </p>
+
+        {selectedLabels.length > 0 && (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+            {selectedLabels.map((key) => (
+              <span
+                key={key}
+                style={{
+                  padding: "4px 10px",
+                  borderRadius: 999,
+                  fontSize: 12,
+                  background: "#0284c7",
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                #{key}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelectedLabels((prev) =>
+                      prev.filter((k) => k !== key)
+                    )
+                  }
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    color: "#fff",
+                    cursor: "pointer",
+                    fontSize: 12,
+                  }}
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Media */}
+      {type !== "TEXT" && (
+        <input
+          placeholder="Media URL"
+          value={mediaUrl}
+          onChange={(e) => setMediaUrl(e.target.value)}
+          style={inputStyle}
+        />
+      )}
+
+      {/* Actions */}
+<div style={{ marginTop: 12 }}>
+  {feedMode === "COMMUNITY" && activeCommunity && (
+    <div
       style={{
-        width: "100%",
-        padding: "10px 12px",
+        marginBottom: 10,
+        padding: "8px 12px",
         borderRadius: 10,
-        border: "1px solid #d1d5db",
-        fontSize: 14,
-        marginBottom: 8,
+        background: "#f8fafc",
+        border: "1px solid #e5e7eb",
+        fontSize: 13,
       }}
     >
-      <option value="TEXT">✍️ Text</option>
-      <option value="IMAGE">🖼 Image</option>
-      <option value="VIDEO">🎥 Video</option>
-    </select>
+      <label
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          cursor: "pointer",
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={postInCommunity}
+          onChange={(e) =>
+            setPostInCommunity(e.target.checked)
+          }
+        />
+        Post only inside{" "}
+        <strong>{activeCommunity.name}</strong>
+      </label>
+    </div>
+  )}
 
-    {/* Scope */}
-    <select
-      value={scope}
-      onChange={(e) => setScope(e.target.value)}
+  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+    <button
+      type="submit"
+      disabled={loading || !!cooldownInfo}
       style={{
-        width: "100%",
-        padding: "10px 12px",
-        borderRadius: 10,
-        border: "1px solid #d1d5db",
-        fontSize: 14,
-        marginBottom: 8,
+        padding: "8px 18px",
+        borderRadius: 999,
+        border: "none",
+        background: cooldownInfo ? "#94a3b8" : "#0284c7",
+        color: "#fff",
+        fontWeight: 500,
+        cursor:
+          loading || cooldownInfo
+            ? "not-allowed"
+            : "pointer",
+        opacity: loading || cooldownInfo ? 0.6 : 1,
       }}
     >
-      <option value="GLOBAL">🌍 Global</option>
-      <option value="COUNTRY">🏳️ Country</option>
-      <option value="LOCAL">📍 Local</option>
-    </select>
+      {loading
+        ? "Posting…"
+        : cooldownInfo
+        ? "On cooldown"
+        : "Post"}
+    </button>
+  </div>
+</div>
+    </form>
+  )
+}
 
-    {/* Caption */}
-    <textarea
-      placeholder="What’s on your mind?"
-      value={caption}
-      onChange={(e) => setCaption(e.target.value)}
-      style={{
+/* ───────── styles ───────── */
+
+const inputStyle = {
   width: "100%",
-  maxWidth: "100%",
+  padding: "10px 12px",
+  marginTop: 8,
+  borderRadius: 10,
+  border: "1px solid #d1d5db",
+  fontSize: 14,
   boxSizing: "border-box",
+}
+
+const textareaStyle = {
+  width: "100%",
   minHeight: 90,
   padding: "10px 12px",
   borderRadius: 12,
@@ -143,51 +409,14 @@ export default function PostComposer({ onPostCreated }) {
   lineHeight: 1.5,
   resize: "vertical",
   marginBottom: 8,
-}}
-    />
+  boxSizing: "border-box",
+}
 
-    {/* Media URL */}
-    {type !== "TEXT" && (
-      <input
-        placeholder="Media URL"
-        value={mediaUrl}
-        onChange={(e) => setMediaUrl(e.target.value)}
-        style={{
-          width: "100%",
-          padding: "10px 12px",
-          borderRadius: 10,
-          border: "1px solid #d1d5db",
-          fontSize: 14,
-          marginBottom: 8,
-        }}
-      />
-    )}
-
-    {/* Actions */}
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "flex-end",
-        marginTop: 12,
-      }}
-    >
-      <button
-        type="submit"
-        disabled={loading}
-        style={{
-          padding: "8px 18px",
-          borderRadius: 999,
-          border: "none",
-          background: "#0284c7",
-          color: "#fff",
-          fontWeight: 500,
-          cursor: loading ? "not-allowed" : "pointer",
-          opacity: loading ? 0.6 : 1,
-        }}
-      >
-        {loading ? "Posting…" : "Post"}
-      </button>
-    </div>
-  </form>
-)
+const selectStyle = {
+  width: "100%",
+  padding: "10px 12px",
+  borderRadius: 10,
+  border: "1px solid #d1d5db",
+  fontSize: 14,
+  marginBottom: 8,
 }

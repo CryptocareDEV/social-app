@@ -5,11 +5,26 @@ export const toggleLike = async (req, res) => {
   try {
     const { postId } = req.params
     const userId = req.user.userId
-    
+
     if (!postId) {
       return res.status(400).json({ error: "Post ID required" })
     }
 
+    // 🚫 Prevent liking your own post
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+      select: { userId: true },
+    })
+
+    if (!post) {
+      return res.status(404).json({ error: "Post not found" })
+    }
+
+    if (post.userId === userId) {
+      return res.status(400).json({
+        error: "You cannot like your own post",
+      })
+    }
 
     const existing = await prisma.like.findUnique({
       where: {
@@ -20,32 +35,39 @@ export const toggleLike = async (req, res) => {
       },
     })
 
-    // UNLIKE
+    let liked
+
     if (existing) {
+      // UNLIKE
       await prisma.like.delete({
         where: { id: existing.id },
       })
-
-      // 🔥 trigger same-day re-ranking
-      await reRankCommunitiesForPost(postId)
-
-      return res.json({ liked: false })
+      liked = false
+    } else {
+      // LIKE
+      await prisma.like.create({
+        data: {
+          userId,
+          postId,
+        },
+      })
+      liked = true
     }
 
-    // LIKE
-    await prisma.like.create({
-      data: {
-        userId,
-        postId,
-      },
-    })
-
-    // 🔥 trigger same-day re-ranking
+    // 🔥 re-rank communities (same-day signal)
     await reRankCommunitiesForPost(postId)
 
-    return res.json({ liked: true })
+    // 🔢 canonical count
+    const likeCount = await prisma.like.count({
+      where: { postId },
+    })
+
+    return res.json({
+      liked,
+      likeCount,
+    })
   } catch (err) {
     console.error("LIKE ERROR:", err)
-    return res.status(500).json({ error: err.message })
+    return res.status(500).json({ error: "Failed to toggle like" })
   }
 }

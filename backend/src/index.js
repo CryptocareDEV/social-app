@@ -8,7 +8,8 @@ import userRoutes from "./routes/user.routes.js"
 import communityRoutes from "./routes/community.routes.js"
 import invitationRoutes from "./routes/invitation.routes.js"
 import { startCommunityFeedCron } from "./jobs/communityFeed.cron.js"
-
+import categoryRoutes from "./routes/category.routes.js"
+import communityChatRoutes from "./routes/communityChat.routes.js"
 
 
 
@@ -26,9 +27,11 @@ app.use("/api/v1/communities", communityRoutes)
 
 app.use("/api/v1/auth", authRoutes)
 app.use("/api/v1/posts", postRoutes);
+app.use("/api/v1/categories", categoryRoutes)
 app.use("/api/v1/likes", likeRoutes)
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/invitations", invitationRoutes)
+app.use("/api/v1/communities", communityChatRoutes)
 
 startCommunityFeedCron()
 

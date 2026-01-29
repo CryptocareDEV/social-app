@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,11 +7,55 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/**
+ * ============================
+ * ENUMS
+ * ============================
+ */
+
 enum CommunityRole {
   ADMIN
   MODERATOR
   MEMBER
 }
+
+enum PostType {
+  TEXT
+  IMAGE
+  VIDEO
+  MEME
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  REVOKED
+}
+
+enum CommunityScope {
+  LOCAL
+  COUNTRY
+  GLOBAL
+}
+
+enum FeedScope {
+  LOCAL
+  COUNTRY
+  GLOBAL
+}
+
+enum ContentRating {
+  SAFE
+  NSFW
+}
+
+/**
+ * ============================
+ * USER
+ * ============================
+ */
 
 model User {
   id           String   @id @default(uuid())
@@ -27,12 +65,24 @@ model User {
   avatarUrl    String?
   createdAt    DateTime @default(now())
 
+  nsfwStrikes   Int       @default(0)
+  isBanned      Boolean   @default(false)
+  cooldownUntil DateTime?
+
   posts                Post[]
   likes                Like[]
   communityMemberships CommunityMember[]
-  sentInvitations      CommunityInvitation[] @relation("InvitedBy")
-  receivedInvitations  CommunityInvitation[] @relation("InvitedUser")
+  chats                CommunityChat[]
+
+  sentInvitations     CommunityInvitation[] @relation("InvitedBy")
+  receivedInvitations CommunityInvitation[] @relation("InvitedUser")
 }
+
+/**
+ * ============================
+ * POSTS
+ * ============================
+ */
 
 model Post {
   id           String   @id @default(uuid())
@@ -45,14 +95,29 @@ model Post {
 
   scope FeedScope
 
-  user               User                @relation(fields: [userId], references: [id])
+  communityId     String?
+  isCommunityOnly Boolean @default(false)
+
+  rating ContentRating @default(SAFE)
+
+  user      User       @relation(fields: [userId], references: [id])
+  community Community? @relation(fields: [communityId], references: [id])
+
   likes              Like[]
   categories         PostCategory[]
   communityFeedItems CommunityFeedItem[]
 
   @@index([userId])
   @@index([scope])
+  @@index([communityId])
+  @@index([rating])
 }
+
+/**
+ * ============================
+ * LIKES
+ * ============================
+ */
 
 model Like {
   id        String   @id @default(uuid())
@@ -66,12 +131,11 @@ model Like {
   @@unique([userId, postId])
 }
 
-enum PostType {
-  TEXT
-  IMAGE
-  VIDEO
-  MEME
-}
+/**
+ * ============================
+ * COMMUNITIES
+ * ============================
+ */
 
 model Community {
   id        String         @id @default(uuid())
@@ -81,11 +145,25 @@ model Community {
   createdBy String
   createdAt DateTime       @default(now())
 
+  rating ContentRating @default(SAFE)
+
+  // ✅ REQUIRED inverse relation
+  posts Post[]
+
   categories         CommunityCategory[]
   members            CommunityMember[]
   invitations        CommunityInvitation[]
   communityFeedItems CommunityFeedItem[]
+  chats              CommunityChat[]
+
+  @@index([rating])
 }
+
+/**
+ * ============================
+ * COMMUNITY FEED
+ * ============================
+ */
 
 model CommunityFeedItem {
   id          String   @id @default(uuid())
@@ -105,6 +183,12 @@ model CommunityFeedItem {
   @@index([communityId, feedDate, rank])
 }
 
+/**
+ * ============================
+ * COMMUNITY MEMBERS
+ * ============================
+ */
+
 model CommunityMember {
   id          String        @id @default(uuid())
   communityId String
@@ -119,34 +203,44 @@ model CommunityMember {
   @@index([communityId])
   @@index([userId])
   @@index([communityId, role])
-
 }
 
+/**
+ * ============================
+ * INVITATIONS
+ * ============================
+ */
+
 model CommunityInvitation {
-  id            String   @id @default(uuid())
+  id            String @id @default(uuid())
   communityId   String
   invitedById   String
   invitedUserId String
 
-  status        InvitationStatus @default(PENDING)
-  expiresAt     DateTime
-  createdAt     DateTime @default(now())
+  status    InvitationStatus @default(PENDING)
+  expiresAt DateTime
+  createdAt DateTime         @default(now())
 
-  community     Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
-  invitedBy     User      @relation("InvitedBy", fields: [invitedById], references: [id])
-  invitedUser   User      @relation("InvitedUser", fields: [invitedUserId], references: [id])
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  invitedBy   User      @relation("InvitedBy", fields: [invitedById], references: [id])
+  invitedUser User      @relation("InvitedUser", fields: [invitedUserId], references: [id])
 
   @@unique([communityId, invitedUserId])
 }
 
-enum InvitationStatus {
-  PENDING
-  ACCEPTED
-  DECLINED
-  EXPIRED
-  REVOKED
-}
+/**
+ * ============================
+ * CATEGORIES
+ * ============================
+ */
 
+model Category {
+  key       String   @id
+  createdAt DateTime @default(now())
+
+  posts       PostCategory[]
+  communities CommunityCategory[]
+}
 
 model CommunityCategory {
   id          String @id @default(uuid())
@@ -154,29 +248,9 @@ model CommunityCategory {
   categoryKey String
 
   community Community @relation(fields: [communityId], references: [id])
+  category  Category  @relation(fields: [categoryKey], references: [key])
 
   @@index([categoryKey])
-}
-
-enum CommunityScope {
-  LOCAL
-  COUNTRY
-  GLOBAL
-}
-
-enum FeedScope {
-  LOCAL
-  COUNTRY
-  GLOBAL
-}
-
-
-model Category {
-  key         String  @id
-  label       String
-  description String?
-
-  posts PostCategory[]
 }
 
 model PostCategory {
@@ -189,4 +263,17 @@ model PostCategory {
 
   @@unique([postId, categoryKey])
   @@index([categoryKey])
+}
+
+model CommunityChat {
+  id          String   @id @default(uuid())
+  communityId String
+  userId      String
+  text        String
+  createdAt   DateTime @default(now())
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([communityId])
 }

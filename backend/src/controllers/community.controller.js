@@ -152,6 +152,26 @@ export const createCommunity = async (req, res) => {
       })
     }
 
+// Normalize + ensure categories exist
+const categoryRecords = []
+
+for (const raw of categories) {
+  const key = raw.toLowerCase().trim()
+
+  const category =
+    (await prisma.category.findUnique({
+      where: { key },
+    })) ??
+    (await prisma.category.create({
+      data: { key },
+    }))
+
+  categoryRecords.push({
+    categoryKey: category.key,
+  })
+}
+
+
     const community = await prisma.community.create({
       data: {
         name: name.trim(),
@@ -159,10 +179,8 @@ export const createCommunity = async (req, res) => {
         scope,
         createdBy: userId,
         categories: {
-          create: categories.map((categoryKey) => ({
-            categoryKey,
-          })),
-        },
+      create: categoryRecords,
+    },
       },
     })
 
@@ -516,17 +534,21 @@ export const createCommunityInvitation = async (req, res) => {
       })
     }
 
-    // 1. Inviter must be a member
+    // 1. Inviter must be admin
     const inviterMembership = await prisma.communityMember.findFirst({
-      where: {
-        communityId,
-        userId: invitedById,
-      },
-    })
+  where: {
+    communityId,
+    userId: invitedById,
+    role: "ADMIN",
+  },
+})
 
-    if (!inviterMembership) {
-      return res.status(403).json({ error: "Not a community member" })
-    }
+if (!inviterMembership) {
+  return res.status(403).json({
+    error: "Only ADMIN can invite members",
+  })
+}
+
 
     // 2. Find invited user by username
     const invitedUser = await prisma.user.findUnique({
@@ -836,22 +858,77 @@ export const getMyCommunities = async (req, res) => {
         },
       },
       select: {
-        id: true,
-        name: true,
-        intention: true,
-        scope: true,
-        createdAt: true,
-      },
+  id: true,
+  name: true,
+  intention: true,
+  scope: true,
+  createdAt: true,
+  members: {
+    where: { userId },
+    select: { role: true },
+  },
+},
       orderBy: {
         createdAt: "desc",
       },
     })
 
-    return res.json(communities)
+    return res.json(
+  communities.map((c) => ({
+    ...c,
+    role: c.members[0]?.role,
+    members: undefined,
+  }))
+)
+
   } catch (err) {
     console.error("GET MY COMMUNITIES ERROR:", err)
     return res
       .status(500)
       .json({ error: "Failed to fetch user communities" })
   }
+}
+
+export const leaveCommunity = async (req, res) => {
+  const { id: communityId } = req.params
+  const userId = req.user.userId
+
+  const membership = await prisma.communityMember.findFirst({
+    where: { communityId, userId },
+  })
+
+  if (!membership) {
+    return res.status(400).json({ error: "Not a member" })
+  }
+
+  if (membership.role === "ADMIN") {
+    const adminCount = await prisma.communityMember.count({
+      where: {
+        communityId,
+        role: "ADMIN",
+      },
+    })
+
+    if (adminCount === 1) {
+      const memberCount = await prisma.communityMember.count({
+        where: { communityId },
+      })
+
+      if (memberCount > 1) {
+        return res.status(400).json({
+          error: "Assign another admin before leaving",
+        })
+      }
+
+      // Last member → delete community
+      await prisma.community.delete({ where: { id: communityId } })
+      return res.json({ deleted: true })
+    }
+  }
+
+  await prisma.communityMember.delete({
+    where: { id: membership.id },
+  })
+
+  return res.json({ left: true })
 }

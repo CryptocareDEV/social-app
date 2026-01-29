@@ -6,6 +6,7 @@ import {
   getCommunityMembers,
   getMyCommunities,
   getCommunityById,
+  leaveCommunity,
 } from "../controllers/community.controller.js"
 import { requireAuth } from "../middleware/auth.middleware.js"
 import { removeCommunityMember } from "../controllers/community.controller.js"
@@ -14,6 +15,10 @@ import { deleteCommunity } from "../controllers/community.controller.js"
 import { rateLimit } from "../middleware/rateLimit.middleware.js"
 import { materializeCommunityNow } from "../controllers/community.controller.js"
 import { updateCommunityCategories } from "../controllers/community.controller.js"
+import {
+  getCommunityChat,
+  postCommunityMessage,
+} from "../controllers/communityChat.controller.js"
 import {
   acceptCommunityInvitation,
   declineCommunityInvitation,
@@ -25,17 +30,18 @@ import {
 import {
   getCommunityInvitations,
 } from "../controllers/community.controller.js"
-
+import { enforceUserStatus } from "../middleware/enforcement.middleware.js"
 
 
 
 
 const router = express.Router()
 
-router.post("/", requireAuth, createCommunity)
+router.post("/", requireAuth, enforceUserStatus, createCommunity)
 router.post(
   "/:id/materialize",
   requireAuth,
+  enforceUserStatus,
   materializeCommunityNow
 )
 router.get(
@@ -77,6 +83,7 @@ router.post(
 router.post(
   "/:id/invitations",
   requireAuth,
+  enforceUserStatus,
   rateLimit({ windowMs: 60_000, max: 10 }),
   createCommunityInvitation
 )
@@ -89,6 +96,11 @@ router.get("/:id/members", requireAuth, getCommunityMembers)
 router.post("/:id/members/:userId/remove", requireAuth, removeCommunityMember)
 router.post("/:id/members/:userId/role", requireAuth, changeCommunityMemberRole)
 router.delete("/:id", requireAuth, deleteCommunity)
+router.post("/:id/leave", requireAuth, leaveCommunity)
+router.get("/:id/chat", requireAuth, getCommunityChat)
+router.post("/:id/chat", requireAuth, postCommunityMessage)
+
+
 
 
 

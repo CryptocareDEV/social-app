@@ -15,9 +15,16 @@ export const api = async (path, options = {}) => {
   })
 
   if (!res.ok) {
-    const text = await res.text()
-    throw new Error(text)
+  let error
+  try {
+    error = await res.json()
+  } catch {
+    error = { error: "Something went wrong" }
   }
+
+  throw error
+}
+
 
   const text = await res.text()
   return text ? JSON.parse(text) : null

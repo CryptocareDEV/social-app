@@ -90,4 +90,79 @@ export const revokeInvitation = async (req, res) => {
   }
 }
 
+export const getMyInvitations = async (req, res) => {
+  try {
+    const userId = req.user.userId
+
+    const invitations = await prisma.communityInvitation.findMany({
+      where: {
+        invitedUserId: userId,
+        status: "PENDING",
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
+      include: {
+        community: {
+          select: {
+            id: true,
+            name: true,
+            scope: true,
+          },
+        },
+        invitedBy: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    })
+
+    return res.json(invitations)
+  } catch (err) {
+    console.error("GET MY INVITATIONS ERROR:", err)
+    return res
+      .status(500)
+      .json({ error: "Failed to load invitations" })
+  }
+}
+
+export const declineInvitation = async (req, res) => {
+  try {
+    const { id } = req.params
+    const userId = req.user.userId
+
+    const invite = await prisma.communityInvitation.findUnique({
+      where: { id },
+    })
+
+    if (!invite || invite.invitedUserId !== userId) {
+      return res
+        .status(404)
+        .json({ error: "Invitation not found" })
+    }
+
+    if (invite.status !== "PENDING") {
+      return res
+        .status(400)
+        .json({ error: "Invitation is no longer valid" })
+    }
+
+    await prisma.communityInvitation.update({
+      where: { id },
+      data: { status: "DECLINED" },
+    })
+
+    return res.json({ success: true })
+  } catch (err) {
+    console.error("DECLINE INVITATION ERROR:", err)
+    return res
+      .status(500)
+      .json({ error: "Failed to decline invitation" })
+  }
+}
 

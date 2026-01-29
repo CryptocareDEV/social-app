@@ -1,7 +1,11 @@
 import { useState } from "react"
 import { api } from "../api/client"
 
-export default function CreateCommunityModal({ onClose, onCreated }) {
+export default function CreateCommunityModal({
+  onClose,
+  onCreated,
+  setCooldownInfo,
+}) {
   const [name, setName] = useState("")
   const [intention, setIntention] = useState("")
   const [scope, setScope] = useState("GLOBAL")
@@ -48,8 +52,14 @@ export default function CreateCommunityModal({ onClose, onCreated }) {
       onCreated(community)
       onClose()
     } catch (err) {
-      setError(err?.error || "Failed to create community")
-    } finally {
+  if (err?.cooldownUntil) {
+    // 🔑 escalate to global banner
+    setCooldownInfo(err)
+  } else {
+    setError(err?.error || "Failed to create community")
+  }
+}
+ finally {
       setLoading(false)
     }
   }

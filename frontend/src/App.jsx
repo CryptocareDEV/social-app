@@ -6,6 +6,10 @@ import Feed from "./components/Feed"
 import PostComposer from "./components/PostComposer"
 import Profile from "./pages/Profile"
 import MemeEditor from "./components/MemeEditor"
+import CreateCommunityModal from "./components/CreateCommunityModal"
+import CommunityChat from "./components/CommunityChat"
+
+
 import { theme } from "./styles/theme"
 import { api } from "./api/client"
 
@@ -14,18 +18,54 @@ export default function App() {
   const [loading, setLoading] = useState(true)
 
   const [posts, setPosts] = useState([])
+  const [communities, setCommunities] = useState([])
 
-  // 🔁 FEED MODE (single source of truth)
-  // "GLOBAL" | "COMMUNITY" | "LABEL"
-  const [feedMode, setFeedMode] = useState("GLOBAL")
+  const [showCreateCommunity, setShowCreateCommunity] = useState(false)
 
+  // 🔁 Feed mode
+  const [feedMode, setFeedMode] = useState("GLOBAL") // GLOBAL | COMMUNITY | LABEL
   const [feedScope, setFeedScope] = useState("GLOBAL")
   const [selectedCommunity, setSelectedCommunity] = useState("GLOBAL")
   const [activeLabel, setActiveLabel] = useState(null)
+  const [communityMembers, setCommunityMembers] = useState([])
+  const [showMembers, setShowMembers] = useState(false)
+  const [cooldownInfo, setCooldownInfo] = useState(null)
 
-  const [memePost, setMemePost] = useState(null)
+
+  // ❤️ Likes
   const [likingIds, setLikingIds] = useState(new Set())
-  const [communities, setCommunities] = useState([])
+
+  // 🖼 Meme
+  const [memePost, setMemePost] = useState(null)
+
+  // 🏷 Community label editing
+  const [editingLabels, setEditingLabels] = useState(false)
+  const [communityLabels, setCommunityLabels] = useState([])
+  const [labelInput, setLabelInput] = useState("")
+  const [invitations, setInvitations] = useState([])
+  const [inviteUsername, setInviteUsername] = useState("")
+  const [pendingInvites, setPendingInvites] = useState([])
+  const activeCommunity =
+  selectedCommunity === "GLOBAL"
+    ? null
+    : communities.find((c) => c.id === selectedCommunity)
+
+const isInCommunity =
+  feedMode === "COMMUNITY" &&
+  selectedCommunity !== "GLOBAL"
+
+// ✅ MUST come AFTER communityMembers + user exist
+const myMembership = isInCommunity
+  ? communityMembers.find((m) => m.id === user?.id)
+  : null
+
+const isAdmin = myMembership?.role === "ADMIN"
+
+
+
+
+
+
 
   // 🔐 Auth bootstrap
   useEffect(() => {
@@ -35,17 +75,83 @@ export default function App() {
       .finally(() => setLoading(false))
   }, [])
 
-  // 📰 FEED LOADER (CANONICAL)
+useEffect(() => {
+  if (!user) return
+
+  api("/users/me")
+    .then((u) => {
+      setUser(u)
+
+      // ⛔ Handle cooldown / ban info
+      if (u.cooldownUntil) {
+        setCooldownInfo({
+          cooldownUntil: u.cooldownUntil,
+        })
+      } else {
+        setCooldownInfo(null)
+      }
+    })
+    .catch(() => {})
+}, [])
+
+
+  const loadInvitations = async () => {
+  try {
+    const data = await api("/communities/invitations/my")
+    setInvitations(data || [])
+  } catch {}
+}
+  const loadCommunityInvites = async () => {
+  if (selectedCommunity === "GLOBAL") return
+
+  const data = await api(
+    `/communities/${selectedCommunity}/invitations`
+  )
+  setPendingInvites(data || [])
+}
+
+
+  // 🏘 Load my communities
+  const loadCommunities = async () => {
+    try {
+      const data = await api("/communities/my")
+      setCommunities(data || [])
+    } catch (err) {
+      console.error("Failed to load communities", err)
+    }
+  }
+
+const loadCommunityMembers = async () => {
+  if (selectedCommunity === "GLOBAL") return
+
+  try {
+    const data = await api(
+      `/communities/${selectedCommunity}/members`
+    )
+    setCommunityMembers(data || [])
+  } catch (err) {
+    console.error("Failed to load members", err)
+  }
+}
+
+useEffect(() => {
+  if (feedMode === "COMMUNITY" && selectedCommunity !== "GLOBAL") {
+    loadCommunityMembers()
+  } else {
+    setCommunityMembers([])
+  }
+}, [feedMode, selectedCommunity])
+
+
+
+  // 📰 Load feed
   const loadFeed = async () => {
     try {
       let endpoint
 
       if (feedMode === "LABEL" && activeLabel) {
         endpoint = `/posts/label/${activeLabel}`
-      } else if (
-        feedMode === "COMMUNITY" &&
-        selectedCommunity !== "GLOBAL"
-      ) {
+      } else if (feedMode === "COMMUNITY" && selectedCommunity !== "GLOBAL") {
         endpoint = `/communities/${selectedCommunity}/feed`
       } else {
         endpoint = `/posts/feed/${feedScope}`
@@ -63,25 +169,40 @@ export default function App() {
       console.error("Failed to load feed", err)
     }
   }
-
-  // 🏘 Communities
-  const loadCommunities = async () => {
-    try {
-      const data = await api("/communities/my")
-      setCommunities(data || [])
-    } catch (err) {
-      console.error("Failed to load communities", err)
-    }
+  
+  useEffect(() => {
+  if (feedMode === "COMMUNITY") {
+    loadCommunityInvites()
   }
+}, [selectedCommunity])
 
-  // 🔁 Reload feed on mode changes only
+  // 🔁 Reload feed + communities
   useEffect(() => {
     if (!user) return
     loadFeed()
     loadCommunities()
   }, [user, feedMode, feedScope, selectedCommunity, activeLabel])
 
-  // ❤️ LIKE HANDLER (BACKEND TRUTH ONLY)
+  // 🏷 Load labels for selected community
+  useEffect(() => {
+    if (!selectedCommunity || selectedCommunity === "GLOBAL") {
+      setCommunityLabels([])
+      return
+    }
+
+    // ⚠️ THIS ENDPOINT MUST EXIST (see backend section below)
+    api(`/communities/${selectedCommunity}`)
+      .then((c) => {
+        setCommunityLabels(
+          c.categories?.map((x) => x.categoryKey) || []
+        )
+      })
+      .catch(() => {
+        setCommunityLabels([])
+      })
+  }, [selectedCommunity])
+
+  // ❤️ Like handler (backend is source of truth)
   const handleLike = async (postId) => {
     if (likingIds.has(postId)) return
 
@@ -130,7 +251,7 @@ export default function App() {
             <Navigate to="/login" />
           ) : (
             <>
-              {/* Header */}
+              {/* HEADER */}
               <header
                 style={{
                   position: "sticky",
@@ -152,7 +273,11 @@ export default function App() {
                 >
                   <strong>🌱 Social</strong>
 
-                  <div style={{ display: "flex", gap: 12 }}>
+                  <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                    <button onClick={() => setShowCreateCommunity(true)}>
+                      + Community
+                    </button>
+
                     <select
                       value={selectedCommunity}
                       onChange={(e) => {
@@ -164,7 +289,9 @@ export default function App() {
                       <option value="GLOBAL">🌍 Global</option>
                       {communities.map((c) => (
                         <option key={c.id} value={c.id}>
-                          🏠 {c.name}
+                          {c.scope === "GLOBAL" && "🌍"}
+                          {c.scope === "COUNTRY" && "🏳️"}
+                          {c.scope === "LOCAL" && "📍"} {c.name}
                         </option>
                       ))}
                     </select>
@@ -173,8 +300,27 @@ export default function App() {
                   </div>
                 </div>
               </header>
+              {cooldownInfo && (
+  <div
+    style={{
+      background: "#fee2e2",
+      color: "#7f1d1d",
+      padding: "10px 16px",
+      textAlign: "center",
+      fontSize: 14,
+    }}
+  >
+    🚫 You’re on cooldown until{" "}
+    <strong>
+      {new Date(cooldownInfo.cooldownUntil).toLocaleString()}
+    </strong>
+  </div>
+)}
 
+
+              {/* MAIN */}
               <main
+              
                 style={{
                   maxWidth: 720,
                   margin: "0 auto",
@@ -182,26 +328,401 @@ export default function App() {
                   background: theme.colors.bg,
                   minHeight: "100vh",
                 }}
-              >
-                <PostComposer onPostCreated={loadFeed} />
+               >
+                {/* 🔔 COMMUNITY INVITATIONS */}
+  {invitations.length > 0 && (
+    <div
+      style={{
+        marginBottom: 16,
+        padding: 12,
+        borderRadius: 12,
+        background: "#fef3c7",
+        border: "1px solid #fde68a",
+      }}
+    >
+      <strong>Community invitations</strong>
 
-                {/* Scope selector */}
-                <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-                  {["GLOBAL", "COUNTRY", "LOCAL"].map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => {
-                        setFeedMode("GLOBAL")
-                        setActiveLabel(null)
-                        setFeedScope(s)
+      {invitations.map((inv) => (
+        <div
+          key={inv.id}
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginTop: 8,
+          }}
+        >
+          <span style={{ fontSize: 14 }}>
+            Invited to <strong>{inv.community.name}</strong>{" "}
+            by @{inv.invitedBy.username}
+          </span>
+
+          <div style={{ display: "flex", gap: 6 }}>
+            <button
+              onClick={async () => {
+                await api(
+                  `/communities/invitations/${inv.id}/accept`,
+                  { method: "POST" }
+                )
+                setInvitations((prev) =>
+                  prev.filter((i) => i.id !== inv.id)
+                )
+                loadCommunities()
+              }}
+            >
+              Accept
+            </button>
+
+            <button
+              onClick={async () => {
+                await api(
+                  `/communities/invitations/${inv.id}/decline`,
+                  { method: "POST" }
+                )
+                setInvitations((prev) =>
+                  prev.filter((i) => i.id !== inv.id)
+                )
+              }}
+            >
+              Decline
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+
+{feedMode === "COMMUNITY" && (
+  <button
+    style={{
+      marginBottom: 12,
+      fontSize: 13,
+      background: "transparent",
+      border: "none",
+      color: "#0284c7",
+      cursor: "pointer",
+    }}
+    onClick={() => {
+      setFeedMode("GLOBAL")
+      setSelectedCommunity("GLOBAL")
+    }}
+  >
+    ← Back to Global feed
+  </button>
+)}
+
+
+                <PostComposer
+  onPostCreated={loadFeed}
+  setCooldownInfo={setCooldownInfo}
+  activeCommunity={activeCommunity}
+  feedMode={feedMode}
+/>
+
+
+
+{feedMode === "COMMUNITY" &&
+  selectedCommunity !== "GLOBAL" && (
+    
+
+    <div
+      style={{
+        marginBottom: 16,
+        padding: 12,
+        borderRadius: 12,
+        background: "#f1f5f9",
+        border: "1px solid #e2e8f0",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <strong>Community members</strong>
+        <button
+          onClick={() => setShowMembers((v) => !v)}
+        >
+          {showMembers ? "Hide" : "Show"}
+        </button>
+      </div>
+
+      {showMembers && (
+        <div style={{ marginTop: 8 }}>
+          {communityMembers.map((m) => (
+            <div
+              key={m.id}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "6px 0",
+                fontSize: 14,
+              }}
+            >
+              <span>
+                @{m.username}
+                {m.role === "ADMIN" && " 👑"}
+                {m.role === "MODERATOR" && " 🛡"}
+              </span>
+
+              <span style={{ fontSize: 12, opacity: 0.7 }}>
+                {m.role}
+              </span>
+            </div>
+          ))}
+
+          {communityMembers.length === 0 && (
+            <p style={{ fontSize: 13, opacity: 0.6 }}>
+              No members yet
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+)}
+
+{isInCommunity && (
+  <button
+    onClick={async () => {
+      const res = await api(
+        `/communities/${selectedCommunity}/leave`,
+        { method: "POST" }
+      )
+
+      // Reset UI to world state
+      setSelectedCommunity("GLOBAL")
+      setFeedMode("GLOBAL")
+      loadCommunities()
+    }}
+    style={{
+      marginTop: 12,
+      background: "#fee2e2",
+      color: "#7f1d1d",
+    }}
+  >
+    Leave community
+  </button>
+)}
+
+
+                {/* COMMUNITY LABEL EDITOR */}
+                {feedMode === "COMMUNITY" &&
+  selectedCommunity !== "GLOBAL" &&
+  activeCommunity?.role === "ADMIN" && (
+                    <div
+                      style={{
+                        marginBottom: 16,
+                        padding: 12,
+                        borderRadius: 12,
+                        background: "#f8fafc",
+                        border: "1px solid #e5e7eb",
                       }}
                     >
-                      {s}
-                    </button>
-                  ))}
-                </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <strong>Community labels</strong>
+                        <button
+                          onClick={() =>
+                            setEditingLabels((v) => !v)
+                          }
+                        >
+                          {editingLabels ? "Done" : "Edit"}
+                        </button>
+                      </div>
 
-                {/* Active label */}
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 6,
+                          flexWrap: "wrap",
+                          marginTop: 8,
+                        }}
+                      >
+                        {communityLabels.map((l) => (
+                          <span
+                            key={l}
+                            onClick={() =>
+                              editingLabels &&
+                              setCommunityLabels((prev) =>
+                                prev.filter((x) => x !== l)
+                              )
+                            }
+                            style={{
+                              padding: "4px 10px",
+                              borderRadius: 999,
+                              background: "#e0f2fe",
+                              fontSize: 12,
+                              cursor: editingLabels
+                                ? "pointer"
+                                : "default",
+                            }}
+                          >
+                            #{l}
+                          </span>
+                        ))}
+                      </div>
+
+                      {editingLabels && (
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: 6,
+                            marginTop: 8,
+                          }}
+                        >
+                          <input
+                            placeholder="Add label"
+                            value={labelInput}
+                            onChange={(e) =>
+                              setLabelInput(e.target.value)
+                            }
+                          />
+                          <button
+                            onClick={() => {
+                              if (!labelInput.trim()) return
+                              setCommunityLabels((prev) => [
+                                ...new Set([
+                                  ...prev,
+                                  labelInput
+                                    .trim()
+                                    .toLowerCase(),
+                                ]),
+                              ])
+                              setLabelInput("")
+                            }}
+                          >
+                            Add
+                          </button>
+                        </div>
+                      )}
+
+                      {editingLabels && (
+                        <button
+                          style={{ marginTop: 10 }}
+                          onClick={async () => {
+                            await api(
+                              `/communities/${selectedCommunity}/categories`,
+                              {
+                                method: "PATCH",
+                                body: JSON.stringify({
+                                  categories: communityLabels,
+                                }),
+                              }
+                            )
+                            await loadFeed()
+                            setEditingLabels(false)
+                          }}
+                        >
+                          Save & rebuild feed
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+{feedMode === "COMMUNITY" &&
+  selectedCommunity !== "GLOBAL" &&
+  activeCommunity?.role === "ADMIN" && (
+  <div
+    style={{
+      marginBottom: 16,
+      padding: 12,
+      borderRadius: 12,
+      background: "#fff7ed",
+      border: "1px solid #fed7aa",
+    }}
+  >
+    <strong>Invite member</strong>
+
+    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+      <input
+        placeholder="Username"
+        value={inviteUsername}
+        onChange={(e) => setInviteUsername(e.target.value)}
+      />
+      <button
+        onClick={async () => {
+          if (!inviteUsername.trim()) return
+          await api(
+            `/communities/${selectedCommunity}/invitations`,
+            {
+              method: "POST",
+              body: JSON.stringify({
+                username: inviteUsername.trim(),
+              }),
+            }
+          )
+          setInviteUsername("")
+          loadCommunityInvites()
+        }}
+      >
+        Invite
+      </button>
+    </div>
+
+    {pendingInvites.length > 0 && (
+      <div style={{ marginTop: 10 }}>
+        <strong style={{ fontSize: 13 }}>
+          Pending invitations
+        </strong>
+
+        {pendingInvites.map((inv) => (
+          <div
+            key={inv.id}
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              marginTop: 6,
+              fontSize: 13,
+            }}
+          >
+            <span>
+              @{inv.invitedUser.username}
+            </span>
+
+            <button
+              onClick={async () => {
+                await api(
+                  `/communities/invitations/${inv.id}/revoke`,
+                  { method: "POST" }
+                )
+                loadCommunityInvites()
+              }}
+            >
+              Revoke
+            </button>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+)}
+
+                {/* FEED SCOPE */}
+                {feedMode !== "COMMUNITY" && (
+  <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+    {["GLOBAL", "COUNTRY", "LOCAL"].map((s) => (
+      <button
+        key={s}
+        onClick={() => {
+          setFeedMode("GLOBAL")
+          setActiveLabel(null)
+          setFeedScope(s)
+        }}
+      >
+        {s}
+      </button>
+    ))}
+  </div>
+)}
+
+
+                {/* ACTIVE LABEL */}
                 {feedMode === "LABEL" && activeLabel && (
                   <button
                     onClick={() => {
@@ -224,6 +745,11 @@ export default function App() {
                     setActiveLabel(label)
                   }}
                 />
+                {feedMode === "COMMUNITY" &&
+  selectedCommunity !== "GLOBAL" && (
+    <CommunityChat communityId={selectedCommunity} />
+)}
+
               </main>
 
               {memePost && (
@@ -236,6 +762,18 @@ export default function App() {
                   }}
                 />
               )}
+
+              {showCreateCommunity && (
+  <CreateCommunityModal
+    onClose={() => setShowCreateCommunity(false)}
+    onCreated={(community) => {
+      setCommunities((prev) => [...prev, community])
+      setFeedMode("COMMUNITY")
+      setSelectedCommunity(community.id)
+    }}
+    setCooldownInfo={setCooldownInfo}
+  />
+)}
             </>
           )
         }
