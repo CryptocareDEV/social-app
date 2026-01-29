@@ -8,6 +8,8 @@ import Profile from "./pages/Profile"
 import MemeEditor from "./components/MemeEditor"
 import CreateCommunityModal from "./components/CreateCommunityModal"
 import CommunityChat from "./components/CommunityChat"
+import Signup from "./pages/Signup"
+
 
 
 import { theme } from "./styles/theme"
@@ -30,6 +32,11 @@ export default function App() {
   const [communityMembers, setCommunityMembers] = useState([])
   const [showMembers, setShowMembers] = useState(false)
   const [cooldownInfo, setCooldownInfo] = useState(null)
+  
+const handleLogout = () => {
+  localStorage.removeItem("token")
+  setUser(null)
+}
 
 
   // ❤️ Likes
@@ -50,6 +57,8 @@ export default function App() {
     ? null
     : communities.find((c) => c.id === selectedCommunity)
 
+  const memberCount = communityMembers.length
+
 const isInCommunity =
   feedMode === "COMMUNITY" &&
   selectedCommunity !== "GLOBAL"
@@ -69,11 +78,15 @@ const isAdmin = myMembership?.role === "ADMIN"
 
   // 🔐 Auth bootstrap
   useEffect(() => {
-    api("/users/me")
-      .then((u) => u && setUser(u))
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [])
+  api("/auth/me")
+    .then(setUser)
+    .catch(() => {
+      localStorage.removeItem("token")
+      setUser(null)
+    })
+    .finally(() => setLoading(false))
+}, [])
+
 
 useEffect(() => {
   if (!user) return
@@ -240,67 +253,112 @@ useEffect(() => {
   return (
     <Routes>
       <Route
-        path="/login"
-        element={user ? <Navigate to="/" /> : <Login onLogin={setUser} />}
-      />
+  path="/login"
+  element={
+    user
+      ? <Navigate to="/" />
+      : <Login onLogin={setUser} />
+  }
+/>
 
-      <Route
-        path="/"
-        element={
-          !user ? (
-            <Navigate to="/login" />
-          ) : (
-            <>
-              {/* HEADER */}
-              <header
-                style={{
-                  position: "sticky",
-                  top: 0,
-                  zIndex: 10,
-                  background: "#fff",
-                  borderBottom: "1px solid #e5e7eb",
-                  padding: "10px 20px",
-                }}
-              >
-                <div
-                  style={{
-                    maxWidth: 720,
-                    margin: "0 auto",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <strong>🌱 Social</strong>
+<Route
+  path="/signup"
+  element={
+    user
+      ? <Navigate to="/" />
+      : <Signup onSignup={setUser} />
+  }
+/>
 
-                  <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                    <button onClick={() => setShowCreateCommunity(true)}>
-                      + Community
-                    </button>
+<Route
+  path="/"
+  element={
+    !user ? (
+      <Navigate to="/login" />
+    ) : (
+      <>
+        {/* HEADER */}
+<header
+  style={{
+    position: "sticky",
+    top: 0,
+    zIndex: 10,
+    background: "#fff",
+    borderBottom: "1px solid #e5e7eb",
+    padding: "10px 20px",
+  }}
+>
+  <div
+    style={{
+      maxWidth: 720,
+      margin: "0 auto",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+    }}
+  >
+    {/* App title */}
+    <strong>🌱 Social</strong>
 
-                    <select
-                      value={selectedCommunity}
-                      onChange={(e) => {
-                        setFeedMode("COMMUNITY")
-                        setActiveLabel(null)
-                        setSelectedCommunity(e.target.value)
-                      }}
-                    >
-                      <option value="GLOBAL">🌍 Global</option>
-                      {communities.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.scope === "GLOBAL" && "🌍"}
-                          {c.scope === "COUNTRY" && "🏳️"}
-                          {c.scope === "LOCAL" && "📍"} {c.name}
-                        </option>
-                      ))}
-                    </select>
+    {/* Right side controls */}
+    <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+      <button onClick={() => setShowCreateCommunity(true)}>
+        + Community
+      </button>
 
-                    <span>@{user.username}</span>
-                  </div>
-                </div>
-              </header>
-              {cooldownInfo && (
+      <select
+  value={selectedCommunity}
+  onChange={(e) => {
+    setFeedMode("COMMUNITY")
+    setActiveLabel(null)
+    setSelectedCommunity(e.target.value)
+  }}
+>
+  {communities.map((c) => (
+    <option key={c.id} value={c.id}>
+      {c.scope === "GLOBAL" && "🌍"}
+      {c.scope === "COUNTRY" && "🏳️"}
+      {c.scope === "LOCAL" && "📍"} {c.name}
+    </option>
+  ))}
+</select>
+
+      {/* Username + Logout */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 14,
+            fontWeight: 500,
+          }}
+        >
+          @{user.username}
+        </span>
+
+        <button
+          onClick={handleLogout}
+          style={{
+            padding: "6px 12px",
+            borderRadius: 999,
+            border: "1px solid #e5e7eb",
+            background: "#f8fafc",
+            cursor: "pointer",
+            fontSize: 13,
+          }}
+        >
+          Logout
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+{cooldownInfo && (
   <div
     style={{
       background: "#fee2e2",
@@ -316,7 +374,6 @@ useEffect(() => {
     </strong>
   </div>
 )}
-
 
               {/* MAIN */}
               <main
@@ -392,24 +449,58 @@ useEffect(() => {
     </div>
   )}
 
-{feedMode === "COMMUNITY" && (
-  <button
+{isInCommunity && (
+  <div style={{ marginBottom: 16 }}>
+    <button
+      onClick={() => {
+        setFeedMode("GLOBAL")
+        setSelectedCommunity("GLOBAL")
+        setActiveLabel(null)
+      }}
+      style={{
+        padding: "6px 14px",
+        borderRadius: 999,
+        border: "1px solid #e5e7eb",
+        background: "#fff",
+        cursor: "pointer",
+        fontSize: 13,
+      }}
+    >
+      ← Back to Global feed
+    </button>
+  </div>
+)}
+
+{isInCommunity && activeCommunity && (
+  <div
     style={{
-      marginBottom: 12,
-      fontSize: 13,
-      background: "transparent",
-      border: "none",
-      color: "#0284c7",
-      cursor: "pointer",
-    }}
-    onClick={() => {
-      setFeedMode("GLOBAL")
-      setSelectedCommunity("GLOBAL")
+      marginBottom: 16,
+      padding: "12px 16px",
+      borderRadius: 16,
+      background: "#f8fafc",
+      border: "1px solid #e5e7eb",
     }}
   >
-    ← Back to Global feed
-  </button>
+    <div style={{ fontSize: 16, fontWeight: 600 }}>
+      {activeCommunity.scope === "GLOBAL" && "🌍"}
+      {activeCommunity.scope === "COUNTRY" && "🏳️"}
+      {activeCommunity.scope === "LOCAL" && "📍"}{" "}
+      {activeCommunity.name}
+    </div>
+
+    <div
+      style={{
+        marginTop: 4,
+        fontSize: 13,
+        color: "#475569",
+      }}
+    >
+      {activeCommunity.scope.toLowerCase()} community •{" "}
+      {memberCount} member{memberCount !== 1 ? "s" : ""}
+    </div>
+  </div>
 )}
+
 
 
                 <PostComposer

@@ -1,12 +1,16 @@
 import { useState } from "react"
 import { api } from "../api/client"
+import { useNavigate, Link } from "react-router-dom"
 import { theme } from "../styles/theme"
 
-export default function Login({ onLogin }) {
+export default function Signup({ onAuth }) {
+  const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+
+  const navigate = useNavigate()
 
   const submit = async (e) => {
     e.preventDefault()
@@ -14,24 +18,20 @@ export default function Login({ onLogin }) {
     setLoading(true)
 
     try {
-      const res = await api("/auth/login", {
+      const res = await api("/auth/signup", {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({
+          username,
+          email,
+          password,
+        }),
       })
 
-      // backend contract: { token, user }
-      if (!res?.token || !res?.user) {
-        throw { error: "Invalid login response" }
-      }
-
       localStorage.setItem("token", res.token)
-      onLogin(res.user)
+      onAuth(res.user)
+      navigate("/")
     } catch (err) {
-      setError(
-        err?.error ||
-        err?.message ||
-        "Login failed"
-      )
+      setError(err?.error || "Signup failed")
     } finally {
       setLoading(false)
     }
@@ -65,7 +65,7 @@ export default function Login({ onLogin }) {
           color: theme.colors.text,
         }}
       >
-        Welcome back
+        Create your account
       </h2>
 
       {error && (
@@ -82,6 +82,14 @@ export default function Login({ onLogin }) {
       )}
 
       <form onSubmit={submit}>
+        <input
+          placeholder="Username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          style={inputStyle}
+          required
+        />
+
         <input
           type="email"
           placeholder="Email"
@@ -111,13 +119,26 @@ export default function Login({ onLogin }) {
             background: theme.colors.primary,
             color: "#fff",
             fontWeight: 500,
-            cursor: loading ? "not-allowed" : "pointer",
+            cursor: "pointer",
             opacity: loading ? 0.6 : 1,
           }}
         >
-          {loading ? "Signing in…" : "Login"}
+          {loading ? "Creating account…" : "Sign up"}
         </button>
       </form>
+
+      <p
+        style={{
+          marginTop: 14,
+          textAlign: "center",
+          fontSize: 14,
+        }}
+      >
+        Already have an account?{" "}
+        <Link to="/login" style={{ color: theme.colors.primary }}>
+          Login
+        </Link>
+      </p>
     </div>
   )
 }

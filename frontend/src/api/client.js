@@ -14,17 +14,20 @@ export const api = async (path, options = {}) => {
     headers,
   })
 
-  if (!res.ok) {
-  let error
-  try {
-    error = await res.json()
-  } catch {
-    error = { error: "Something went wrong" }
+  // 🔒 Handle auth failure centrally
+  if (res.status === 401) {
+    localStorage.removeItem("token")
   }
 
-  throw error
-}
-
+  if (!res.ok) {
+    let error
+    try {
+      error = await res.json()
+    } catch {
+      error = { error: "Something went wrong" }
+    }
+    throw error
+  }
 
   const text = await res.text()
   return text ? JSON.parse(text) : null
