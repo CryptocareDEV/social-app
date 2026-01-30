@@ -29,7 +29,20 @@ export default function App() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   // 🎨 Theme (Phase 1 foundation)
-  const [theme, setTheme] = useState(baseTheme)
+  const [theme, setTheme] = useState(() => {
+  const saved = localStorage.getItem("theme-mode")
+  return {
+    ...baseTheme,
+    mode: saved === "dark" ? "dark" : "light",
+  }
+})
+const toggleTheme = () => {
+  setTheme((t) => {
+    const nextMode = t.mode === "light" ? "dark" : "light"
+    localStorage.setItem("theme-mode", nextMode)
+    return { ...t, mode: nextMode }
+  })
+}
   const colors = getThemeColors(theme)
 
 
@@ -388,6 +401,18 @@ useEffect(() => {
         >
           @{user.username}
         </span>
+        <button
+  onClick={toggleTheme}
+  style={headerGhostButton(theme)}
+  title={
+    theme.mode === "light"
+      ? "Switch to dark mode"
+      : "Switch to light mode"
+  }
+>
+  {theme.mode === "light" ? "🌙" : "☀️"}
+</button>
+
 
         <button
           onClick={handleLogout}

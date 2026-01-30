@@ -4,7 +4,19 @@ import prisma from "../lib/prisma.js"
 
 export const signup = async (req, res) => {
   try {
-    const { email, username, password } = req.body
+    const { email, username, password, dateOfBirth } = req.body
+    if (!dateOfBirth) {
+  return res.status(400).json({
+    error: "dateOfBirth is required",
+  })
+}
+
+const dob = new Date(dateOfBirth)
+if (isNaN(dob.getTime())) {
+  return res.status(400).json({
+    error: "Invalid dateOfBirth",
+  })
+}
 
     if (!email || !username || !password) {
       return res.status(400).json({ error: "Missing required fields" })
@@ -27,8 +39,38 @@ export const signup = async (req, res) => {
         email,
         username,
         passwordHash,
+        dateOfBirth: dob,
       },
     })
+    await prisma.userProfile.create({
+  data: {
+    userId: user.id,
+  },
+})
+
+await prisma.feedProfile.create({
+  data: {
+    userId: user.id,
+    name: "Default",
+    isActive: true,
+    preferences: {
+      labels: {
+        GLOBAL: [],
+        COUNTRY: [],
+        LOCAL: [],
+      },
+      nsfw: {
+        posts: "HIDE",
+        communities: {
+          inFeeds: false,
+          onProfile: false,
+        },
+      },
+      ordering: "RECENT",
+    },
+  },
+})
+
 
     return res.status(201).json({
       id: user.id,

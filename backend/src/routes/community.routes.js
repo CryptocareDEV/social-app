@@ -6,6 +6,7 @@ import {
   getCommunityMembers,
   getMyCommunities,
   getCommunityById,
+  addCommunityLabelImport,
   leaveCommunity,
 } from "../controllers/community.controller.js"
 import { requireAuth } from "../middleware/auth.middleware.js"
@@ -66,6 +67,12 @@ router.get(
   "/invitations/my",
   requireAuth,
   getMyInvitations
+)
+
+router.post(
+  "/:id/label-imports",
+  requireAuth,
+  addCommunityLabelImport
 )
 
 router.post(

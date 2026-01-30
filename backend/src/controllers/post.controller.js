@@ -1,6 +1,25 @@
 import prisma from "../lib/prisma.js"
 import { isValidLabel } from "../utils/labelValidation.js"
 import { materializeCommunityFeed } from "../services/communityFeed.service.js"
+import { getActiveFeedProfile } from "../lib/feedProfile.js"
+
+
+const buildNsfwFilter = ({ isMinor, feedProfile }) => {
+  if (isMinor) {
+    return { rating: "SAFE" }
+  }
+
+  const nsfwPref =
+    feedProfile?.preferences?.nsfw?.posts === "SHOW"
+      ? "SHOW"
+      : "HIDE"
+
+  if (nsfwPref === "SHOW") {
+    return {}
+  }
+
+  return { rating: "SAFE" }
+}
 
 
 /**
@@ -24,6 +43,41 @@ export const createPost = async (req, res) => {
     } = req.body
 
     const userId = req.user.userId
+
+
+    /* =========================
+   🔞 NSFW CREATION GUARDS
+========================= */
+
+// 🚫 Minors can never create NSFW posts
+if (rating === "NSFW" && req.user.isMinor) {
+  return res.status(403).json({
+    error: "Minors cannot create NSFW content",
+  })
+}
+
+// 🏘 Community-specific NSFW rules
+if (communityId && rating === "NSFW") {
+  const community = await prisma.community.findUnique({
+    where: { id: communityId },
+    select: { rating: true },
+  })
+
+  if (!community) {
+    return res.status(404).json({
+      error: "Community not found",
+    })
+  }
+
+  // 🚫 SAFE communities can never contain NSFW posts
+  if (community.rating !== "NSFW") {
+    return res.status(403).json({
+      error:
+        "NSFW posts cannot be created inside SAFE communities",
+    })
+  }
+}
+
 
     /* =========================
        1️⃣ BASIC VALIDATION
@@ -191,19 +245,64 @@ export const createPost = async (req, res) => {
 
 export const getFeed = async (req, res) => {
   try {
-    const page = parseInt(req.query.page || "1", 10)
-    const limit = parseInt(req.query.limit || "10", 10)
-    const skip = (page - 1) * limit
-    const userId = req.user?.userId
+    // 🔁 Delegate to GLOBAL scoped feed
+    req.params.scope = "GLOBAL"
+    return getScopedFeed(req, res)
+  } catch (err) {
+    console.error("getFeed error:", err)
+    return res.status(500).json({
+      success: false,
+      data: null,
+      error: { message: "Failed to load feed" },
+    })
+  }
+}
+
+/* ============================================================
+   SCOPED FEEDS (STRICT SEPARATION)
+============================================================ */
+
+
+export const getScopedFeed = async (req, res) => {
+  try {
+    const { scope } = req.params
+
+    if (!["LOCAL", "COUNTRY", "GLOBAL"].includes(scope)) {
+      return res.status(400).json({ error: "Invalid scope" })
+    }
+
+    // 🔑 Authenticated user
+    const userId = req.user.userId
+
+    // 🔑 Load active feed profile
+    const feedProfile = await getActiveFeedProfile(userId)
+
+    // 🔞 Build NSFW visibility filter (hard rule)
+    const nsfwFilter = buildNsfwFilter({
+      isMinor: req.user.isMinor,
+      feedProfile,
+    })
+
+    // 🔑 Extract label preferences for this scope
+    const labelPrefs =
+      feedProfile?.preferences?.labels?.[scope] ?? []
 
     const posts = await prisma.post.findMany({
       where: {
-        communityId: null,      // 🔒 no community content
-        rating: "SAFE",         // 🔞 no NSFW
+        scope,
+        communityId: null, // 🔒 never leak community posts
+        ...nsfwFilter,
+        ...(labelPrefs.length > 0 && {
+          categories: {
+            some: {
+              category: {
+                key: { in: labelPrefs },
+              },
+            },
+          },
+        }),
       },
       orderBy: { createdAt: "desc" },
-      skip,
-      take: limit,
       include: {
         user: {
           select: {
@@ -231,81 +330,23 @@ export const getFeed = async (req, res) => {
       },
     })
 
+    // ❤️ Normalize like state
     const enriched = posts.map((p) => ({
       ...p,
-      likedByMe: userId
-        ? p.likes.length > 0
-        : false,
+      likedByMe: userId ? p.likes?.length > 0 : false,
       likes: undefined,
     }))
 
-    return res.json({
-      success: true,
-      data: {
-        items: enriched,
-        page,
-        hasMore: posts.length === limit,
-      },
-      error: null,
-    })
+    return res.json(enriched)
   } catch (err) {
-    console.error("getFeed error:", err)
-    return res.status(500).json({
-      success: false,
-      data: null,
-      error: { message: "Failed to load feed" },
+    console.error("getScopedFeed error:", err)
+    res.status(500).json({
+      error: "Failed to fetch feed",
     })
   }
 }
 
-/* ============================================================
-   SCOPED FEEDS (STRICT SEPARATION)
-============================================================ */
 
-export const getScopedFeed = async (req, res) => {
-  try {
-    const { scope } = req.params
-
-    if (!["LOCAL", "COUNTRY", "GLOBAL"].includes(scope)) {
-      return res.status(400).json({ error: "Invalid scope" })
-    }
-
-    const posts = await prisma.post.findMany({
-      where: {
-        scope,
-        communityId: null,   // 🔒 world-only
-        rating: "SAFE",      // 🔞 safe-only
-      },
-      orderBy: { createdAt: "desc" },
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            avatarUrl: true,
-          },
-        },
-        categories: {
-          include: {
-            category: {
-              select: { key: true },
-            },
-          },
-        },
-        _count: {
-          select: { likes: true },
-        },
-      },
-    })
-
-    return res.json(posts)
-  } catch (err) {
-    console.error(err)
-    res
-      .status(500)
-      .json({ error: "Failed to fetch feed" })
-  }
-}
 
 /* ============================================================
    POSTS BY LABEL (WORLD ONLY)
@@ -314,11 +355,23 @@ export const getScopedFeed = async (req, res) => {
 export const getPostsByLabel = async (req, res) => {
   try {
     const { key } = req.params
+    const userId = req.user?.userId
+
+    // 🔍 Load active feed profile (adults only matter)
+    const feedProfile = userId
+      ? await getActiveFeedProfile(userId)
+      : null
+
+    // 🔞 Build NSFW visibility filter
+    const nsfwFilter = buildNsfwFilter({
+      isMinor: req.user.isMinor,
+      feedProfile,
+    })
 
     const posts = await prisma.post.findMany({
       where: {
-        communityId: null,   // 🔒 no community leakage
-        rating: "SAFE",
+        communityId: null, // 🔒 no community leakage
+        ...nsfwFilter,
         categories: {
           some: {
             categoryKey: key,
@@ -336,20 +389,35 @@ export const getPostsByLabel = async (req, res) => {
         },
         categories: {
           include: {
-            category: true,
+            category: {
+              select: { key: true },
+            },
           },
         },
+        likes: userId
+          ? {
+              where: { userId },
+              select: { id: true },
+            }
+          : false,
         _count: {
           select: { likes: true },
         },
       },
     })
 
-    res.json(posts)
+    // ❤️ normalize like state
+    const enriched = posts.map((p) => ({
+      ...p,
+      likedByMe: userId ? p.likes?.length > 0 : false,
+      likes: undefined,
+    }))
+
+    res.json(enriched)
   } catch (err) {
     console.error("GET POSTS BY LABEL ERROR:", err)
-    res
-      .status(500)
-      .json({ error: "Failed to fetch posts by label" })
+    res.status(500).json({
+      error: "Failed to fetch posts by label",
+    })
   }
 }

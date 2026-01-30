@@ -1,7 +1,25 @@
-// backend/src/middleware/auth.middleware.js
-
 import jwt from "jsonwebtoken"
 import prisma from "../lib/prisma.js"
+
+/**
+ * 🔞 Derive minor status from date of birth
+ * A user is a minor until the exact moment they turn 18
+ */
+const isMinorFromDob = (dateOfBirth) => {
+  if (!dateOfBirth) return true // fail-safe
+  const now = new Date()
+  const dob = new Date(dateOfBirth)
+
+  let age = now.getFullYear() - dob.getFullYear()
+  const m = now.getMonth() - dob.getMonth()
+
+  if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) {
+    age--
+  }
+
+  return age < 18
+}
+
 
 export const requireAuth = async (req, res, next) => {
   try {
@@ -12,7 +30,6 @@ export const requireAuth = async (req, res, next) => {
     }
 
     const token = header.split(" ")[1]
-
     const decoded = jwt.verify(token, process.env.JWT_SECRET)
 
     // 🔎 Load user from DB
@@ -46,13 +63,18 @@ export const requireAuth = async (req, res, next) => {
       })
     }
 
-    /* ================================ */
+    /* ================================
+       🔞 AGE DERIVATION (HARD TRUTH)
+    ================================= */
 
-    // ✅ Attach safe user object
+    const isMinor = isMinorFromDob(user.dateOfBirth)
+
+    // ✅ Attach safe, derived user object
     req.user = {
       userId: user.id,
       username: user.username,
       email: user.email,
+      isMinor, // 🚨 derived, never stored
     }
 
     next()

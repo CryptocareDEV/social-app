@@ -13,8 +13,9 @@ const router = express.Router()
 
 router.get("/label/:key", requireAuth, getPostsByLabel)
 router.post("/", requireAuth, enforceUserStatus, createPost)
-router.get("/feed", getFeed)
-router.get("/feed/:scope", getScopedFeed)
+router.get("/feed", requireAuth, getFeed)
+router.get("/feed/:scope", requireAuth, getScopedFeed)
+
 
 
 

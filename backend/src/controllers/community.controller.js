@@ -23,6 +23,110 @@ export const materializeCommunityNow = async (req, res) => {
 }
 
 /**
+ * POST /api/v1/communities/:id/label-imports
+ * Add or update a label import rule
+ */
+export const addCommunityLabelImport = async (req, res) => {
+  try {
+    const communityId = req.params.id
+    const { categoryKey, importMode } = req.body
+    const userId = req.user.userId
+
+    if (!categoryKey || !importMode) {
+      return res.status(400).json({
+        error: "categoryKey and importMode are required",
+      })
+    }
+
+    if (!["SAFE_ONLY", "NSFW_ONLY", "BOTH"].includes(importMode)) {
+      return res.status(400).json({
+        error: "Invalid importMode",
+      })
+    }
+
+    // 🔎 Load community + membership
+    const community = await prisma.community.findUnique({
+      where: { id: communityId },
+      include: {
+        members: {
+          where: { userId },
+          select: { role: true },
+        },
+      },
+    })
+
+    if (!community) {
+      return res.status(404).json({
+        error: "Community not found",
+      })
+    }
+
+    const membership = community.members[0]
+
+    if (!membership || membership.role !== "ADMIN") {
+      return res.status(403).json({
+        error: "Only admins can manage label imports",
+      })
+    }
+
+    // 🔎 Load category
+    const category = await prisma.category.findUnique({
+      where: { key: categoryKey },
+    })
+
+    if (!category) {
+      return res.status(404).json({
+        error: "Category not found",
+      })
+    }
+
+    // 🚫 LOCAL labels are never allowed in communities
+    if (category.scope === "LOCAL") {
+      return res.status(403).json({
+        error: "Local labels cannot be imported into communities",
+      })
+    }
+
+    // 🚫 SAFE communities cannot import NSFW
+    if (
+      community.rating === "SAFE" &&
+      importMode !== "SAFE_ONLY"
+    ) {
+      return res.status(403).json({
+        error:
+          "SAFE communities may only import SAFE content",
+      })
+    }
+
+    // ✅ Upsert import rule
+    const rule = await prisma.communityLabelImport.upsert({
+      where: {
+        communityId_categoryKey: {
+          communityId,
+          categoryKey,
+        },
+      },
+      update: {
+        importMode,
+      },
+      create: {
+        communityId,
+        categoryKey,
+        importMode,
+      },
+    })
+
+    res.status(201).json(rule)
+  } catch (err) {
+    console.error("ADD LABEL IMPORT ERROR:", err)
+    res.status(500).json({
+      error: "Failed to add label import rule",
+    })
+  }
+}
+
+
+/**
  * GET /communities/:id
  * Get community details + labels (members only)
  */
@@ -136,6 +240,25 @@ export const getCommunityInvitations = async (req, res) => {
 export const createCommunity = async (req, res) => {
   try {
     const { name, intention, scope, categories = [] } = req.body
+    /* =========================
+   🔞 COMMUNITY CREATION GUARDS
+========================= */
+
+const { rating = "SAFE" } = req.body
+
+if (!["SAFE", "NSFW"].includes(rating)) {
+  return res.status(400).json({
+    error: "Invalid community rating",
+  })
+}
+
+// 🚫 Minors cannot create NSFW communities
+if (rating === "NSFW" && req.user.isMinor) {
+  return res.status(403).json({
+    error: "Minors cannot create NSFW communities",
+  })
+}
+
     const userId = req.user.userId
 
     // 🔒 Structural validation (schema-level)
@@ -177,6 +300,7 @@ for (const raw of categories) {
         name: name.trim(),
         intention: intention.trim(),
         scope,
+        rating,
         createdBy: userId,
         categories: {
       create: categoryRecords,
@@ -282,6 +406,14 @@ const cursor = req.query.cursor
     if (!community) {
       return res.status(404).json({ error: "Community not found" })
     }
+
+// 🔞 Minor safety: block NSFW communities entirely
+if (req.user.isMinor && community.rating === "NSFW") {
+  return res.status(403).json({
+    error: "Minors cannot access NSFW communities",
+  })
+}
+
 
     // 2. Verify membership
     const membership = await prisma.communityMember.findFirst({
@@ -520,7 +652,8 @@ export const deleteCommunity = async (req, res) => {
 
 /**
  * POST /communities/:id/invitations
- * - Any member can invite
+ * - Only ADMIN can invite
+ * - Minors cannot be invited to NSFW communities
  */
 export const createCommunityInvitation = async (req, res) => {
   try {
@@ -534,47 +667,91 @@ export const createCommunityInvitation = async (req, res) => {
       })
     }
 
-    // 1. Inviter must be admin
-    const inviterMembership = await prisma.communityMember.findFirst({
-  where: {
-    communityId,
-    userId: invitedById,
-    role: "ADMIN",
-  },
-})
+    // 1. Inviter must be ADMIN
+    const inviterMembership =
+      await prisma.communityMember.findFirst({
+        where: {
+          communityId,
+          userId: invitedById,
+          role: "ADMIN",
+        },
+      })
 
-if (!inviterMembership) {
-  return res.status(403).json({
-    error: "Only ADMIN can invite members",
-  })
-}
+    if (!inviterMembership) {
+      return res.status(403).json({
+        error: "Only ADMIN can invite members",
+      })
+    }
 
+    // 2. Load community (needed for NSFW check)
+    const community = await prisma.community.findUnique({
+      where: { id: communityId },
+    })
 
-    // 2. Find invited user by username
+    if (!community) {
+      return res.status(404).json({
+        error: "Community not found",
+      })
+    }
+
+    // 3. Find invited user by username
     const invitedUser = await prisma.user.findUnique({
       where: { username },
     })
 
     if (!invitedUser) {
-      return res.status(404).json({ error: "User not found" })
+      return res.status(404).json({
+        error: "User not found",
+      })
     }
 
     const invitedUserId = invitedUser.id
 
-    // 3. Cannot invite yourself
+    // 4. 🔞 Minor safety: block NSFW invitations entirely
+    if (community.rating === "NSFW") {
+      const dob = invitedUser.dateOfBirth
+
+      if (!dob) {
+        // fail-safe: no DOB → treat as minor
+        return res.status(403).json({
+          error: "Minors cannot be invited to NSFW communities",
+        })
+      }
+
+      const now = new Date()
+      const birthDate = new Date(dob)
+
+      let age = now.getFullYear() - birthDate.getFullYear()
+      const m = now.getMonth() - birthDate.getMonth()
+      if (
+        m < 0 ||
+        (m === 0 && now.getDate() < birthDate.getDate())
+      ) {
+        age--
+      }
+
+      if (age < 18) {
+        return res.status(403).json({
+          error: "Minors cannot be invited to NSFW communities",
+        })
+      }
+    }
+
+    // 5. Cannot invite yourself
     if (invitedUserId === invitedById) {
       return res.status(400).json({
         error: "You cannot invite yourself",
       })
     }
 
-    // 4. Cannot invite existing members
-    const existingMembership = await prisma.communityMember.findFirst({
-      where: {
-        communityId,
-        userId: invitedUserId,
-      },
-    })
+    // 6. Cannot invite existing members
+    const existingMembership =
+      await prisma.communityMember.findFirst({
+        where: {
+          communityId,
+          userId: invitedUserId,
+        },
+      })
 
     if (existingMembership) {
       return res.status(400).json({
@@ -582,14 +759,15 @@ if (!inviterMembership) {
       })
     }
 
-    // 5. Prevent duplicate pending invitations
-    const existingInvite = await prisma.communityInvitation.findFirst({
-      where: {
-        communityId,
-        invitedUserId,
-        status: "PENDING",
-      },
-    })
+    // 7. Prevent duplicate pending invitations
+    const existingInvite =
+      await prisma.communityInvitation.findFirst({
+        where: {
+          communityId,
+          invitedUserId,
+          status: "PENDING",
+        },
+      })
 
     if (existingInvite) {
       return res.status(400).json({
@@ -597,17 +775,18 @@ if (!inviterMembership) {
       })
     }
 
-    // 6. Create invitation with expiry (7 days)
-    const invitation = await prisma.communityInvitation.create({
-      data: {
-        communityId,
-        invitedById,
-        invitedUserId,
-        expiresAt: new Date(
-          Date.now() + 7 * 24 * 60 * 60 * 1000
-        ),
-      },
-    })
+    // 8. Create invitation (expires in 7 days)
+    const invitation =
+      await prisma.communityInvitation.create({
+        data: {
+          communityId,
+          invitedById,
+          invitedUserId,
+          expiresAt: new Date(
+            Date.now() + 7 * 24 * 60 * 60 * 1000
+          ),
+        },
+      })
 
     return res.status(201).json(invitation)
   } catch (err) {
@@ -617,6 +796,7 @@ if (!inviterMembership) {
     })
   }
 }
+
 
 
 /**

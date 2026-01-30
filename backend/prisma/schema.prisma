@@ -19,6 +19,18 @@ enum CommunityRole {
   MEMBER
 }
 
+enum LabelScope {
+  GLOBAL
+  COUNTRY
+  LOCAL
+}
+
+enum PostOriginType {
+  USER
+  COMMUNITY
+}
+
+
 enum PostType {
   TEXT
   IMAGE
@@ -64,6 +76,11 @@ model User {
   passwordHash String
   avatarUrl    String?
   createdAt    DateTime @default(now())
+  
+  // 🔒 Age & safety
+  dateOfBirth   DateTime
+  dobVerifiedAt DateTime?
+  dobMethod     String?  // self_declared | gov_id | guardian
 
   nsfwStrikes   Int       @default(0)
   isBanned      Boolean   @default(false)
@@ -73,9 +90,16 @@ model User {
   likes                Like[]
   communityMemberships CommunityMember[]
   chats                CommunityChat[]
+  reportsMade          Report[]
+  superuser           Superuser?
+
+
 
   sentInvitations     CommunityInvitation[] @relation("InvitedBy")
   receivedInvitations CommunityInvitation[] @relation("InvitedUser")
+  profiles      FeedProfile[]
+  profile       UserProfile?
+
 }
 
 /**
@@ -99,6 +123,10 @@ model Post {
   isCommunityOnly Boolean @default(false)
 
   rating ContentRating @default(SAFE)
+    // 🔍 origin & sharing traceability
+  originType        PostOriginType @default(USER)
+  originCommunityId String?
+
 
   user      User       @relation(fields: [userId], references: [id])
   community Community? @relation(fields: [communityId], references: [id])
@@ -106,6 +134,10 @@ model Post {
   likes              Like[]
   categories         PostCategory[]
   communityFeedItems CommunityFeedItem[]
+  reports            Report[]
+  moderationActions   ModerationAction[]
+
+
 
   @@index([userId])
   @@index([scope])
@@ -155,6 +187,8 @@ model Community {
   invitations        CommunityInvitation[]
   communityFeedItems CommunityFeedItem[]
   chats              CommunityChat[]
+  labelImports CommunityLabelImport[]
+
 
   @@index([rating])
 }
@@ -235,12 +269,18 @@ model CommunityInvitation {
  */
 
 model Category {
-  key       String   @id
-  createdAt DateTime @default(now())
+  key         String     @id
+  scope       LabelScope
+  countryCode String?    // required if scope == COUNTRY
+  createdAt   DateTime   @default(now())
+  
+
 
   posts       PostCategory[]
   communities CommunityCategory[]
+  labelImports CommunityLabelImport[]
 }
+
 
 model CommunityCategory {
   id          String @id @default(uuid())
@@ -252,6 +292,26 @@ model CommunityCategory {
 
   @@index([categoryKey])
 }
+
+enum LabelImportMode {
+  SAFE_ONLY
+  NSFW_ONLY
+  BOTH
+}
+
+model CommunityLabelImport {
+  id          String          @id @default(uuid())
+  communityId String
+  categoryKey String
+  importMode  LabelImportMode
+
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  category    Category  @relation(fields: [categoryKey], references: [key])
+
+  @@unique([communityId, categoryKey])
+  @@index([communityId])
+}
+
 
 model PostCategory {
   id          String @id @default(uuid())
@@ -276,4 +336,109 @@ model CommunityChat {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([communityId])
+}
+
+model UserProfile {
+  userId        String   @id
+  bio           String?  @db.VarChar(160)
+  joinedAt      DateTime @default(now())
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FeedProfile {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  isActive    Boolean  @default(false)
+
+  preferences Json
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+}
+
+
+enum ReportReason {
+  NSFW_EXPOSURE
+  MINOR_SAFETY
+  HARASSMENT
+  HATE
+  VIOLENCE
+  SPAM
+  MISINFORMATION
+  OTHER
+}
+
+model Report {
+  id         String       @id @default(uuid())
+  reporterId String
+  postId     String
+  reason     ReportReason
+  context    String?
+  createdAt DateTime     @default(now())
+
+  reporter   User @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  post       Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([reporterId])
+}
+
+
+enum ModerationOutcome {
+  NO_ACTION
+  LIMITED
+  REMOVED
+  ESCALATED
+}
+
+model ModerationAction {
+  id         String             @id @default(uuid())
+  postId     String
+  outcome    ModerationOutcome
+  note       String?
+  createdAt DateTime           @default(now())
+
+  post       Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+}
+
+
+enum ModeratorActorType {
+  USER
+  MODERATOR
+  SUPERUSER
+}
+
+model ModerationLog {
+  id         String              @id @default(uuid())
+  actorId   String
+  actorType ModeratorActorType
+  action    String
+  targetId  String
+  reason    String?
+  createdAt DateTime            @default(now())
+}
+
+
+
+enum SuperuserRole {
+  MODERATOR
+  ADMIN
+  LEGAL
+}
+
+model Superuser {
+  id        String        @id @default(uuid())
+  userId    String        @unique
+  role      SuperuserRole
+  createdAt DateTime      @default(now())
+
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

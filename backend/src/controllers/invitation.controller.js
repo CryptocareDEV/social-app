@@ -13,6 +13,23 @@ export const acceptInvitation = async (req, res) => {
       return res.status(404).json({ error: "Invitation not found" })
     }
 
+// 🔎 Load community for safety checks
+const community = await prisma.community.findUnique({
+  where: { id: invitation.communityId },
+})
+
+if (!community) {
+  return res.status(404).json({ error: "Community not found" })
+}
+
+// 🔞 Minor safety: block NSFW community invitations
+if (req.user.isMinor && community.rating === "NSFW") {
+  return res.status(403).json({
+    error: "Minors cannot accept invitations to NSFW communities",
+  })
+}
+
+
     // Must be invited user
     if (invitation.invitedUserId !== userId) {
       return res.status(403).json({ error: "Not authorized to accept this invite" })
