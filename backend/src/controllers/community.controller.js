@@ -282,12 +282,16 @@ for (const raw of categories) {
   const key = raw.toLowerCase().trim()
 
   const category =
-    (await prisma.category.findUnique({
-      where: { key },
-    })) ??
-    (await prisma.category.create({
-      data: { key },
-    }))
+  (await prisma.category.findUnique({
+    where: { key },
+  })) ??
+  (await prisma.category.create({
+    data: {
+      key,
+      scope: scope,        // 👈 REQUIRED
+      countryCode: scope === "COUNTRY" ? req.user.countryCode ?? null : null,
+    },
+  }))
 
   categoryRecords.push({
     categoryKey: category.key,
@@ -445,6 +449,9 @@ let feedItems = await prisma.communityFeedItem.findMany({
   where: {
     communityId: id,
     feedDate: feedDate,
+    post: {
+    isRemoved: false,
+  },
     ...(cursor && {
       rank: {
         gt: (
@@ -623,31 +630,63 @@ export const changeCommunityMemberRole = async (req, res) => {
 export const deleteCommunity = async (req, res) => {
   try {
     const { id: communityId } = req.params
-    const requesterId = req.user.userId
+    const userId = req.user.userId
 
-    // Ensure requester is ADMIN
+    // 1️⃣ Ensure requester is ADMIN
     const requester = await prisma.communityMember.findFirst({
       where: {
         communityId,
-        userId: requesterId,
+        userId,
         role: "ADMIN",
       },
     })
 
     if (!requester) {
-      return res.status(403).json({ error: "Only ADMIN can delete community" })
+      return res.status(403).json({
+        error: "Only ADMIN can delete community",
+      })
     }
 
-    await prisma.community.delete({
-      where: { id: communityId },
-    })
+    // 2️⃣ Atomic cleanup + delete
+    await prisma.$transaction([
+      prisma.communityCategory.deleteMany({
+        where: { communityId },
+      }),
+
+      prisma.communityMember.deleteMany({
+        where: { communityId },
+      }),
+
+      prisma.communityInvitation.deleteMany({
+        where: { communityId },
+      }),
+
+      prisma.communityFeedItem.deleteMany({
+        where: { communityId },
+      }),
+
+      prisma.communityChat.deleteMany({
+        where: { communityId },
+      }),
+
+      prisma.communityLabelImport.deleteMany({
+        where: { communityId },
+      }),
+
+      prisma.community.delete({
+        where: { id: communityId },
+      }),
+    ])
 
     return res.json({ success: true })
   } catch (err) {
-    console.error(err)
-    return res.status(500).json({ error: "Failed to delete community" })
+    console.error("DELETE COMMUNITY ERROR:", err)
+    return res.status(500).json({
+      error: "Failed to delete community",
+    })
   }
 }
+
 
 
 /**

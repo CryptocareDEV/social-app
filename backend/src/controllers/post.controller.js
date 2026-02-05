@@ -3,33 +3,25 @@ import { isValidLabel } from "../utils/labelValidation.js"
 import { materializeCommunityFeed } from "../services/communityFeed.service.js"
 import { getActiveFeedProfile } from "../lib/feedProfile.js"
 
+/* ============================================================
+   HELPERS
+============================================================ */
 
 const buildNsfwFilter = ({ isMinor, feedProfile }) => {
-  if (isMinor) {
-    return { rating: "SAFE" }
-  }
+  if (isMinor) return { rating: "SAFE" }
 
   const nsfwPref =
     feedProfile?.preferences?.nsfw?.posts === "SHOW"
       ? "SHOW"
       : "HIDE"
 
-  if (nsfwPref === "SHOW") {
-    return {}
-  }
-
-  return { rating: "SAFE" }
+  return nsfwPref === "SHOW" ? {} : { rating: "SAFE" }
 }
 
+/* ============================================================
+   CREATE POST
+============================================================ */
 
-/**
- * CREATE POST
- * Enforces:
- * - cooldown / ban (via middleware)
- * - NSFW invariants
- * - community containment
- * - world-feed safety
- */
 export const createPost = async (req, res) => {
   try {
     const {
@@ -44,45 +36,31 @@ export const createPost = async (req, res) => {
 
     const userId = req.user.userId
 
+    /* 🔞 NSFW guards */
+    if (rating === "NSFW" && req.user.isMinor) {
+      return res.status(403).json({
+        error: "Minors cannot create NSFW content",
+      })
+    }
 
-    /* =========================
-   🔞 NSFW CREATION GUARDS
-========================= */
+    if (communityId && rating === "NSFW") {
+      const community = await prisma.community.findUnique({
+        where: { id: communityId },
+        select: { rating: true },
+      })
 
-// 🚫 Minors can never create NSFW posts
-if (rating === "NSFW" && req.user.isMinor) {
-  return res.status(403).json({
-    error: "Minors cannot create NSFW content",
-  })
-}
+      if (!community) {
+        return res.status(404).json({ error: "Community not found" })
+      }
 
-// 🏘 Community-specific NSFW rules
-if (communityId && rating === "NSFW") {
-  const community = await prisma.community.findUnique({
-    where: { id: communityId },
-    select: { rating: true },
-  })
+      if (community.rating !== "NSFW") {
+        return res.status(403).json({
+          error: "NSFW posts not allowed in SAFE communities",
+        })
+      }
+    }
 
-  if (!community) {
-    return res.status(404).json({
-      error: "Community not found",
-    })
-  }
-
-  // 🚫 SAFE communities can never contain NSFW posts
-  if (community.rating !== "NSFW") {
-    return res.status(403).json({
-      error:
-        "NSFW posts cannot be created inside SAFE communities",
-    })
-  }
-}
-
-
-    /* =========================
-       1️⃣ BASIC VALIDATION
-    ========================= */
-
+    /* Basic validation */
     if (!type || !scope) {
       return res.status(400).json({
         error: "Post type and scope required",
@@ -96,9 +74,7 @@ if (communityId && rating === "NSFW") {
     }
 
     if (
-      (type === "IMAGE" ||
-        type === "VIDEO" ||
-        type === "MEME") &&
+      ["IMAGE", "VIDEO", "MEME"].includes(type) &&
       !mediaUrl?.trim()
     ) {
       return res.status(400).json({
@@ -106,10 +82,7 @@ if (communityId && rating === "NSFW") {
       })
     }
 
-    /* =========================
-       2️⃣ CATEGORY VALIDATION
-    ========================= */
-
+    /* Category validation */
     const safeCategories = Array.isArray(categories)
       ? categories
       : []
@@ -126,10 +99,7 @@ if (communityId && rating === "NSFW") {
       })
     }
 
-    /* =========================
-       3️⃣ NORMALIZE + UPSERT CATEGORIES
-    ========================= */
-
+    /* Normalize + upsert categories */
     const categoryRecords = []
 
     for (const raw of safeCategories) {
@@ -142,67 +112,30 @@ if (communityId && rating === "NSFW") {
       }
 
       const category =
-        (await prisma.category.findUnique({
-          where: { key },
-        })) ??
-        (await prisma.category.create({
-          data: { key },
-        }))
+        (await prisma.category.findUnique({ where: { key } })) ??
+        (await prisma.category.create({ data: { key } }))
 
-      categoryRecords.push({
-        categoryKey: category.key,
-      })
+      categoryRecords.push({ categoryKey: category.key })
     }
 
-    /* =========================
-       4️⃣ COMMUNITY + NSFW ENFORCEMENT
-    ========================= */
-
+    /* Community enforcement */
     let isCommunityOnly = false
 
-   
     if (communityId) {
-  const community = await prisma.community.findUnique({
-    where: { id: communityId },
-  })
+      const membership = await prisma.communityMember.findFirst({
+        where: { communityId, userId },
+      })
 
-  if (!community) {
-    return res.status(404).json({ error: "Community not found" })
-  }
+      if (!membership) {
+        return res.status(403).json({
+          error: "You are not a member of this community",
+        })
+      }
 
-  const membership = await prisma.communityMember.findFirst({
-    where: {
-      communityId,
-      userId,
-    },
-  })
+      isCommunityOnly = true
+    }
 
-  if (!membership) {
-    return res.status(403).json({
-      error: "You are not a member of this community",
-    })
-  }
-
-  if (community.rating === "NSFW" && rating !== "NSFW") {
-    return res.status(400).json({
-      error: "Posts in NSFW communities must be marked NSFW",
-    })
-  }
-
-  if (community.rating === "SAFE" && rating === "NSFW") {
-    return res.status(400).json({
-      error: "NSFW content not allowed in SAFE communities",
-    })
-  }
-
-  isCommunityOnly = true
-}
-
-
-    /* =========================
-       5️⃣ CREATE POST
-    ========================= */
-
+    /* Create post */
     const post = await prisma.post.create({
       data: {
         type,
@@ -225,72 +158,71 @@ if (communityId && rating === "NSFW") {
         },
       },
     })
-    if (communityId) {
-  await materializeCommunityFeed(communityId)
-}
 
+    if (communityId) {
+      await materializeCommunityFeed(communityId)
+    }
 
     return res.status(201).json(post)
   } catch (err) {
     console.error("CREATE POST ERROR:", err)
-    return res
-      .status(500)
-      .json({ error: "Failed to create post" })
-  }
-}
-
-/* ============================================================
-   GLOBAL FEED (SAFE + WORLD ONLY)
-============================================================ */
-
-export const getFeed = async (req, res) => {
-  try {
-    // 🔁 Delegate to GLOBAL scoped feed
-    req.params.scope = "GLOBAL"
-    return getScopedFeed(req, res)
-  } catch (err) {
-    console.error("getFeed error:", err)
     return res.status(500).json({
-      success: false,
-      data: null,
-      error: { message: "Failed to load feed" },
+      error: "Failed to create post",
     })
   }
 }
 
 /* ============================================================
-   SCOPED FEEDS (STRICT SEPARATION)
+   GLOBAL FEED
 ============================================================ */
 
+export const getFeed = async (req, res) => {
+  req.params.scope = "GLOBAL"
+  return getScopedFeed(req, res)
+}
+
+/* ============================================================
+   SCOPED FEED (THIS IS THE IMPORTANT PART)
+============================================================ */
 
 export const getScopedFeed = async (req, res) => {
   try {
     const { scope } = req.params
 
-    if (!["LOCAL", "COUNTRY", "GLOBAL"].includes(scope)) {
+    if (!["GLOBAL", "COUNTRY", "LOCAL"].includes(scope)) {
       return res.status(400).json({ error: "Invalid scope" })
     }
 
-    // 🔑 Authenticated user
     const userId = req.user.userId
 
-    // 🔑 Load active feed profile
+    /* 🔑 Load active feed profile */
     const feedProfile = await getActiveFeedProfile(userId)
 
-    // 🔞 Build NSFW visibility filter (hard rule)
+    if (!feedProfile) {
+      console.warn("⚠️ No active feed profile for user", userId)
+    }
+
+    console.log("🧠 ACTIVE FEED PROFILE:", feedProfile)
+
+    const labelPrefs =
+      feedProfile?.preferences?.labels?.[scope] ?? []
+
+    console.log(
+      "🧠 FEED LABELS FOR SCOPE",
+      scope,
+      labelPrefs
+    )
+
     const nsfwFilter = buildNsfwFilter({
       isMinor: req.user.isMinor,
       feedProfile,
     })
 
-    // 🔑 Extract label preferences for this scope
-    const labelPrefs =
-      feedProfile?.preferences?.labels?.[scope] ?? []
-
     const posts = await prisma.post.findMany({
       where: {
         scope,
-        communityId: null, // 🔒 never leak community posts
+        communityId: null,
+        isRemoved: false,
         ...nsfwFilter,
         ...(labelPrefs.length > 0 && {
           categories: {
@@ -313,56 +245,45 @@ export const getScopedFeed = async (req, res) => {
         },
         categories: {
           include: {
-            category: {
-              select: { key: true },
-            },
+            category: { select: { key: true } },
           },
         },
-        likes: userId
-          ? {
-              where: { userId },
-              select: { id: true },
-            }
-          : false,
+        likes: {
+          where: { userId },
+          select: { id: true },
+        },
         _count: {
           select: { likes: true },
         },
       },
     })
 
-    // ❤️ Normalize like state
-    const enriched = posts.map((p) => ({
-      ...p,
-      likedByMe: userId ? p.likes?.length > 0 : false,
-      likes: undefined,
-    }))
-
-    return res.json(enriched)
+    return res.json(
+      posts.map((p) => ({
+        ...p,
+        likedByMe: p.likes.length > 0,
+        likes: undefined,
+      }))
+    )
   } catch (err) {
-    console.error("getScopedFeed error:", err)
-    res.status(500).json({
+    console.error("GET SCOPED FEED ERROR:", err)
+    return res.status(500).json({
       error: "Failed to fetch feed",
     })
   }
 }
 
-
-
 /* ============================================================
-   POSTS BY LABEL (WORLD ONLY)
+   POSTS BY LABEL
 ============================================================ */
 
 export const getPostsByLabel = async (req, res) => {
   try {
     const { key } = req.params
-    const userId = req.user?.userId
+    const userId = req.user.userId
 
-    // 🔍 Load active feed profile (adults only matter)
-    const feedProfile = userId
-      ? await getActiveFeedProfile(userId)
-      : null
+    const feedProfile = await getActiveFeedProfile(userId)
 
-    // 🔞 Build NSFW visibility filter
     const nsfwFilter = buildNsfwFilter({
       isMinor: req.user.isMinor,
       feedProfile,
@@ -370,7 +291,8 @@ export const getPostsByLabel = async (req, res) => {
 
     const posts = await prisma.post.findMany({
       where: {
-        communityId: null, // 🔒 no community leakage
+        communityId: null,
+        isRemoved: false,
         ...nsfwFilter,
         categories: {
           some: {
@@ -389,34 +311,29 @@ export const getPostsByLabel = async (req, res) => {
         },
         categories: {
           include: {
-            category: {
-              select: { key: true },
-            },
+            category: { select: { key: true } },
           },
         },
-        likes: userId
-          ? {
-              where: { userId },
-              select: { id: true },
-            }
-          : false,
+        likes: {
+          where: { userId },
+          select: { id: true },
+        },
         _count: {
           select: { likes: true },
         },
       },
     })
 
-    // ❤️ normalize like state
-    const enriched = posts.map((p) => ({
-      ...p,
-      likedByMe: userId ? p.likes?.length > 0 : false,
-      likes: undefined,
-    }))
-
-    res.json(enriched)
+    return res.json(
+      posts.map((p) => ({
+        ...p,
+        likedByMe: p.likes.length > 0,
+        likes: undefined,
+      }))
+    )
   } catch (err) {
     console.error("GET POSTS BY LABEL ERROR:", err)
-    res.status(500).json({
+    return res.status(500).json({
       error: "Failed to fetch posts by label",
     })
   }

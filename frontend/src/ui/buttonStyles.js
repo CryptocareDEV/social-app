@@ -10,10 +10,11 @@ export const buttonBase = (theme) => {
     fontSize: 14,
     fontWeight: 500,
     cursor: "pointer",
-    transition: "all 0.15s ease",
+    transition: "background 0.15s ease, color 0.15s ease",
     outline: "none",
   }
 }
+
 
 export const primaryButton = (theme) => {
   const c = getThemeColors(theme)

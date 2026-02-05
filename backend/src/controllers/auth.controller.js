@@ -2,21 +2,25 @@ import bcrypt from "bcrypt"
 import jwt from "jsonwebtoken"
 import prisma from "../lib/prisma.js"
 
+/* =========================
+   SIGNUP
+========================= */
 export const signup = async (req, res) => {
   try {
     const { email, username, password, dateOfBirth } = req.body
-    if (!dateOfBirth) {
-  return res.status(400).json({
-    error: "dateOfBirth is required",
-  })
-}
 
-const dob = new Date(dateOfBirth)
-if (isNaN(dob.getTime())) {
-  return res.status(400).json({
-    error: "Invalid dateOfBirth",
-  })
-}
+    if (!dateOfBirth) {
+      return res.status(400).json({
+        error: "dateOfBirth is required",
+      })
+    }
+
+    const dob = new Date(dateOfBirth)
+    if (isNaN(dob.getTime())) {
+      return res.status(400).json({
+        error: "Invalid dateOfBirth",
+      })
+    }
 
     if (!email || !username || !password) {
       return res.status(400).json({ error: "Missing required fields" })
@@ -42,35 +46,35 @@ if (isNaN(dob.getTime())) {
         dateOfBirth: dob,
       },
     })
-    await prisma.userProfile.create({
-  data: {
-    userId: user.id,
-  },
-})
 
-await prisma.feedProfile.create({
-  data: {
-    userId: user.id,
-    name: "Default",
-    isActive: true,
-    preferences: {
-      labels: {
-        GLOBAL: [],
-        COUNTRY: [],
-        LOCAL: [],
-      },
-      nsfw: {
-        posts: "HIDE",
-        communities: {
-          inFeeds: false,
-          onProfile: false,
+    // profile
+    await prisma.userProfile.create({
+      data: { userId: user.id },
+    })
+
+    // default feed profile
+    await prisma.feedProfile.create({
+      data: {
+        userId: user.id,
+        name: "Default",
+        isActive: true,
+        preferences: {
+          labels: {
+            GLOBAL: [],
+            COUNTRY: [],
+            LOCAL: [],
+          },
+          nsfw: {
+            posts: "HIDE",
+            communities: {
+              inFeeds: false,
+              onProfile: false,
+            },
+          },
+          ordering: "RECENT",
         },
       },
-      ordering: "RECENT",
-    },
-  },
-})
-
+    })
 
     return res.status(201).json({
       id: user.id,
@@ -83,6 +87,9 @@ await prisma.feedProfile.create({
   }
 }
 
+/* =========================
+   LOGIN
+========================= */
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body
@@ -100,7 +107,6 @@ export const login = async (req, res) => {
     }
 
     const isValid = await bcrypt.compare(password, user.passwordHash)
-
     if (!isValid) {
       return res.status(401).json({ error: "Invalid credentials" })
     }
@@ -128,22 +134,29 @@ export const login = async (req, res) => {
   }
 }
 
+/* =========================
+   AUTH ME  ✅ FIXED
+========================= */
 export const me = async (req, res) => {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.userId },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        avatarUrl: true,
-        createdAt: true,
-      },
-    })
+    // ✅ Trust auth middleware as single source of truth
+    return res.json({
+      id: req.user.userId,
+      email: req.user.email,
+      username: req.user.username,
 
-    return res.json(user)
+      // safety flags
+      isMinor: req.user.isMinor,
+      isSuperuser: req.user.isSuperuser,
+
+      // enforcement state (READ-ONLY for UI)
+      cooldownUntil: req.user.cooldownUntil ?? null,
+      reportCooldownUntil: req.user.reportCooldownUntil ?? null,
+      nsfwStrikes: req.user.nsfwStrikes ?? 0,
+    })
   } catch (err) {
     console.error(err)
     return res.status(500).json({ error: "Failed to fetch user" })
   }
 }
+

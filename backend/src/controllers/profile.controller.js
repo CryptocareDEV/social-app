@@ -64,6 +64,7 @@ export const getMyProfile = async (req, res) => {
     joinedAt: req.user.createdAt,
     activeFeedProfile,
     feedProfiles,
+    cooldownUntil: req.user.cooldownUntil ?? null,
   })
 }
 

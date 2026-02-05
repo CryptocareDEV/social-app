@@ -1,6 +1,7 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Link } from "react-router-dom"
 import { getThemeColors } from "../ui/theme"
+import { api } from "../api/client"
 
 export default function PostCard({
   post,
@@ -10,10 +11,98 @@ export default function PostCard({
   onLabelClick,
   theme,
 }) {
+  if (post.isRemoved) {
+  return null
+}
   const [showReason, setShowReason] = useState(false)
+  const [reportCooldownUntil, setReportCooldownUntil] = useState(null)
+  const severityCopy = {
+  LOW: {
+    tone: "#64748b",
+    text: "Content may be low quality or off-topic",
+  },
+  MEDIUM: {
+    tone: "#92400e",
+    text: "Content visibility is limited due to reports",
+  },
+  HIGH: {
+    tone: "#7c2d12",
+    text: "Content removed for policy violations",
+  },
+  CRITICAL: {
+    tone: "#7f1d1d",
+    text: "Sensitive content restricted for safety",
+  },
+}
+
   const colors = getThemeColors(theme)
 
-  console.log("POSTCARD POST:", post)
+  const severity = (() => {
+  if (!post?.rating) return null
+
+  if (post.rating === "NSFW") return "CRITICAL"
+
+  if (post.reason?.autoLimited) return "MEDIUM"
+
+  if (post.reason?.moderationOutcome === "REMOVED")
+    return "HIGH"
+
+  return null
+})()
+
+
+  /* ================================
+     🔎 Load user cooldown (once)
+  ================================= */
+  useEffect(() => {
+    let mounted = true
+
+    const loadMe = async () => {
+      try {
+        const me = await api("/users/me")
+        if (mounted && me?.reportCooldownUntil) {
+         setReportCooldownUntil(me.reportCooldownUntil)
+        }
+      } catch {
+        // backend still enforces cooldown
+      }
+    }
+
+    loadMe()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  /* ================================
+     ⛔ Derived cooldown state
+  ================================= */
+  const isOnReportCooldown =
+    reportCooldownUntil &&
+    new Date(reportCooldownUntil) > new Date()
+
+  /* ================================
+     🚩 Report handler
+  ================================= */
+  const handleReport = async () => {
+    if (isOnReportCooldown) {
+      alert("Reporting is temporarily disabled due to cooldown")
+      return
+    }
+
+    try {
+      await api("/reports", {
+        method: "POST",
+        body: JSON.stringify({
+          postId: post.id,
+          reason: "OTHER",
+        }),
+      })
+      alert("Report submitted")
+    } catch (err) {
+      alert(err?.error || "Failed to report post")
+    }
+  }
 
   return (
     <article
@@ -47,12 +136,7 @@ export default function PostCard({
           @{post.user.username}
         </Link>
 
-        <span
-          style={{
-            fontSize: 12,
-            color: colors.textMuted,
-          }}
-        >
+        <span style={{ fontSize: 12, color: colors.textMuted }}>
           {post.scope}
         </span>
       </header>
@@ -154,72 +238,64 @@ export default function PostCard({
           ))}
         </div>
       )}
-
-      {/* MEDIA */}
-      {(post.type === "IMAGE" || post.type === "MEME") &&
-        post.mediaUrl && (
-          <>
-            <img
-              src={post.mediaUrl}
-              alt=""
-              style={{
-                width: "100%",
-                borderRadius: theme.radius.md,
-                marginTop: 10,
-                border: `1px solid ${colors.border}`,
-              }}
-            />
-
-            {post.type === "IMAGE" && (
-              <button
-                onClick={() => onMeme(post)}
-                style={{
-                  marginTop: 8,
-                  background: "transparent",
-                  border: "none",
-                  color: colors.primary,
-                  cursor: "pointer",
-                  fontSize: 13,
-                }}
-              >
-                Create meme
-              </button>
-            )}
-          </>
-        )}
-
-      {post.type === "VIDEO" && post.mediaUrl && (
-        <video
-          src={post.mediaUrl}
-          controls
-          style={{
-            width: "100%",
-            borderRadius: theme.radius.md,
-            marginTop: 10,
-            border: `1px solid ${colors.border}`,
-          }}
-        />
-      )}
+{severity && severityCopy[severity] && (
+  <div
+    style={{
+      marginTop: 10,
+      padding: "8px 10px",
+      borderRadius: 8,
+      fontSize: 12,
+      background: "#fff7ed",
+      color: severityCopy[severity].tone,
+      border: "1px solid #fed7aa",
+    }}
+  >
+    ⚠️ {severityCopy[severity].text}
+  </div>
+)}
 
       {/* FOOTER */}
-      <footer style={{ marginTop: 12 }}>
+      <footer
+        style={{
+          marginTop: 12,
+          display: "flex",
+          gap: 12,
+          alignItems: "center",
+        }}
+      >
         <button
           disabled={isLiking}
           onClick={() => onLike(post.id)}
-          style={{
-            background: "transparent",
-            border: "none",
-            cursor: "pointer",
-            fontSize: 14,
-            color: post.likedByMe
-              ? colors.primary
-              : colors.textMuted,
-            fontWeight: post.likedByMe ? 600 : 400,
-          }}
         >
-          {post.likedByMe ? "💙" : "🤍"}{" "}
-          {post._count?.likes ?? 0}
+          {post.likedByMe ? "💙" : "🤍"} {post._count.likes}
         </button>
+
+        <span
+  title={
+    isOnReportCooldown
+      ? "Reporting paused due to repeated inaccurate reports"
+      : severity === "CRITICAL"
+      ? "Use for serious safety concerns only"
+      : "Report content that violates rules"
+  }
+><button
+  onClick={handleReport}
+  disabled={isOnReportCooldown}
+  style={{
+    fontSize: 12,
+    background: "transparent",
+    border: "none",
+    color: isOnReportCooldown ? "#94a3b8" : "#64748b",
+    cursor: isOnReportCooldown ? "not-allowed" : "pointer",
+  }}
+>
+  {isOnReportCooldown
+    ? "Reporting temporarily paused"
+    : severity === "CRITICAL"
+    ? "Report (safety issue)"
+    : "Report"}
+</button>
+</span>
       </footer>
     </article>
   )

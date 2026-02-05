@@ -9,6 +9,10 @@ import {
   addCommunityLabelImport,
   leaveCommunity,
 } from "../controllers/community.controller.js"
+import {
+  applyCommunityModerationAction,
+} from "../controllers/communityModeration.controller.js"
+
 import { requireAuth } from "../middleware/auth.middleware.js"
 import { removeCommunityMember } from "../controllers/community.controller.js"
 import { changeCommunityMemberRole } from "../controllers/community.controller.js"
@@ -32,6 +36,9 @@ import {
   getCommunityInvitations,
 } from "../controllers/community.controller.js"
 import { enforceUserStatus } from "../middleware/enforcement.middleware.js"
+import {
+  getCommunityModerationReports,
+} from "../controllers/communityModeration.controller.js"
 
 
 
@@ -50,6 +57,19 @@ router.get(
   requireAuth,
   getCommunityInvitations
 )
+router.post(
+  "/:id/moderation/actions",
+  requireAuth,
+  applyCommunityModerationAction
+)
+router.get(
+  "/:id/moderation/reports",
+  requireAuth,
+  getCommunityModerationReports
+)
+
+
+
 router.get("/my", requireAuth, getMyCommunities)
 router.get(
   "/:id/feed",

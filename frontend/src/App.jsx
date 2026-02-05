@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react"
 import { Routes, Route, Navigate } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
+
+
+
+
+
+import ModerationDashboard from "./pages/ModerationDashboard"
 
 import Login from "./pages/Login"
 import Feed from "./components/Feed"
@@ -8,15 +15,20 @@ import Profile from "./pages/Profile"
 import MemeEditor from "./components/MemeEditor"
 import CreateCommunityModal from "./components/CreateCommunityModal"
 import CommunityChat from "./components/CommunityChat"
+import CommunityActionBar from "./components/CommunityActionBar"
 import Signup from "./pages/Signup"
 import {
   primaryButton,
   secondaryButton,
   ghostButton,
+  dangerButton,
   headerPrimaryButton,
   headerGhostButton,
   headerSelect, // 👈 ADD THIS
 } from "./ui/buttonStyles"
+import CommunityModerationDashboard from "./pages/CommunityModerationDashboard"
+
+
 
 
 
@@ -28,6 +40,8 @@ import { api } from "./api/client"
 export default function App() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const navigate = useNavigate()
+
   // 🎨 Theme (Phase 1 foundation)
   const [theme, setTheme] = useState(() => {
   const saved = localStorage.getItem("theme-mode")
@@ -59,6 +73,9 @@ const toggleTheme = () => {
   const [communityMembers, setCommunityMembers] = useState([])
   const [showMembers, setShowMembers] = useState(false)
   const [cooldownInfo, setCooldownInfo] = useState(null)
+const [activeFeedProfileId, setActiveFeedProfileId] = useState(null)
+const [activeFeedProfileName, setActiveFeedProfileName] = useState(null)
+  
   
 const handleLogout = () => {
   localStorage.removeItem("token")
@@ -94,19 +111,40 @@ const isInCommunity =
 const myMembership = isInCommunity
   ? communityMembers.find((m) => m.id === user?.id)
   : null
+  const isCommunityModerator =
+  myMembership?.role === "ADMIN" ||
+  myMembership?.role === "MODERATOR"
+
 
 const isAdmin = myMembership?.role === "ADMIN"
 
 
 
 
+useEffect(() => {
+  api("/users/me")
+    .then((u) => {
+      setUser(u)
+      loadInvitations()
+      loadCommunities()
 
-
-
-  // 🔐 Auth bootstrap
-  useEffect(() => {
-  api("/auth/me")
-    .then(setUser)
+      // Priority order:
+      // 1. Report cooldown
+      // 2. Post / action cooldown
+      if (u.reportCooldownUntil) {
+        setCooldownInfo({
+          type: "REPORT",
+          until: u.reportCooldownUntil,
+        })
+      } else if (u.cooldownUntil) {
+        setCooldownInfo({
+          type: "ACTION",
+          until: u.cooldownUntil,
+        })
+      } else {
+        setCooldownInfo(null)
+      }
+    })
     .catch(() => {
       localStorage.removeItem("token")
       setUser(null)
@@ -115,24 +153,8 @@ const isAdmin = myMembership?.role === "ADMIN"
 }, [])
 
 
-useEffect(() => {
-  if (!user) return
 
-  api("/users/me")
-    .then((u) => {
-      setUser(u)
 
-      // ⛔ Handle cooldown / ban info
-      if (u.cooldownUntil) {
-        setCooldownInfo({
-          cooldownUntil: u.cooldownUntil,
-        })
-      } else {
-        setCooldownInfo(null)
-      }
-    })
-    .catch(() => {})
-}, [])
 
 
   const loadInvitations = async () => {
@@ -149,6 +171,11 @@ useEffect(() => {
   )
   setPendingInvites(data || [])
 }
+useEffect(() => {
+  if (user) {
+    loadInvitations()
+  }
+}, [user])
 
 
   // 🏘 Load my communities
@@ -160,6 +187,7 @@ useEffect(() => {
       console.error("Failed to load communities", err)
     }
   }
+
 
 const loadCommunityMembers = async () => {
   if (selectedCommunity === "GLOBAL") return
@@ -175,6 +203,28 @@ const loadCommunityMembers = async () => {
 }
 
 useEffect(() => {
+  if (!user) return
+
+  api("/feed-profiles")
+    .then((profiles) => {
+      const active = profiles?.find((p) => p.isActive)
+      if (active) {
+        setActiveFeedProfileId(active.id)
+        setActiveFeedProfileName(active.name)
+      }
+    })
+    .catch(() => {
+      // fail silently – feed still works with default profile
+    })
+}, [user])
+
+
+
+
+
+
+
+useEffect(() => {
   if (feedMode === "COMMUNITY" && selectedCommunity !== "GLOBAL") {
     loadCommunityMembers()
   } else {
@@ -185,62 +235,152 @@ useEffect(() => {
 
 
   // 📰 Load feed
-  const loadFeed = async () => {
-    try {
-      let endpoint
+  // 📰 Load feed (single source of truth)
+const loadFeed = async () => {
+  try {
+    let endpoint = null
 
-      if (feedMode === "LABEL" && activeLabel) {
-        endpoint = `/posts/label/${activeLabel}`
-      } else if (feedMode === "COMMUNITY" && selectedCommunity !== "GLOBAL") {
-        endpoint = `/communities/${selectedCommunity}/feed`
-      } else {
-        endpoint = `/posts/feed/${feedScope}`
-      }
-
-      const data = await api(endpoint)
-
-      setPosts(
-        (data.items ?? data).map((p) => ({
-          ...p,
-          likedByMe: !!p.likedByMe,
-        }))
-      )
-    } catch (err) {
-      console.error("Failed to load feed", err)
+    if (feedMode === "LABEL" && activeLabel) {
+      endpoint = `/posts/label/${activeLabel}`
+    } 
+    else if (
+      feedMode === "COMMUNITY" &&
+      selectedCommunity &&
+      selectedCommunity !== "GLOBAL"
+    ) {
+      endpoint = `/communities/${selectedCommunity}/feed`
+    } 
+    else {
+      endpoint = `/posts/feed/${feedScope}`
     }
+
+    if (!endpoint) return
+
+    const data = await api(endpoint, {
+  headers: activeFeedProfileId
+    ? { "X-Feed-Profile": activeFeedProfileId }
+    : {},
+})
+
+    const items = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.items)
+      ? data.items
+      : []
+
+    setPosts(
+      items.map((p) => ({
+        ...p,
+        likedByMe: !!p.likedByMe,
+      }))
+    )
+  } catch (err) {
+    console.error("Failed to load feed", err)
+    setPosts([]) // fail-safe: never leave stale feed
   }
+}
+// 🔥 DELETE COMMUNITY (ADMIN + only member)
+const handleDeleteCommunity = async () => {
+  if (!activeCommunity) return
+
+  const ok = window.confirm(
+    "Delete this community permanently? This action cannot be undone."
+  )
+  if (!ok) return
+
+  try {
+    await api(`/communities/${activeCommunity.id}`, {
+      method: "DELETE",
+    })
+
+    // Remove from UI state
+    setCommunities((prev) =>
+      prev.filter((c) => c.id !== activeCommunity.id)
+    )
+
+    // Reset navigation
+    setSelectedCommunity("GLOBAL")
+    setFeedMode("GLOBAL")
+    setCommunityMembers([])
+    setCommunityLabels([])
+
+    await loadFeed()
+  } catch (err) {
+    alert(err?.error || "Failed to delete community")
+  }
+}
+
+// 🚪 LEAVE COMMUNITY (non-admin OR admin with another admin present)
+const handleLeaveCommunity = async () => {
+  try {
+    await api(`/communities/${selectedCommunity}/leave`, {
+      method: "POST",
+    })
+
+    setCommunities((prev) =>
+      prev.filter((c) => c.id !== selectedCommunity)
+    )
+
+    setSelectedCommunity("GLOBAL")
+    setFeedMode("GLOBAL")
+    setCommunityMembers([])
+
+    await loadFeed()
+  } catch (err) {
+    alert(err?.error || "Failed to leave community")
+  }
+}
+
   
-  useEffect(() => {
-  if (feedMode === "COMMUNITY") {
+  // 📩 Load community invites when entering a community
+useEffect(() => {
+  if (
+    feedMode === "COMMUNITY" &&
+    selectedCommunity &&
+    selectedCommunity !== "GLOBAL"
+  ) {
     loadCommunityInvites()
   }
-}, [selectedCommunity])
+}, [feedMode, selectedCommunity])
+
 
   // 🔁 Reload feed + communities
-  useEffect(() => {
-    if (!user) return
-    loadFeed()
-    loadCommunities()
-  }, [user, feedMode, feedScope, selectedCommunity, activeLabel])
+  // 🔁 Reload feed when feed inputs change
+useEffect(() => {
+  if (!user || !activeFeedProfileId) return
+  loadFeed()
+}, [
+  user,
+  feedMode,
+  feedScope,
+  selectedCommunity,
+  activeLabel,
+  activeFeedProfileId,
+])
+
+
 
   // 🏷 Load labels for selected community
-  useEffect(() => {
-    if (!selectedCommunity || selectedCommunity === "GLOBAL") {
-      setCommunityLabels([])
-      return
-    }
+  // 🏷 Load labels for selected community
+useEffect(() => {
+  if (!selectedCommunity || selectedCommunity === "GLOBAL") {
+    setCommunityLabels([])
+    return
+  }
 
-    // ⚠️ THIS ENDPOINT MUST EXIST (see backend section below)
-    api(`/communities/${selectedCommunity}`)
-      .then((c) => {
-        setCommunityLabels(
-          c.categories?.map((x) => x.categoryKey) || []
-        )
-      })
-      .catch(() => {
-        setCommunityLabels([])
-      })
-  }, [selectedCommunity])
+  api(`/communities/${selectedCommunity}`)
+    .then((c) => {
+      setCommunityLabels(
+        Array.isArray(c?.categories)
+          ? c.categories.map((x) => x.categoryKey)
+          : []
+      )
+    })
+    .catch(() => {
+      setCommunityLabels([])
+    })
+}, [selectedCommunity])
+
 
   // ❤️ Like handler (backend is source of truth)
   const handleLike = async (postId) => {
@@ -288,30 +428,46 @@ useEffect(() => {
     <Routes>
 
       <Route
-  path="/login"
+    path="/login"
+    element={
+      user ? <Navigate to="/" /> : <Login onLogin={setUser} />
+    }
+  />
+
+<Route
+    path="/signup"
+    element={
+      user ? <Navigate to="/" /> : <Signup onSignup={setUser} />
+    }
+  />
+
+
+  <Route
+  path="/moderation"
   element={
-    user
-      ? <Navigate to="/" />
-      : <Login onLogin={setUser} />
+    user && user.isSuperuser
+      ? <ModerationDashboard />
+      : <Navigate to="/" />
   }
 />
 
 <Route
-  path="/signup"
+  path="/communities/:id/moderation"
   element={
-    user
-      ? <Navigate to="/" />
-      : <Signup onSignup={setUser} />
-  }
+  user
+    ? <CommunityModerationDashboard />
+    : <Navigate to="/" />
+}
 />
 
+
 <Route
-  path="/"
-  element={
-    !user ? (
-      <Navigate to="/login" />
-    ) : (
-      <>
+    path="/"
+    element={
+      !user ? (
+        <Navigate to="/login" />
+      ) : (
+        <>
       
 
 
@@ -340,6 +496,21 @@ useEffect(() => {
     <strong>🌱 Social</strong>
 
     {/* Right side controls */}
+    {activeFeedProfileName && (
+  <div
+    style={{
+      fontSize: 12,
+      padding: "4px 10px",
+      borderRadius: 999,
+      background: colors.surfaceMuted,
+      border: `1px solid ${colors.border}`,
+      opacity: 0.85,
+    }}
+  >
+    👁 Viewing as: <strong>{activeFeedProfileName}</strong>
+  </div>
+)}
+
     <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
       <button
   onClick={() => setShowCreateCommunity(true)}
@@ -348,25 +519,50 @@ useEffect(() => {
   + Community
 </button>
 
+{user?.isSuperuser && (
+  <Link to="/moderation" style={{ textDecoration: "none" }}>
+  <button style={secondaryButton(theme)}>
+    🛡 Platform moderation
+  </button>
+</Link>
+)}
+
+{isCommunityModerator && activeCommunity && (
+  <Link to={`/communities/${activeCommunity.id}/moderation`} style={{ textDecoration: "none" }}>
+  <button style={secondaryButton(theme)}>
+    🏘️ Community moderation
+  </button>
+</Link>
+)}
+
+
+
+
 
       <div style={{ position: "relative" }}>
   <select
-    value={selectedCommunity}
-    onChange={(e) => {
-      setFeedMode("COMMUNITY")
-      setActiveLabel(null)
-      setSelectedCommunity(e.target.value)
-    }}
-    style={headerSelect(theme)}
-  >
-    {communities.map((c) => (
-      <option key={c.id} value={c.id}>
-        {c.scope === "GLOBAL" && "🌍"}
-        {c.scope === "COUNTRY" && "🏳️"}
-        {c.scope === "LOCAL" && "📍"} {c.name}
-      </option>
-    ))}
-  </select>
+  value={selectedCommunity}
+  onChange={(e) => {
+    const value = e.target.value
+    setSelectedCommunity(value)
+    setActiveLabel(null)
+    setFeedMode(value === "GLOBAL" ? "GLOBAL" : "COMMUNITY")
+  }}
+  style={headerSelect(theme)}
+>
+  <option value="GLOBAL">🌍 Global feed</option>
+
+  {communities.map((c) => (
+    <option key={c.id} value={c.id}>
+      {c.scope === "GLOBAL" && "🌍"}
+      {c.scope === "COUNTRY" && "🏳️"}
+      {c.scope === "LOCAL" && "📍"} {c.name}
+    </option>
+  ))}
+</select>
+
+
+
 
   {/* dropdown arrow */}
   <span
@@ -393,14 +589,17 @@ useEffect(() => {
           gap: 10,
         }}
       >
-        <span
-          style={{
-            fontSize: 14,
-            fontWeight: 500,
-          }}
-        >
-          @{user.username}
-        </span>
+        <Link
+  to={`/profile/${user.id}`}
+  style={{
+    fontSize: 14,
+    fontWeight: 600,
+    color: colors.text,
+    textDecoration: "none",
+  }}
+>
+  @{user.username}
+</Link>
         <button
   onClick={toggleTheme}
   style={headerGhostButton(theme)}
@@ -426,20 +625,24 @@ useEffect(() => {
   
 </header>
 
-{cooldownInfo && (
+{cooldownInfo?.type === "REPORT" && (
   <div
     style={{
-      background: "#fee2e2",
-      color: "#7f1d1d",
+      background: "#fff7ed",
+      color: "#7c2d12",
       padding: "10px 16px",
       textAlign: "center",
       fontSize: 14,
+      borderBottom: "1px solid #fed7aa",
     }}
   >
-    🚫 You’re on cooldown until{" "}
+    ⚠️ Reporting is temporarily paused until{" "}
     <strong>
-      {new Date(cooldownInfo.cooldownUntil).toLocaleString()}
+      {new Date(cooldownInfo.until).toLocaleString()}
     </strong>
+    <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>
+      This helps keep reports accurate and fair for everyone.
+    </div>
   </div>
 )}
 
@@ -447,13 +650,17 @@ useEffect(() => {
               <main
               
                 style={{
-                  maxWidth: 720,
-                  margin: "0 auto",
-                  padding: 20,
+                  maxWidth: "min(100%, 720px)",
+margin: "0 auto",
+padding: "24px 16px",
                   background: theme.colors.bg,
                   minHeight: "100vh",
                 }}
                >
+
+
+
+
                 {/* 🔔 COMMUNITY INVITATIONS */}
   {invitations.length > 0 && (
     <div
@@ -461,8 +668,10 @@ useEffect(() => {
         marginBottom: 16,
         padding: 12,
         borderRadius: 12,
-        background: "#fef3c7",
-        border: "1px solid #fde68a",
+        background: colors.surfaceMuted,
+border: `1px solid ${colors.border}`,
+color: colors.text,
+color: colors.textMuted
       }}
     >
       <strong>Community invitations</strong>
@@ -494,6 +703,7 @@ useEffect(() => {
                 )
                 loadCommunities()
               }}
+              style={primaryButton(theme)}
             >
               Accept
             </button>
@@ -508,6 +718,7 @@ useEffect(() => {
                   prev.filter((i) => i.id !== inv.id)
                 )
               }}
+              style={secondaryButton(theme)}
             >
               Decline
             </button>
@@ -539,8 +750,8 @@ useEffect(() => {
       marginBottom: 16,
       padding: "12px 16px",
       borderRadius: 16,
-      background: "#f8fafc",
-      border: "1px solid #e5e7eb",
+      background: colors.surface,
+border: `1px solid ${colors.border}`,
     }}
   >
     <div style={{ fontSize: 16, fontWeight: 600 }}>
@@ -562,7 +773,26 @@ useEffect(() => {
     </div>
   </div>
 )}
+{isInCommunity && activeCommunity && (
+  <CommunityActionBar
+    theme={theme}
+    colors={colors}
+    community={activeCommunity}
+    isAdmin={isAdmin}
+    isModerator={isCommunityModerator}
+    memberCount={memberCount}
+    onInvite={() => {
+      // scroll to invite section instead of duplicating UI
+      document
+        .getElementById("community-invite")
+        ?.scrollIntoView({ behavior: "smooth" })
+    }}
+    onLeave={handleLeaveCommunity}
+    onDelete={handleDeleteCommunity}
+  />
+)}
 
+              
 
 
                 <PostComposer
@@ -575,7 +805,6 @@ useEffect(() => {
 
 
 
-
 {feedMode === "COMMUNITY" &&
   selectedCommunity !== "GLOBAL" && (
     
@@ -585,8 +814,8 @@ useEffect(() => {
         marginBottom: 16,
         padding: 12,
         borderRadius: 12,
-        background: "#f1f5f9",
-        border: "1px solid #e2e8f0",
+        background: colors.surfaceMuted,
+border: `1px solid ${colors.border}`,
       }}
     >
       <div
@@ -638,28 +867,47 @@ useEffect(() => {
     </div>
 )}
 
-{isInCommunity && (
+{/* 🔥 ADMIN: single-member → DELETE */}
+{isInCommunity && isAdmin && memberCount === 1 && (
   <button
-    onClick={async () => {
-      const res = await api(
-        `/communities/${selectedCommunity}/leave`,
-        { method: "POST" }
-      )
-
-      // Reset UI to world state
-      setSelectedCommunity("GLOBAL")
-      setFeedMode("GLOBAL")
-      loadCommunities()
-    }}
-    style={{
-      marginTop: 12,
-      background: "#fee2e2",
-      color: "#7f1d1d",
-    }}
+    onClick={handleDeleteCommunity}
+    style={dangerButton(theme)}
   >
-    Leave community
+    Delete community
   </button>
 )}
+
+{/* 🚪 LEAVE COMMUNITY */}
+{isInCommunity && (
+  <>
+    {/* MEMBER or MODERATOR */}
+    {!isAdmin && (
+      <button
+        onClick={handleLeaveCommunity}
+        style={secondaryButton(theme)}
+      >
+        Leave community
+      </button>
+    )}
+
+    {/* ADMIN with other members */}
+    {isAdmin && memberCount > 1 && (
+      <div
+        style={{
+          marginTop: 8,
+          fontSize: 13,
+          color: colors.textMuted,
+        }}
+      >
+        You must assign another admin before leaving this
+        community.
+      </div>
+    )}
+  </>
+)}
+
+
+
 
 
                 {/* COMMUNITY LABEL EDITOR */}
@@ -783,80 +1031,116 @@ useEffect(() => {
 {feedMode === "COMMUNITY" &&
   selectedCommunity !== "GLOBAL" &&
   activeCommunity?.role === "ADMIN" && (
-  <div
-    style={{
-      marginBottom: 16,
-      padding: 12,
-      borderRadius: 12,
-      background: "#fff7ed",
-      border: "1px solid #fed7aa",
-    }}
-  >
-    <strong>Invite member</strong>
-
-    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-      <input
-        placeholder="Username"
-        value={inviteUsername}
-        onChange={(e) => setInviteUsername(e.target.value)}
-      />
-      <button
-        onClick={async () => {
-          if (!inviteUsername.trim()) return
-          await api(
-            `/communities/${selectedCommunity}/invitations`,
-            {
-              method: "POST",
-              body: JSON.stringify({
-                username: inviteUsername.trim(),
-              }),
-            }
-          )
-          setInviteUsername("")
-          loadCommunityInvites()
+    <div
+      id="community-invite"
+      style={{
+        marginBottom: 20,
+        padding: 14,
+        borderRadius: 16,
+        background: colors.surface,
+        border: `1px solid ${colors.border}`,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 14,
+          fontWeight: 600,
+          marginBottom: 10,
         }}
       >
-        Invite
-      </button>
-    </div>
+        Invite people
+      </div>
 
-    {pendingInvites.length > 0 && (
-      <div style={{ marginTop: 10 }}>
-        <strong style={{ fontSize: 13 }}>
-          Pending invitations
-        </strong>
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          marginBottom: 12,
+        }}
+      >
+        <input
+          placeholder="Username"
+          value={inviteUsername}
+          onChange={(e) => setInviteUsername(e.target.value)}
+          style={{
+            flex: 1,
+            padding: "8px 10px",
+            borderRadius: 10,
+            border: `1px solid ${colors.border}`,
+            background: colors.bg,
+            color: colors.text,
+            fontSize: 14,
+          }}
+        />
+        <button
+          onClick={async () => {
+            if (!inviteUsername.trim()) return
+            await api(
+              `/communities/${selectedCommunity}/invitations`,
+              {
+                method: "POST",
+                body: JSON.stringify({
+                  username: inviteUsername.trim(),
+                }),
+              }
+            )
+            setInviteUsername("")
+            loadCommunityInvites()
+          }}
+          style={primaryButton(theme)}
+        >
+          Invite
+        </button>
+      </div>
 
-        {pendingInvites.map((inv) => (
+      {pendingInvites.length > 0 && (
+        <div style={{ marginTop: 8 }}>
           <div
-            key={inv.id}
             style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginTop: 6,
-              fontSize: 13,
+              fontSize: 12,
+              fontWeight: 600,
+              color: colors.textMuted,
+              marginBottom: 6,
             }}
           >
-            <span>
-              @{inv.invitedUser.username}
-            </span>
+            Pending invitations
+          </div>
 
-            <button
-              onClick={async () => {
-                await api(
-                  `/communities/invitations/${inv.id}/revoke`,
-                  { method: "POST" }
-                )
-                loadCommunityInvites()
+          {pendingInvites.map((inv) => (
+            <div
+              key={inv.id}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "6px 8px",
+                borderRadius: 10,
+                background: colors.bg,
+                marginBottom: 6,
+                fontSize: 13,
               }}
             >
-              Revoke
-            </button>
-          </div>
-        ))}
-      </div>
-    )}
-  </div>
+              <span>@{inv.invitedUser.username}</span>
+
+              <button
+                onClick={async () => {
+                  await api(
+                    `/communities/invitations/${inv.id}/revoke`,
+                    { method: "POST" }
+                  )
+                  loadCommunityInvites()
+                }}
+                style={ghostButton(theme)}
+              >
+                Revoke
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
 )}
+
 
                 {/* FEED SCOPE */}
                 {feedMode !== "COMMUNITY" && (
@@ -889,7 +1173,14 @@ useEffect(() => {
                     ❌ Clear #{activeLabel}
                   </button>
                 )}
-
+<div
+  style={{
+    background: colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    boxShadow: theme.shadow.sm,
+  }}
+>
                 <Feed
                   posts={posts}
                   onLike={handleLike}
@@ -901,6 +1192,7 @@ useEffect(() => {
                   }}
                   theme={theme}
                 />
+                </div>
                 {feedMode === "COMMUNITY" &&
   selectedCommunity !== "GLOBAL" && (
     <CommunityChat communityId={selectedCommunity} />
@@ -922,12 +1214,14 @@ useEffect(() => {
               {showCreateCommunity && (
   <CreateCommunityModal
     onClose={() => setShowCreateCommunity(false)}
-    onCreated={(community) => {
-      setCommunities((prev) => [...prev, community])
-      setFeedMode("COMMUNITY")
-      setSelectedCommunity(community.id)
-    }}
+    onCreated={async () => {
+  setShowCreateCommunity(false)
+  await loadCommunities()
+  setSelectedCommunity("GLOBAL")
+  setFeedMode("GLOBAL")
+}}
     setCooldownInfo={setCooldownInfo}
+    theme={theme}
   />
 )}
             </>
@@ -936,11 +1230,28 @@ useEffect(() => {
       />
 
       <Route
-        path="/profile/:id"
-        element={user ? <Profile /> : <Navigate to="/login" />}
+  path="/profile/:id"
+  element={
+    user ? (
+      <Profile
+        theme={theme}
+        onFeedProfileChange={({ id, name }) => {
+          setActiveFeedProfileId(id)
+          setActiveFeedProfileName(name)
+          setFeedMode("GLOBAL")
+          setActiveLabel(null)
+        }}
       />
+    ) : (
+      <Navigate to="/login" />
+    )
+  }
+/>
+
     </Routes>
+    
      </div>
+     
 
   )
 }

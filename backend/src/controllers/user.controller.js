@@ -45,25 +45,50 @@ export const getUserPosts = async (req, res) => {
   }
 }
 
+/**
+ * GET /api/v1/users/me
+ * 🔑 Auth bootstrap endpoint
+ */
 export const getMe = async (req, res) => {
   try {
+    const userId = req.user.userId
+
+    // 1️⃣ Load base user
     const user = await prisma.user.findUnique({
-      where: { id: req.user.userId },
+      where: { id: userId },
       select: {
         id: true,
         email: true,
         username: true,
         avatarUrl: true,
         createdAt: true,
+        cooldownUntil: true,
+        reportCooldownUntil: true,
       },
     })
 
-    return res.json(user)
+    if (!user) {
+      return res.status(404).json({ error: "User not found" })
+    }
+
+    // 2️⃣ Check superuser status
+    const superuser = await prisma.superuser.findUnique({
+      where: { userId },
+      select: { role: true },
+    })
+
+    // 3️⃣ Return enriched auth state
+    return res.json({
+      ...user,
+      isSuperuser: !!superuser,
+      superuserRole: superuser?.role || null,
+    })
   } catch (err) {
     console.error(err)
     return res.status(500).json({ error: "Failed to fetch me" })
   }
 }
+
 export const getMyInvitations = async (req, res) => {
   try {
     const userId = req.user.userId
@@ -100,4 +125,3 @@ export const getMyInvitations = async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch invitations" })
   }
 }
-
