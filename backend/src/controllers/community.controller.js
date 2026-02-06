@@ -174,7 +174,10 @@ export const getCommunityById = async (req, res) => {
       })
     }
 
-    return res.json(community)
+    return res.json({
+  ...community,
+  myRole: membership.role,
+})
   } catch (err) {
     console.error("GET COMMUNITY BY ID ERROR:", err)
     return res.status(500).json({
@@ -1216,4 +1219,54 @@ export const leaveCommunity = async (req, res) => {
   })
 
   return res.json({ left: true })
+}
+
+
+/**
+ * PATCH /communities/:id/intention
+ * Update community intention (ADMIN only)
+ */
+export const updateCommunityIntention = async (req, res) => {
+  try {
+    const { id: communityId } = req.params
+    const { intention } = req.body
+    const userId = req.user.userId
+
+    if (typeof intention !== "string") {
+      return res.status(400).json({ error: "Invalid intention" })
+    }
+
+    // Ensure requester is ADMIN
+    const membership = await prisma.communityMember.findFirst({
+      where: {
+        communityId,
+        userId,
+        role: "ADMIN",
+      },
+    })
+
+    if (!membership) {
+      return res
+        .status(403)
+        .json({ error: "Only ADMIN can edit community intention" })
+    }
+
+    const community = await prisma.community.update({
+      where: { id: communityId },
+      data: {
+        intention: intention.trim(),
+      },
+      select: {
+        id: true,
+        intention: true,
+      },
+    })
+
+    return res.json(community)
+  } catch (err) {
+    console.error("UPDATE COMMUNITY INTENTION ERROR:", err)
+    return res.status(500).json({
+      error: "Failed to update community intention",
+    })
+  }
 }

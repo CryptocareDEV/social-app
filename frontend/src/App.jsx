@@ -27,7 +27,7 @@ import {
   headerSelect, // 👈 ADD THIS
 } from "./ui/buttonStyles"
 import CommunityModerationDashboard from "./pages/CommunityModerationDashboard"
-
+import CommunityPage from "./pages/CommunityPage"
 
 
 
@@ -459,6 +459,12 @@ useEffect(() => {
     : <Navigate to="/" />
 }
 />
+
+<Route
+  path="/communities/:id"
+  element={<CommunityPage theme={theme} />}
+/>
+
 
 
 <Route

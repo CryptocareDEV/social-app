@@ -12,6 +12,11 @@ export const getUserProfile = async (req, res) => {
         avatarUrl: true,
         createdAt: true,
         _count: { select: { posts: true } },
+        profile: {
+          select: {
+            bio: true,
+          },
+        },
       },
     })
 
@@ -19,12 +24,16 @@ export const getUserProfile = async (req, res) => {
       return res.status(404).json({ error: "User not found" })
     }
 
-    return res.json(user)
+    return res.json({
+      ...user,
+      bio: user.profile?.bio ?? "",
+    })
   } catch (err) {
     console.error(err)
     return res.status(500).json({ error: "Failed to fetch profile" })
   }
 }
+
 
 export const getUserPosts = async (req, res) => {
   try {
@@ -123,5 +132,50 @@ export const getMyInvitations = async (req, res) => {
   } catch (err) {
     console.error(err)
     return res.status(500).json({ error: "Failed to fetch invitations" })
+  }
+}
+
+export const updateMe = async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const { bio } = req.body
+
+    if (typeof bio !== "string") {
+      return res.status(400).json({ error: "Invalid bio" })
+    }
+
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        profile: {
+          upsert: {
+            create: {
+              bio: bio.trim(),
+            },
+            update: {
+              bio: bio.trim(),
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        profile: {
+          select: {
+            bio: true,
+          },
+        },
+      },
+    })
+
+    return res.json({
+      id: user.id,
+      bio: user.profile?.bio ?? "",
+    })
+  } catch (err) {
+    console.error("UPDATE ME ERROR:", err)
+    return res.status(500).json({
+      error: "Failed to update profile",
+    })
   }
 }

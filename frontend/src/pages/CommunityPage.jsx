@@ -21,6 +21,13 @@ export default function CommunityPage({ theme }) {
 
   const [members, setMembers] = useState([])
   const [loadingMembers, setLoadingMembers] = useState(false)
+  const [myRole, setMyRole] = useState(null)
+
+  const [editingIntention, setEditingIntention] = useState(false)
+  const [intentionDraft, setIntentionDraft] = useState("")
+  const [savingIntention, setSavingIntention] = useState(false)
+
+
 
   /* =====================
      Load community meta
@@ -31,7 +38,10 @@ export default function CommunityPage({ theme }) {
 
     api(`/communities/${id}`)
       .then((data) => {
-        if (mounted) setCommunity(data)
+        if (!mounted) return
+    setCommunity(data)
+    setMyRole(data.myRole || null)
+    setIntentionDraft(data.intention || "")
       })
       .catch(() => {
         if (mounted) setError("Failed to load community")
@@ -164,7 +174,8 @@ export default function CommunityPage({ theme }) {
           fontSize: 13,
         }}
       >
-        {["feed", "chat", "members"].map((tab) => (
+        {["feed", "chat", "members", ...(myRole === "ADMIN" ? ["settings"] : [])]
+  .map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -192,6 +203,151 @@ export default function CommunityPage({ theme }) {
           minHeight: 200,
         }}
       >
+        {activeTab === "settings" && myRole === "ADMIN" && (
+  <div style={{ maxWidth: 520 }}>
+    <div
+      style={{
+        fontSize: 14,
+        fontWeight: 600,
+        marginBottom: 12,
+      }}
+    >
+      Community settings
+    </div>
+
+    {/* Intention */}
+<div style={{ marginBottom: 16 }}>
+  <label
+    style={{
+      fontSize: 12,
+      color: colors.textMuted,
+      display: "block",
+      marginBottom: 6,
+    }}
+  >
+    Community intention
+  </label>
+
+  {!editingIntention ? (
+    <div
+      style={{
+        padding: 10,
+        borderRadius: 12,
+        border: `1px solid ${colors.border}`,
+        background: colors.surfaceMuted,
+        fontSize: 14,
+        lineHeight: 1.5,
+        whiteSpace: "pre-wrap",
+        cursor: "pointer",
+      }}
+      onClick={() => setEditingIntention(true)}
+    >
+      {community.intention || "Click to add intention"}
+    </div>
+  ) : (
+    <>
+      <textarea
+        value={intentionDraft}
+        onChange={(e) => setIntentionDraft(e.target.value)}
+        rows={3}
+        style={{
+          width: "100%",
+          boxSizing: "border-box",
+          padding: 10,
+          borderRadius: 12,
+          border: `1px solid ${colors.border}`,
+          background: colors.surface,
+          resize: "none",
+          fontSize: 14,
+          marginBottom: 8,
+        }}
+      />
+
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          justifyContent: "flex-end",
+        }}
+      >
+        <button
+          onClick={() => {
+            setEditingIntention(false)
+            setIntentionDraft(community.intention || "")
+          }}
+          style={{
+            fontSize: 12,
+            padding: "6px 10px",
+            borderRadius: 10,
+            border: `1px solid ${colors.border}`,
+            background: colors.surface,
+            cursor: "pointer",
+          }}
+        >
+          Cancel
+        </button>
+
+        <button
+          disabled={savingIntention}
+          onClick={async () => {
+            setSavingIntention(true)
+            try {
+              await api(`/communities/${id}/intention`, {
+  method: "PATCH",
+  body: JSON.stringify({
+    intention: intentionDraft,
+  }),
+})
+
+
+              setCommunity((prev) => ({
+                ...prev,
+                intention: intentionDraft,
+              }))
+              setEditingIntention(false)
+            } finally {
+              setSavingIntention(false)
+            }
+          }}
+          style={{
+            fontSize: 12,
+            padding: "6px 12px",
+            borderRadius: 10,
+            border: "none",
+            background: colors.primary,
+            color: "#fff",
+            cursor: "pointer",
+            opacity: savingIntention ? 0.6 : 1,
+          }}
+        >
+          Save
+        </button>
+      </div>
+    </>
+  )}
+</div>
+
+
+    {/* Labels placeholder */}
+    <div
+      style={{
+        padding: 12,
+        borderRadius: 12,
+        background: colors.surfaceMuted,
+        fontSize: 13,
+        color: colors.textMuted,
+        lineHeight: 1.4,
+      }}
+    >
+      Label editor comes next (Step 3.1.2)
+    </div>
+  </div>
+)}
+
+
+
+
+
         {activeTab === "feed" && (
   <div
     style={{

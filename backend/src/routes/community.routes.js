@@ -39,6 +39,8 @@ import { enforceUserStatus } from "../middleware/enforcement.middleware.js"
 import {
   getCommunityModerationReports,
 } from "../controllers/communityModeration.controller.js"
+import { updateCommunityIntention } from "../controllers/community.controller.js"
+
 
 
 
@@ -67,6 +69,13 @@ router.get(
   requireAuth,
   getCommunityModerationReports
 )
+
+router.patch(
+  "/:id/intention",
+  requireAuth,
+  updateCommunityIntention
+)
+
 
 
 

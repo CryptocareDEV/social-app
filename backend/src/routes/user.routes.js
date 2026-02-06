@@ -4,6 +4,7 @@ import {
   getUserPosts,
   getMe,
   getMyInvitations,
+  updateMe,
 } from "../controllers/user.controller.js"
 import { requireAuth } from "../middleware/auth.middleware.js"
 
@@ -19,6 +20,7 @@ router.get(
   },
   getMe
 )
+router.patch("/me", requireAuth, updateMe)
 
 router.get("/me/invitations", requireAuth, getMyInvitations)
 
