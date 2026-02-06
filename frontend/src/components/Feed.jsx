@@ -58,7 +58,7 @@ export default function Feed({
           post={post}
           onLike={onLike}
           onMeme={onMeme}
-          isLiking={likingIds.has(post.id)}
+          isLiking={likingIds?.has?.(post.id) ?? false}
           onLabelClick={onLabelClick}
           theme={theme}
         />

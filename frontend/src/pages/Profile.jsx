@@ -18,6 +18,12 @@ export default function Profile({ theme, onFeedProfileChange }) {
   const [error, setError] = useState("")
   const [showCreateProfile, setShowCreateProfile] = useState(false)
   const [editingProfile, setEditingProfile] = useState(null)
+  const [bio, setBio] = useState("")
+  const [editingBio, setEditingBio] = useState(false)
+  const [bioDraft, setBioDraft] = useState("")
+  const [communities, setCommunities] = useState([])
+
+
 
 
   useEffect(() => {
@@ -28,13 +34,17 @@ export default function Profile({ theme, onFeedProfileChange }) {
       api(`/users/${id}`),
       api(`/users/${id}/posts`),
       api("/me/feed-profiles"),
+      api("/communities/my"),
     ])
-      .then(([u, userPosts, fps]) => {
+      .then(([u, userPosts, fps, myCommunities]) => {
         if (!mounted) return
 
         setUser(u)
         setPosts(userPosts || [])
         setProfiles(fps || [])
+        setBio(u.bio || "")
+        setCommunities(myCommunities || [])
+
 
         const active = fps?.find((p) => p.isActive)
         if (active) {
@@ -114,6 +124,122 @@ export default function Profile({ theme, onFeedProfileChange }) {
         >
           Joined {new Date(user.createdAt).toLocaleDateString()}
         </div>
+
+        {/* Bio */}
+<div style={{ marginTop: 16 }}>
+  <div
+    style={{
+      fontSize: 12,
+      fontWeight: 600,
+      marginBottom: 6,
+      color: colors.textMuted,
+    }}
+  >
+    Bio
+  </div>
+
+  {!editingBio ? (
+    <>
+      <div
+        style={{
+          fontSize: 14,
+          lineHeight: 1.6,
+          whiteSpace: "pre-wrap",
+          padding: "10px 12px",
+          borderRadius: 12,
+          background: colors.surfaceMuted,
+          border: `1px solid ${colors.border}`,
+          color: bio ? colors.text : colors.textMuted,
+          maxWidth: "100%",
+          boxSizing: "border-box",
+        }}
+      >
+        {bio || "No bio yet."}
+      </div>
+
+      <button
+        onClick={() => {
+          setBioDraft(bio)
+          setEditingBio(true)
+        }}
+        style={{
+          marginTop: 6,
+          fontSize: 12,
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          cursor: "pointer",
+          color: colors.textMuted,
+        }}
+      >
+        Edit bio
+      </button>
+    </>
+  ) : (
+    <>
+      <textarea
+        value={bioDraft}
+        onChange={(e) => setBioDraft(e.target.value)}
+        maxLength={280}
+        rows={3}
+        style={{
+          width: "100%",
+          padding: "10px 12px",
+          borderRadius: 12,
+          border: `1px solid ${colors.border}`,
+          background: colors.surface,
+          fontSize: 14,
+          resize: "none",
+          boxSizing: "border-box",
+        }}
+      />
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: 8,
+          marginTop: 8,
+        }}
+      >
+        <button
+          onClick={() => setEditingBio(false)}
+          style={{
+            fontSize: 12,
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            color: colors.textMuted,
+          }}
+        >
+          Cancel
+        </button>
+
+        <button
+          onClick={async () => {
+            await api("/users/me", {
+  method: "PATCH",
+  body: JSON.stringify({
+    bio: bioDraft.trim(),
+  }),
+})
+
+
+            setBio(bioDraft.trim())
+            setEditingBio(false)
+          }}
+          style={{
+            fontSize: 12,
+            cursor: "pointer",
+          }}
+        >
+          Save
+        </button>
+      </div>
+    </>
+  )}
+</div>
+
 
         <div style={{ marginTop: 12, fontSize: 14 }}>
           <strong>{user._count?.posts ?? 0}</strong> posts
@@ -221,6 +347,100 @@ export default function Profile({ theme, onFeedProfileChange }) {
 />
 
       </div>
+
+{/* 🏛️ Communities */}
+<h2
+  style={{
+    fontSize: 16,
+    fontWeight: 600,
+    marginTop: 32,
+    marginBottom: 12,
+  }}
+>
+  🏛️ Communities
+</h2>
+
+{communities.length === 0 ? (
+  <p style={{ fontSize: 13, color: colors.textMuted }}>
+    You are not part of any communities yet.
+  </p>
+) : (
+  <div
+    style={{
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+      marginBottom: 24,
+    }}
+  >
+    {communities.map((c) => (
+      <div
+        key={c.id}
+        style={{
+          padding: 14,
+          borderRadius: 12,
+          background: colors.surface,
+          border: `1px solid ${colors.border}`,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          overflow: "hidden", // 🔒 prevents layout break
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <button
+            onClick={() =>
+              (window.location.href = `/communities/${c.id}`)
+            }
+            style={{
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              color: colors.text,
+              fontSize: 14,
+              fontWeight: 500,
+              textAlign: "left",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              maxWidth: 420,
+            }}
+          >
+            {c.name}
+          </button>
+
+          <div
+            style={{
+              fontSize: 12,
+              color: colors.textMuted,
+              marginTop: 2,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              maxWidth: 420,
+            }}
+          >
+            {c.intention}
+          </div>
+        </div>
+
+        <div
+          style={{
+            fontSize: 12,
+            color: colors.textMuted,
+            textTransform: "capitalize",
+            flexShrink: 0,
+          }}
+        >
+          {c.role?.toLowerCase()}
+        </div>
+      </div>
+    ))}
+  </div>
+)}
+
+
 
       {/* 📝 Posts */}
       <div>
