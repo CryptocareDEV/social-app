@@ -1,4 +1,8 @@
 import prisma from "../lib/prisma.js"
+import { loadCommunityWithCategories } from "./community.loader.js"
+
+
+
 
 export const materializeCommunityFeed = async (
   communityId,
@@ -8,27 +12,23 @@ export const materializeCommunityFeed = async (
   const startOfDay = new Date(date)
   startOfDay.setHours(0, 0, 0, 0)
 
-  // 1. Load community + label import rules
-const community = await prisma.community.findUnique({
-  where: { id: communityId },
-})
-
-if (!community) return
-
-const labelImports = await prisma.communityLabelImport.findMany({
-  where: { communityId },
-})
-
-// 🚨 No imports → nothing to materialize
-if (labelImports.length === 0) {
-  console.warn(
-    `Community ${communityId} has no label imports; skipping materialization`
-  )
-  return
-}
+  // 1. Load community WITH categories
+  const community = await loadCommunityWithCategories(communityId)
 
 
   if (!community) return
+
+  const labelImports = await prisma.communityLabelImport.findMany({
+    where: { communityId },
+  })
+
+  // 🚨 No imports → nothing to materialize
+  if (labelImports.length === 0) {
+    console.warn(
+      `Community ${communityId} has no label imports; skipping materialization`
+    )
+    return
+  }
 
   const categoryKeys = community.categories.map(
     (c) => c.categoryKey
@@ -53,71 +53,69 @@ if (labelImports.length === 0) {
 
   let collectedPosts = []
 
-for (const rule of labelImports) {
-  let ratingFilter = {}
+  for (const rule of labelImports) {
+    let ratingFilter = {}
 
-  // 🔒 SAFE community hard rule
-  if (community.rating === "SAFE") {
-    ratingFilter = { rating: "SAFE" }
-  } else {
-    if (rule.importMode === "SAFE_ONLY") {
+    // 🔒 SAFE community hard rule
+    if (community.rating === "SAFE") {
       ratingFilter = { rating: "SAFE" }
+    } else {
+      if (rule.importMode === "SAFE_ONLY") {
+        ratingFilter = { rating: "SAFE" }
+      }
+      if (rule.importMode === "NSFW_ONLY") {
+        ratingFilter = { rating: "NSFW" }
+      }
+      // BOTH → no rating filter
     }
-    if (rule.importMode === "NSFW_ONLY") {
-      ratingFilter = { rating: "NSFW" }
-    }
-    // BOTH → no rating filter
-  }
 
-  const posts = await prisma.post.findMany({
-    where: {
-      communityId: null, // 🔒 no community leakage
-      scope: { in: allowedScopes },
-      categories: {
-        some: {
-          categoryKey: rule.categoryKey,
+    const posts = await prisma.post.findMany({
+      where: {
+        communityId: null, // 🔒 no community leakage
+        scope: { in: allowedScopes },
+        categories: {
+          some: {
+            categoryKey: rule.categoryKey,
+          },
         },
+        ...ratingFilter,
       },
-      ...ratingFilter,
-    },
-    include: {
-      _count: { select: { likes: true } },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 50,
-  })
-
-  collectedPosts.push(
-    ...posts.map((p) => ({
-      postId: p.id,
-      score: p._count.likes,
-      createdAt: p.createdAt,
-      reason: {
-        label: rule.categoryKey,
-        importMode: rule.importMode,
-        scopeCeiling: community.scope,
+      include: {
+        _count: { select: { likes: true } },
       },
-    }))
-  )
-}
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    })
 
-
-  if (posts.length === 0) return
-
-  // 4. Deduplicate posts (same post may match multiple labels)
-const unique = new Map()
-
-for (const item of collectedPosts) {
-  if (!unique.has(item.postId)) {
-    unique.set(item.postId, item)
+    collectedPosts.push(
+      ...posts.map((p) => ({
+        postId: p.id,
+        score: p._count.likes,
+        createdAt: p.createdAt,
+        reason: {
+          label: rule.categoryKey,
+          importMode: rule.importMode,
+          scopeCeiling: community.scope,
+        },
+      }))
+    )
   }
-}
 
-const ranked = Array.from(unique.values()).sort((a, b) => {
-  if (b.score !== a.score) return b.score - a.score
-  return b.createdAt - a.createdAt
-})
+  if (collectedPosts.length === 0) return
 
+  // 4. Deduplicate posts
+  const unique = new Map()
+
+  for (const item of collectedPosts) {
+    if (!unique.has(item.postId)) {
+      unique.set(item.postId, item)
+    }
+  }
+
+  const ranked = Array.from(unique.values()).sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score
+    return b.createdAt - a.createdAt
+  })
 
   // 5. Clear existing feed for the day
   await prisma.communityFeedItem.deleteMany({

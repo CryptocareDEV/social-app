@@ -1,5 +1,6 @@
 import prisma from "../lib/prisma.js"
 import { materializeCommunityFeed } from "../services/communityFeed.service.js"
+import { loadCommunityWithCategories } from "../services/community.loader.js"
 
 
 
@@ -366,15 +367,7 @@ await prisma.communityLabelImport.createMany({
 export const updateCommunityCategories = async (req, res) => {
   try {
     const { id: communityId } = req.params
-    const community = await prisma.community.findUnique({
-  where: { id: communityId },
-})
-
-if (!community) {
-  return res.status(404).json({
-    error: "Community not found",
-  })
-}
+    
 
     const { categories } = req.body
     const userId = req.user.userId
@@ -386,38 +379,56 @@ if (!community) {
     }
 
     // Ensure requester is ADMIN
-    const membership = await prisma.communityMember.findFirst({
-      where: {
-        communityId,
-        userId,
-        role: "ADMIN",
-      },
-    })
+    // Ensure requester is ADMIN
+const membership = await prisma.communityMember.findFirst({
+  where: {
+    communityId,
+    userId,
+    role: "ADMIN",
+  },
+})
 
-    if (!membership) {
-      return res.status(403).json({
-        error: "Only ADMIN can edit community labels",
-      })
-    }
+if (!membership) {
+  return res.status(403).json({
+    error: "Only ADMIN can edit community labels",
+  })
+}
 
-    // Clear existing categories
+
+
+// 🔑 LOAD COMMUNITY WITH CATEGORIES (CRITICAL)
+const community = await loadCommunityWithCategories(communityId)
+
+if (!community) {
+  return res.status(404).json({ error: "Community not found" })
+}
+
+
+
+  // Clear existing categories
     await prisma.communityCategory.deleteMany({
       where: { communityId },
     })
 
-    // 🔥 Reset label imports to match categories
-await prisma.communityLabelImport.deleteMany({
-  where: { communityId },
-})
+  
+    
 
-await prisma.communityLabelImport.createMany({
-  data: categories.map((key) => ({
-    communityId,
-    categoryKey: key,
-    importMode:
-      community.rating === "SAFE" ? "SAFE_ONLY" : "BOTH",
-  })),
-})
+    
+// 🔥 Reset label imports atomically
+await prisma.$transaction([
+  prisma.communityLabelImport.deleteMany({
+    where: { communityId },
+  }),
+  prisma.communityLabelImport.createMany({
+    data: categories.map((key) => ({
+      communityId,
+      categoryKey: key,
+      importMode:
+        community.rating === "SAFE" ? "SAFE_ONLY" : "BOTH",
+    })),
+  }),
+])
+
 
 
     // Add new categories
