@@ -6,6 +6,13 @@ import { materializeCommunityFeed } from "../services/communityFeed.service.js"
 export const materializeCommunityNow = async (req, res) => {
   try {
     const { id } = req.params
+    const community = await prisma.community.findUnique({
+  where: { id: communityId },
+})
+
+if (!community) {
+  return res.status(404).json({ error: "Community not found" })
+}
 
     if (!id) {
       return res.status(400).json({ error: "Community ID required" })
@@ -311,6 +318,17 @@ for (const raw of categories) {
     },
       },
     })
+    if (categories?.length > 0) {
+  await prisma.communityLabelImport.createMany({
+    data: categories.map((key) => ({
+      communityId: community.id,
+      categoryKey: key,
+      importMode: "BOTH", // default
+    })),
+    skipDuplicates: true,
+  })
+}
+
 
     // 👤 Ensure creator is a member
     await prisma.communityMember.create({
@@ -320,6 +338,17 @@ for (const raw of categories) {
         role: "ADMIN",
       },
     })
+
+// 🔑 CREATE DEFAULT LABEL IMPORT RULES
+await prisma.communityLabelImport.createMany({
+  data: categoryRecords.map((c) => ({
+    communityId: community.id,
+    categoryKey: c.categoryKey,
+    importMode:
+      rating === "SAFE" ? "SAFE_ONLY" : "BOTH",
+  })),
+})
+
 
     return res.status(201).json(community)
   } catch (err) {
@@ -337,6 +366,16 @@ for (const raw of categories) {
 export const updateCommunityCategories = async (req, res) => {
   try {
     const { id: communityId } = req.params
+    const community = await prisma.community.findUnique({
+  where: { id: communityId },
+})
+
+if (!community) {
+  return res.status(404).json({
+    error: "Community not found",
+  })
+}
+
     const { categories } = req.body
     const userId = req.user.userId
 
@@ -366,6 +405,21 @@ export const updateCommunityCategories = async (req, res) => {
       where: { communityId },
     })
 
+    // 🔥 Reset label imports to match categories
+await prisma.communityLabelImport.deleteMany({
+  where: { communityId },
+})
+
+await prisma.communityLabelImport.createMany({
+  data: categories.map((key) => ({
+    communityId,
+    categoryKey: key,
+    importMode:
+      community.rating === "SAFE" ? "SAFE_ONLY" : "BOTH",
+  })),
+})
+
+
     // Add new categories
     await prisma.communityCategory.createMany({
       data: categories.map((key) => ({
@@ -375,7 +429,8 @@ export const updateCommunityCategories = async (req, res) => {
     })
 
     // Optional but recommended: re-materialize feed
-    await materializeCommunityFeed(communityId)
+    // 🔥 ALWAYS rebuild today's feed after label change
+    await materializeCommunityFeed(communityId, new Date())
 
     return res.json({ success: true })
   } catch (err) {
