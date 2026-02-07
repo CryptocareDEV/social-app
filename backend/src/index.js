@@ -14,6 +14,8 @@ import profileRoutes from "./routes/profile.routes.js"
 import reportRoutes from "./routes/report.routes.js"
 import moderationRoutes from "./routes/moderation.routes.js"
 import feedProfileRoutes from "./routes/feedProfile.routes.js"
+import mediaRoutes from "./routes/media.routes.js"
+
 
 
 
@@ -29,6 +31,8 @@ app.use(express.urlencoded({ limit: "10mb", extended: true }))
 app.use("/api/v1/communities", communityRoutes)
 app.use("/api/v1", feedProfileRoutes)
 app.use("/api/v1", profileRoutes)
+app.use("/api/v1/media", mediaRoutes)
+
 
 
 

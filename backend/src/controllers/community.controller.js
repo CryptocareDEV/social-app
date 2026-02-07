@@ -543,17 +543,46 @@ let feedItems = await prisma.communityFeedItem.findMany({
   },
   take: limit,
   include: {
-    post: {
-      include: {
-        user: {
-          select: { id: true, username: true, avatarUrl: true },
+  post: {
+    include: {
+      user: {
+        select: { id: true, username: true, avatarUrl: true },
+      },
+
+      categories: {
+        include: {
+          category: { select: { key: true } },
         },
-        _count: {
-          select: { likes: true },
+      },
+
+      likes: {
+        where: { userId },
+        select: { id: true },
+      },
+
+      _count: {
+        select: { likes: true },
+      },
+
+      // 🔑 ABSOLUTELY REQUIRED
+      originPost: {
+        select: {
+          id: true,
+          type: true,
+          mediaUrl: true,
+          originPostId: true,
+          originPost: {
+            select: {
+              id: true,
+              mediaUrl: true,
+            },
+          },
         },
       },
     },
   },
+},
+
 })
 
 
@@ -568,27 +597,74 @@ if (feedItems.length === 0) {
     },
     orderBy: { rank: "asc" },
     include: {
-      post: {
+  post: {
+    include: {
+      user: {
+        select: { id: true, username: true, avatarUrl: true },
+      },
+
+      categories: {
         include: {
-          user: {
-            select: { id: true, username: true, avatarUrl: true },
-          },
-          _count: {
-            select: { likes: true },
+          category: { select: { key: true } },
+        },
+      },
+
+      likes: {
+        where: { userId },
+        select: { id: true },
+      },
+
+      _count: {
+        select: { likes: true },
+      },
+
+      // 🔑 ABSOLUTELY REQUIRED
+      originPost: {
+        select: {
+          id: true,
+          type: true,
+          mediaUrl: true,
+          originPostId: true,
+          originPost: {
+            select: {
+              id: true,
+              mediaUrl: true,
+            },
           },
         },
       },
     },
+  },
+},
+
   })
 }
 
 return res.json(
-  feedItems.map(item => ({
-    ...item.post,
-    reason: item.reason,
-    _feedRank: item.rank,
-  }))
+  feedItems.map(item => {
+    const post = item.post
+
+    return {
+      id: post.id,
+      type: post.type,
+      caption: post.caption,
+      mediaUrl: post.mediaUrl,          // 🔑 FORCE PASS
+      scope: post.scope,
+      rating: post.rating,
+      createdAt: post.createdAt,
+      isRemoved: post.isRemoved,
+
+      user: post.user,
+      categories: post.categories,
+      _count: post._count,
+
+      originPost: post.originPost ?? null, // 🔑 KEEP LINEAGE
+      reason: item.reason,
+      _feedRank: item.rank,
+    }
+  })
 )
+
 
   } catch (err) {
     console.error(err)

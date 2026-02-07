@@ -16,6 +16,8 @@ export default function PostCard({
 }
   const [showReason, setShowReason] = useState(false)
   const [reportCooldownUntil, setReportCooldownUntil] = useState(null)
+  const [hasReported, setHasReported] = useState(false)
+
   const severityCopy = {
   LOW: {
     tone: "#64748b",
@@ -36,6 +38,10 @@ export default function PostCard({
 }
 
   const colors = getThemeColors(theme)
+  // 🔑 Render post's own media (MEME and IMAGE are first-class)
+  const imageSrc = post.mediaUrl || null
+
+
 
   const severity = (() => {
   if (!post?.rating) return null
@@ -85,61 +91,140 @@ export default function PostCard({
      🚩 Report handler
   ================================= */
   const handleReport = async () => {
-    if (isOnReportCooldown) {
-      alert("Reporting is temporarily disabled due to cooldown")
-      return
-    }
-
-    try {
-      await api("/reports", {
-        method: "POST",
-        body: JSON.stringify({
-          postId: post.id,
-          reason: "OTHER",
-        }),
-      })
-      alert("Report submitted")
-    } catch (err) {
-      alert(err?.error || "Failed to report post")
-    }
+  if (isOnReportCooldown) {
+    alert("Reporting is temporarily disabled due to cooldown")
+    return
   }
+
+  if (hasReported) {
+    return
+  }
+
+  try {
+    await api("/reports", {
+      method: "POST",
+      body: JSON.stringify({
+        postId: post.id,
+        reason: "OTHER",
+      }),
+    })
+
+    setHasReported(true)
+    alert("Report submitted. Thank you for helping keep the community safe.")
+  } catch (err) {
+    alert(err?.error || "Failed to report post")
+  }
+}
+
+
+const actionButtonStyle = {
+  fontSize: 12,
+  padding: "6px 10px",
+  borderRadius: theme.radius.pill,
+  border: `1px solid ${colors.border}`,
+  background: "transparent",
+  color: colors.textMuted,
+  cursor: "pointer",
+  transition: "background 0.15s ease, color 0.15s ease",
+}
+
 
   return (
     <article
-      style={{
-        background: colors.surface,
-        borderRadius: theme.radius.lg,
-        padding: 16,
-        marginBottom: 16,
-        border: `1px solid ${colors.border}`,
-        boxShadow: theme.shadow.sm,
-      }}
-    >
+  style={{
+    background: colors.surface,
+    borderRadius: theme.radius.lg,
+    padding: 18,
+    border: `1px solid ${colors.border}`,
+    boxShadow: theme.shadow.sm,
+    transition: "box-shadow 0.18s ease, transform 0.18s ease",
+  }}
+  onMouseEnter={(e) => {
+    e.currentTarget.style.boxShadow = theme.shadow.md
+    e.currentTarget.style.transform = "translateY(-1px)"
+  }}
+  onMouseLeave={(e) => {
+    e.currentTarget.style.boxShadow = theme.shadow.sm
+    e.currentTarget.style.transform = "translateY(0)"
+  }}
+>
       {/* HEADER */}
       <header
-        style={{
-          display: "flex",
-          gap: 8,
-          marginBottom: 8,
-          alignItems: "center",
-          fontSize: 13,
-        }}
-      >
-        <Link
-          to={`/profile/${post.user.id}`}
-          style={{
-            color: colors.text,
-            fontWeight: 500,
-            textDecoration: "none",
-          }}
-        >
-          @{post.user.username}
-        </Link>
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
+    fontSize: 13,
+  }}
+>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+    <Link
+      to={`/profile/${post.user.id}`}
+      style={{
+        color: colors.text,
+        fontWeight: 600,
+        textDecoration: "none",
+      }}
+    >
+      @{post.user.username}
+    </Link>
 
-        <span style={{ fontSize: 12, color: colors.textMuted }}>
-          {post.scope}
-        </span>
-      </header>
+    <span
+  style={{
+    fontSize: 12,
+    color: colors.textMuted,
+    opacity: 0.75,
+  }}
+>
+  {post.scope}
+</span>
+  </div>
+
+<div style={{ marginLeft: "auto" }}>
+  <span
+  title={
+  hasReported
+    ? "You’ve already reported this post"
+    : isOnReportCooldown
+    ? "Reporting paused due to repeated inaccurate reports"
+    : severity === "CRITICAL"
+    ? "Use for serious safety concerns only"
+    : "Report content that violates rules"
+}
+
+  
+>
+  <button
+  onClick={handleReport}
+  disabled={isOnReportCooldown}
+  style={{
+  ...actionButtonStyle,
+  color: isOnReportCooldown ? "#94a3b8" : "#64748b",
+  borderStyle: "dashed",
+  opacity: 0.75,
+  cursor: isOnReportCooldown ? "not-allowed" : "pointer",
+}}
+onMouseEnter={(e) => {
+  if (!isOnReportCooldown) e.currentTarget.style.opacity = 1
+}}
+onMouseLeave={(e) => {
+  e.currentTarget.style.opacity = 0.75
+}}
+
+>
+  {isOnReportCooldown
+    ? "Reporting paused"
+    : severity === "CRITICAL"
+    ? "Report (safety)"
+    : "Report"}
+
+
+</button>
+
+</span>
+</div>
+</header>
 
       {/* CAPTION */}
       {post.caption && (
@@ -147,13 +232,98 @@ export default function PostCard({
           style={{
             color: colors.text,
             lineHeight: 1.6,
-            marginBottom: 8,
+            marginBottom: 12,
             whiteSpace: "pre-wrap",
           }}
         >
           {post.caption}
         </p>
       )}
+
+{/* IMAGE / MEME */}
+{imageSrc && (
+  <div
+    style={{
+      marginTop: 12,
+      borderRadius: theme.radius.md,
+      overflow: "hidden",
+      border: `1px solid ${colors.border}`,
+      background: colors.surfaceMuted,
+      position: "relative",
+    }}
+  >
+    <img
+      src={imageSrc}
+      alt={post.type === "MEME" ? "Meme image" : "Post media"}
+      loading="lazy"
+      style={{
+        width: "100%",
+        display: "block",
+        maxHeight: 520,
+        objectFit: "contain",
+        background: colors.bg,
+      }}
+    />
+    {/* 📝 MEME TEXT OVERLAY */}
+    {post.type === "MEME" && post.memeMeta && (
+  <>
+    {/* TOP TEXT */}
+    {post.memeMeta.topText && (
+      <div
+        style={{
+          position: "absolute",
+          top: 12,
+          left: "50%",
+          transform: "translateX(-50%)",
+          maxWidth: "90%",
+          padding: "6px 12px",
+          background: "rgba(0,0,0,0.6)",
+          color: "#fff",
+          borderRadius: 6,
+          fontSize: 16,
+          fontWeight: 700,
+          textAlign: "center",
+          textShadow: "0 1px 2px rgba(0,0,0,0.8)",
+          pointerEvents: "none",
+        }}
+      >
+        {post.memeMeta.topText}
+      </div>
+    )}
+
+    {/* BOTTOM TEXT */}
+    {post.memeMeta.bottomText && (
+      <div
+        style={{
+          position: "absolute",
+          bottom: 12,
+          left: "50%",
+          transform: "translateX(-50%)",
+          maxWidth: "90%",
+          padding: "6px 12px",
+          background: "rgba(0,0,0,0.6)",
+          color: "#fff",
+          borderRadius: 6,
+          fontSize: 16,
+          fontWeight: 700,
+          textAlign: "center",
+          textShadow: "0 1px 2px rgba(0,0,0,0.8)",
+          pointerEvents: "none",
+        }}
+      >
+        {post.memeMeta.bottomText}
+      </div>
+    )}
+  </>
+)}
+
+
+  </div>
+)}
+
+
+
+
 
       {/* WHY AM I SEEING THIS */}
       {post.reason && (
@@ -225,13 +395,21 @@ export default function PostCard({
               key={c.category.key}
               onClick={() => onLabelClick(c.category.key)}
               style={{
-                fontSize: 12,
-                padding: "4px 10px",
-                borderRadius: theme.radius.pill,
-                background: colors.primarySoft,
-                color: colors.primary,
-                cursor: "pointer",
-              }}
+    fontSize: 12,
+    padding: "4px 10px",
+    borderRadius: theme.radius.pill,
+    background:
+      theme.mode === "dark"
+        ? "rgba(59,130,246,0.15)"
+        : "rgba(37,99,235,0.08)",
+    color:
+      theme.mode === "dark"
+        ? "#bfdbfe"
+        : "#1e3a8a",
+    border: `1px solid ${colors.border}`,
+    cursor: "pointer",
+    fontWeight: 500,
+  }}
             >
               #{c.category.key}
             </span>
@@ -257,45 +435,53 @@ export default function PostCard({
       {/* FOOTER */}
       <footer
         style={{
-          marginTop: 12,
+          marginTop: 16,
           display: "flex",
           gap: 12,
           alignItems: "center",
         }}
       >
         <button
-          disabled={isLiking}
-          onClick={() => onLike(post.id)}
-        >
-          {post.likedByMe ? "💙" : "🤍"} {post._count.likes}
-        </button>
-
-        <span
-  title={
-    isOnReportCooldown
-      ? "Reporting paused due to repeated inaccurate reports"
-      : severity === "CRITICAL"
-      ? "Use for serious safety concerns only"
-      : "Report content that violates rules"
-  }
-><button
-  onClick={handleReport}
-  disabled={isOnReportCooldown}
+  disabled={isLiking}
+  onClick={() => onLike(post.id)}
   style={{
-    fontSize: 12,
-    background: "transparent",
-    border: "none",
-    color: isOnReportCooldown ? "#94a3b8" : "#64748b",
-    cursor: isOnReportCooldown ? "not-allowed" : "pointer",
+    ...actionButtonStyle,
+    fontWeight: 500,
+    color: post.likedByMe ? colors.primary : colors.textMuted,
+    borderColor: post.likedByMe ? colors.primarySoft : colors.border,
   }}
 >
-  {isOnReportCooldown
-    ? "Reporting temporarily paused"
-    : severity === "CRITICAL"
-    ? "Report (safety issue)"
-    : "Report"}
+  {post.likedByMe ? "💙" : "🤍"} {post._count.likes}
 </button>
-</span>
+
+{/* MEME (image-only) */}
+  {["IMAGE", "MEME"].includes(post.type) && imageSrc && (
+  <button
+    onClick={() => onMeme(post)}
+    style={{
+      fontSize: 12,
+      padding: "6px 10px",
+      borderRadius: theme.radius.pill,
+      border: `1px solid ${colors.border}`,
+      background: "transparent",
+      color: colors.textMuted,
+      opacity: 0.75,
+      cursor: "pointer",
+      transition: "opacity 0.15s ease",
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.opacity = 1
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.opacity = 0.75
+    }}
+  >
+    🖼️ Meme
+  </button>
+)}
+
+
+        
       </footer>
     </article>
   )

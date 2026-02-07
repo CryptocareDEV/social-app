@@ -268,7 +268,7 @@ const effectiveCommunityId =
             border: "1px solid #e5e7eb",
             borderRadius: 12,
             padding: 6,
-            background: "#ffffff",
+            background: "#191414",
             boxShadow: "0 6px 20px rgba(0,0,0,0.08)",
           }}
         >
@@ -320,7 +320,7 @@ const effectiveCommunityId =
                   borderRadius: 999,
                   fontSize: 12,
                   background: "#0284c7",
-                  color: "#fff",
+                  color: "#1d1919",
                   display: "flex",
                   alignItems: "center",
                   gap: 6,
@@ -337,7 +337,7 @@ const effectiveCommunityId =
                   style={{
                     background: "transparent",
                     border: "none",
-                    color: "#fff",
+                    color: "#1e1d1d",
                     cursor: "pointer",
                     fontSize: 12,
                   }}

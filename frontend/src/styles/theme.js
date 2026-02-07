@@ -10,41 +10,64 @@ export const theme = {
     pill: 999,
   },
 
+
+  spacing: {
+  xs: 6,
+  sm: 10,
+  md: 16,
+  lg: 24,
+  xl: 32,
+},
+
+
   shadow: {
-    sm: "0 1px 2px rgba(0,0,0,0.05)",
-    md: "0 6px 20px rgba(0,0,0,0.08)",
+    sm: "0 1px 2px rgba(0,0,0,0.04)",
+    md: "0 8px 24px rgba(0,0,0,0.06)",
   },
 
   colors: {
-  light: {
-    bg: "#f9fafb",
-    surface: "#ffffff",
-    surfaceMuted: "#f1f5f9",
-    border: "#e5e7eb",
-    text: "#0f172a",
-    textMuted: "#475569",
+    light: {
+  // Backgrounds (slightly warm, breathable)
+  bg: "#fdfefe",
+  surface: "#ffffff",
+  surfaceMuted: "#f3f5f8",
 
-    primary: "#2563eb",
-    primarySoft: "#e0e7ff",
+  // Borders (still subtle, but clearer)
+  border: "#dde1e7",
 
-    success: "#16a34a",
-    danger: "#dc2626",
+  // Text hierarchy (crisper + more contrast)
+  text: "#0b1220",
+  textMuted: "#556070",
+
+  // Accents (unchanged, already good)
+  primary: "#2563eb",
+  primarySoft: "#e6ecff",
+
+  success: "#16a34a",
+  danger: "#dc2626",
+},
+
+    dark: {
+      // Backgrounds (deep, not pitch black)
+      bg: "#020617",
+      surface: "#04091a",
+      surfaceMuted: "#070d22",
+
+      // Borders (barely visible)
+      border: "#1c2540",
+
+      // Text hierarchy
+      text: "#e6e8ee",        // soft off-white (never pure white)
+      textMuted: "#9aa4b2",   // fades earlier than primary
+
+      // Accents
+      primary: "#4f8cff",
+      primarySoft: "#1e2a52",
+
+      success: "#22c55e",
+      danger: "#ef4444",
+    },
   },
-  dark: {
-    bg: "#020617",
-    surface: "#020617",
-    surfaceMuted: "#020617",
-    border: "#1e293b",
-    text: "#e5e7eb",
-    textMuted: "#94a3b8",
-
-    primary: "#3b82f6",
-    primarySoft: "#1e3a8a",
-
-    success: "#22c55e",
-    danger: "#ef4444",
-  },
-}
 }
 
 export const getThemeColors = (theme) => {

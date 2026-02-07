@@ -24,6 +24,8 @@ const buildNsfwFilter = ({ isMinor, feedProfile }) => {
 
 export const createPost = async (req, res) => {
   try {
+        console.log("🧬 CREATE POST BODY:", req.body)
+
     const {
       type,
       caption,
@@ -32,6 +34,7 @@ export const createPost = async (req, res) => {
       categories,
       communityId = null,
       rating = "SAFE",
+      originPostId = null,
     } = req.body
 
     const userId = req.user.userId
@@ -61,11 +64,23 @@ export const createPost = async (req, res) => {
     }
 
     /* Basic validation */
-    if (!type || !scope) {
-      return res.status(400).json({
-        error: "Post type and scope required",
-      })
-    }
+    const allowedTypes = ["TEXT", "IMAGE", "VIDEO", "MEME"]
+
+if (!allowedTypes.includes(type)) {
+  return res.status(400).json({
+    error: "Invalid post type",
+  })
+}
+// 🔒 MEME posts must ALWAYS have originPostId
+if (type === "MEME") {
+  if (!originPostId) {
+    return res.status(400).json({
+      error: "MEME posts require originPostId",
+    })
+  }
+}
+
+
 
     if (type === "TEXT" && !caption?.trim()) {
       return res.status(400).json({
@@ -81,6 +96,40 @@ export const createPost = async (req, res) => {
         error: "Media posts require a mediaUrl",
       })
     }
+
+/* MEME lineage validation */
+let originPost = null
+
+if (type === "MEME") {
+  if (!originPostId) {
+    return res.status(400).json({
+      error: "originPostId is required for meme posts",
+    })
+  }
+
+  originPost = await prisma.post.findUnique({
+    where: { id: originPostId },
+    select: {
+      id: true,
+      type: true,
+      mediaUrl: true,
+      isRemoved: true,
+    },
+  })
+
+  if (!originPost || originPost.isRemoved) {
+    return res.status(404).json({
+      error: "Original post not found",
+    })
+  }
+
+  if (!["IMAGE", "MEME"].includes(originPost.type)) {
+    return res.status(400).json({
+      error: "Memes can only be created from image posts",
+    })
+  }
+}
+
 
     /* Category validation */
     const safeCategories = Array.isArray(categories)
@@ -135,7 +184,14 @@ export const createPost = async (req, res) => {
       isCommunityOnly = true
     }
 
-    /* Create post */
+
+
+console.log("🧠 CREATING POST", {
+  type,
+  mediaUrl,
+  originPostId,
+})
+   /* Create post */
     const post = await prisma.post.create({
       data: {
         type,
@@ -146,6 +202,8 @@ export const createPost = async (req, res) => {
         userId,
         communityId,
         isCommunityOnly,
+        originPostId: type === "MEME" ? originPostId : null,
+        originType: "USER",
         categories: {
           create: categoryRecords,
         },
@@ -255,16 +313,43 @@ export const getScopedFeed = async (req, res) => {
         _count: {
           select: { likes: true },
         },
+        originPost: {
+    select: {
+      id: true,
+      type: true,
+      mediaUrl: true,
+      originPostId: true,
+      originPost: {
+        select: {
+          id: true,
+          mediaUrl: true,
+        },
+      },
+    },
+  },
       },
     })
 
     return res.json(
-      posts.map((p) => ({
-        ...p,
-        likedByMe: p.likes.length > 0,
-        likes: undefined,
-      }))
-    )
+  posts.map((p) => ({
+    id: p.id,
+    type: p.type,
+    caption: p.caption,
+    mediaUrl: p.mediaUrl,            // 🔑 FORCE PASS
+    scope: p.scope,
+    rating: p.rating,
+    createdAt: p.createdAt,
+    isRemoved: p.isRemoved,
+
+    user: p.user,
+    categories: p.categories,
+    _count: p._count,
+
+    originPost: p.originPost ?? null,
+    likedByMe: p.likes.length > 0,
+  }))
+)
+
   } catch (err) {
     console.error("GET SCOPED FEED ERROR:", err)
     return res.status(500).json({
@@ -336,5 +421,54 @@ export const getPostsByLabel = async (req, res) => {
     return res.status(500).json({
       error: "Failed to fetch posts by label",
     })
+  }
+}
+
+
+
+export const getPostOrigin = async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const post = await prisma.post.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        type: true,
+        mediaUrl: true,
+        originPostId: true,
+        originPost: {
+          select: {
+            id: true,
+            mediaUrl: true,
+            originPostId: true,
+            originPost: {
+              select: {
+                id: true,
+                mediaUrl: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    if (!post) {
+      return res.status(404).json({ error: "Post not found" })
+    }
+
+    // Walk up to the clean root
+    let root = post
+    while (root.originPost) {
+      root = root.originPost
+    }
+
+    return res.json({
+      id: root.id,
+      mediaUrl: root.mediaUrl,
+    })
+  } catch (err) {
+    console.error("GET POST ORIGIN ERROR", err)
+    return res.status(500).json({ error: "Failed to fetch origin post" })
   }
 }

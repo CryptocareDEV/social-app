@@ -49,7 +49,7 @@ export default function Feed({
       style={{
         display: "flex",
         flexDirection: "column",
-        gap: 12, // consistent vertical rhythm
+        gap: 18,
       }}
     >
       {posts.map((post) => (

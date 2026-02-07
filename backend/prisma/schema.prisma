@@ -54,8 +54,14 @@ model Post {
   communityId        String?
   isCommunityOnly    Boolean             @default(false)
   rating             ContentRating       @default(SAFE)
+  memeTopText        String?
+  memeBottomText     String?
+  originPostId       String?
+  originPost         Post?    @relation("PostOrigin", fields: [originPostId], references: [id])
+  derivedPosts       Post[]   @relation("PostOrigin")
   originCommunityId  String?
   originType         PostOriginType      @default(USER)
+  isRemoved          Boolean             @default(false)
   communityFeedItems CommunityFeedItem[]
   likes              Like[]
   moderationActions  ModerationAction[]
@@ -63,11 +69,10 @@ model Post {
   user               User                @relation(fields: [userId], references: [id])
   categories         PostCategory[]
   reports            Report[]
-  isRemoved          Boolean             @default(false)
-
 
   @@index([userId])
   @@index([scope])
+  @@index([originPostId])
   @@index([communityId])
   @@index([rating])
 }

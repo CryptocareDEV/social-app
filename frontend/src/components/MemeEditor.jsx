@@ -1,73 +1,138 @@
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { api } from "../api/client"
-import { theme } from "../styles/theme"
+import { theme } from "../ui/theme"
 
 export default function MemeEditor({ post, onClose, onPosted }) {
   const [topText, setTopText] = useState("")
   const [bottomText, setBottomText] = useState("")
   const [saving, setSaving] = useState(false)
+  const [baseImageUrl, setBaseImageUrl] = useState(null)
+  
+
 
   const canvasRef = useRef(null)
 
+useEffect(() => {
+  let mounted = true
+
+  const loadBaseImage = async () => {
+    try {
+      // 🔑 Always ask backend for canonical root image
+      const res = await api(`/posts/${post.id}/origin`)
+
+
+      if (!res?.mediaUrl) {
+        throw new Error("No root image returned from backend")
+      }
+
+      if (mounted) {
+        setBaseImageUrl(res.mediaUrl)
+      }
+    } catch (err) {
+      console.error("Failed to load base image", err)
+      alert("Could not load meme base image")
+    }
+  }
+
+  loadBaseImage()
+
+  return () => {
+    mounted = false
+  }
+}, [post.id])
+
+
+
+
   // 🔐 SAFE IMAGE LOADER (avoids CORS-tainted canvas)
-  const loadImageSafely = async () => {
-    const res = await fetch(post.mediaUrl)
-    const blob = await res.blob()
-    const url = URL.createObjectURL(blob)
-
-    return new Promise((resolve, reject) => {
-      const img = new Image()
-      img.src = url
-      img.onload = () => resolve({ img, url })
-      img.onerror = reject
-    })
-  }
-
-  const drawMemeToCanvas = async () => {
-    const canvas = canvasRef.current
-    const ctx = canvas.getContext("2d")
-
-    const { img, url } = await loadImageSafely()
-
-    canvas.width = img.width
-    canvas.height = img.height
-
-    ctx.drawImage(img, 0, 0)
-    ctx.font = "bold 48px Impact"
-    ctx.fillStyle = "white"
-    ctx.strokeStyle = "black"
-    ctx.lineWidth = 4
-    ctx.textAlign = "center"
-
-    if (topText) {
-      ctx.fillText(topText, canvas.width / 2, 60)
-      ctx.strokeText(topText, canvas.width / 2, 60)
+  const loadImageDirect = () => {
+  return new Promise((resolve, reject) => {
+    if (!baseImageUrl) {
+      reject("No base image URL")
+      return
     }
 
-    if (bottomText) {
-      ctx.fillText(bottomText, canvas.width / 2, canvas.height - 20)
-      ctx.strokeText(
-        bottomText,
-        canvas.width / 2,
-        canvas.height - 20
-      )
-    }
+    const img = new Image()
+    img.crossOrigin = "anonymous"
+    img.src = baseImageUrl
 
-    URL.revokeObjectURL(url)
-    return canvas
+    img.onload = () => resolve(img)
+    img.onerror = (e) => reject(e)
+  })
+}
+
+const drawIntoCanvas = async (canvas, top, bottom) => {
+  const ctx = canvas.getContext("2d")
+  const img = await loadImageDirect()
+
+  // Size FIRST
+  canvas.width = img.naturalWidth
+  canvas.height = img.naturalHeight
+
+  const padding = canvas.height * 0.05
+  const maxWidth = canvas.width * 0.9
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  ctx.drawImage(img, 0, 0)
+
+  const fontSize = Math.max(
+    Math.floor(canvas.width / 12),
+    48
+  )
+
+  ctx.font = `bold ${fontSize}px Impact`
+  ctx.fillStyle = "white"
+  ctx.strokeStyle = "black"
+  ctx.lineWidth = 4
+  ctx.textAlign = "center"
+
+  if (top) {
+    ctx.textBaseline = "top"
+    ctx.strokeText(top, canvas.width / 2, padding)
+    ctx.fillText(top, canvas.width / 2, padding)
   }
+
+  if (bottom) {
+    ctx.textBaseline = "bottom"
+    ctx.strokeText(
+      bottom,
+      canvas.width / 2,
+      canvas.height - padding
+    )
+    ctx.fillText(
+      bottom,
+      canvas.width / 2,
+      canvas.height - padding
+    )
+  }
+}
+
+
+  const drawMemeToCanvas = async (top, bottom) => {
+  const canvas = canvasRef.current
+  await drawIntoCanvas(canvas, top, bottom)
+  return canvas
+}
+
+
 
   // ⬇️ DOWNLOAD (WORKS RELIABLY)
   const downloadMeme = async () => {
-    const canvas = await drawMemeToCanvas()
+    const exportCanvas = document.createElement("canvas")
 
-    canvas.toBlob((blob) => {
-      const link = document.createElement("a")
-      link.href = URL.createObjectURL(blob)
-      link.download = "meme.png"
-      link.click()
-      URL.revokeObjectURL(link.href)
-    })
+await drawIntoCanvas(
+  exportCanvas,
+  topText,
+  bottomText
+)
+
+exportCanvas.toBlob((blob) => {
+  const link = document.createElement("a")
+  link.href = URL.createObjectURL(blob)
+  link.download = "meme.png"
+  link.click()
+  URL.revokeObjectURL(link.href)
+})
   }
 
   // 🧬 POST MEME (unchanged logic)
@@ -76,8 +141,17 @@ export default function MemeEditor({ post, onClose, onPosted }) {
     setSaving(true)
 
     try {
-      const canvas = await drawMemeToCanvas()
-      const memeDataUrl = canvas.toDataURL("image/png")
+      const exportCanvas = document.createElement("canvas")
+
+await drawIntoCanvas(
+  exportCanvas,
+  topText,
+  bottomText
+)
+
+const memeDataUrl =
+  exportCanvas.toDataURL("image/png")
+
 
       const categories =
         post.categories?.map((c) => c.category.key) || []
@@ -87,15 +161,22 @@ export default function MemeEditor({ post, onClose, onPosted }) {
       }
 
       await api("/posts", {
-        method: "POST",
-        body: JSON.stringify({
-          type: "MEME",
-          caption: `${topText}${bottomText ? " / " + bottomText : ""}`,
-          mediaUrl: memeDataUrl,
-          scope: post.scope,
-          categories,
-        }),
-      })
+  method: "POST",
+  body: JSON.stringify({
+    type: "MEME",
+    caption: "", // heading intentionally empty
+    mediaUrl: memeDataUrl,   // 🔑 FINAL IMAGE WITH TEXT
+    scope: post.scope,
+    categories,
+    originPostId:
+      post.type === "MEME"
+        ? post.originPostId ?? post.id
+        : post.id,
+  }),
+})
+
+
+
 
       onPosted()
     } catch (err) {
@@ -129,14 +210,39 @@ export default function MemeEditor({ post, onClose, onPosted }) {
         }}
       >
         <h3 style={{ marginBottom: 12 }}>Create meme</h3>
+{baseImageUrl && (
+  <div style={{ marginBottom: 8 }}>
+    <a
+      href={baseImageUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{
+        fontSize: 12,
+        color: "#2563eb",
+        textDecoration: "underline",
+        cursor: "pointer",
+      }}
+    >
+      View original image
+    </a>
+  </div>
+)}
 
         {/* Preview */}
         <div style={{ position: "relative", marginBottom: 12 }}>
-          <img
-            src={post.mediaUrl}
-            alt=""
-            style={{ maxWidth: "100%", borderRadius: 12 }}
-          />
+          
+          {baseImageUrl ? (
+  <img
+    src={baseImageUrl}
+    alt=""
+    style={{ maxWidth: "100%", borderRadius: 12 }}
+  />
+) : (
+  <div style={{ padding: 40, textAlign: "center" }}>
+    Loading image…
+  </div>
+)}
+
 
           <div
             style={{
@@ -198,8 +304,10 @@ export default function MemeEditor({ post, onClose, onPosted }) {
           </div>
         </div>
 
-        <canvas ref={canvasRef} style={{ display: "none" }} />
+      
       </div>
     </div>
   )
 }
+
+
