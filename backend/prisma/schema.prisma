@@ -8,38 +8,39 @@ datasource db {
 }
 
 model User {
-  id                   String                @id @default(uuid())
-  username             String                @unique
-  email                String                @unique
-  passwordHash         String
-  avatarUrl            String?
-  createdAt            DateTime              @default(now())
-  cooldownUntil        DateTime?
-  isBanned             Boolean               @default(false)
-  nsfwStrikes          Int                   @default(0)
-  dateOfBirth          DateTime
-  dobMethod            String?
-  dobVerifiedAt        DateTime?
-  lastStrikeAt         DateTime?
-  lastReportAt         DateTime?
-  reportAccuracy       Float                 @default(1.0)
-  reportsConfirmed     Int                   @default(0)
-  reportsRejected      Int                   @default(0)
-  reportsSubmitted     Int                   @default(0)
-  strikeUpdatedAt      DateTime?             @default(now())
-  reportCooldownUntil  DateTime?
-  lastRejectedAt       DateTime?
-  lastRejectedSeverity String?
-  chats                CommunityChat[]
-  sentInvitations      CommunityInvitation[] @relation("InvitedBy")
-  receivedInvitations  CommunityInvitation[] @relation("InvitedUser")
-  communityMemberships CommunityMember[]
-  profiles             FeedProfile[]
-  likes                Like[]
-  posts                Post[]
-  reportsMade          Report[]
-  superuser            Superuser?
-  profile              UserProfile?
+  id                    String                 @id @default(uuid())
+  username              String                 @unique
+  email                 String                 @unique
+  passwordHash          String
+  avatarUrl             String?
+  createdAt             DateTime               @default(now())
+  cooldownUntil         DateTime?
+  isBanned              Boolean                @default(false)
+  nsfwStrikes           Int                    @default(0)
+  dateOfBirth           DateTime
+  dobMethod             String?
+  dobVerifiedAt         DateTime?
+  lastStrikeAt          DateTime?
+  lastReportAt          DateTime?
+  reportAccuracy        Float                  @default(1.0)
+  reportsConfirmed      Int                    @default(0)
+  reportsRejected       Int                    @default(0)
+  reportsSubmitted      Int                    @default(0)
+  strikeUpdatedAt       DateTime?              @default(now())
+  reportCooldownUntil   DateTime?
+  lastRejectedAt        DateTime?
+  lastRejectedSeverity  String?
+  chats                 CommunityChat[]
+  sentInvitations       CommunityInvitation[]  @relation("InvitedBy")
+  receivedInvitations   CommunityInvitation[]  @relation("InvitedUser")
+  communityMemberships  CommunityMember[]
+  profiles              FeedProfile[]
+  likes                 Like[]
+  posts                 Post[]
+  reportsMade           Report[]
+  superuser             Superuser?
+  profile               UserProfile?
+  communityJoinRequests CommunityJoinRequest[]
 }
 
 model Post {
@@ -57,8 +58,8 @@ model Post {
   memeTopText        String?
   memeBottomText     String?
   originPostId       String?
-  originPost         Post?    @relation("PostOrigin", fields: [originPostId], references: [id])
-  derivedPosts       Post[]   @relation("PostOrigin")
+  originPost         Post?               @relation("PostOrigin", fields: [originPostId], references: [id])
+  derivedPosts       Post[]              @relation("PostOrigin")
   originCommunityId  String?
   originType         PostOriginType      @default(USER)
   isRemoved          Boolean             @default(false)
@@ -89,20 +90,24 @@ model Like {
 }
 
 model Community {
-  id                 String                 @id @default(uuid())
-  name               String
-  intention          String
-  scope              CommunityScope
-  createdBy          String
-  createdAt          DateTime               @default(now())
-  rating             ContentRating          @default(SAFE)
-  categories         CommunityCategory[]
-  chats              CommunityChat[]
-  communityFeedItems CommunityFeedItem[]
-  invitations        CommunityInvitation[]
-  labelImports       CommunityLabelImport[]
-  members            CommunityMember[]
-  posts              Post[]
+  id        String         @id @default(uuid())
+  name      String
+  intention String
+  scope     CommunityScope
+  createdBy String
+  createdAt DateTime       @default(now())
+  rating    ContentRating  @default(SAFE)
+
+  joinPolicy JoinPolicy @default(APPROVAL_REQUIRED)
+
+  categories            CommunityCategory[]
+  chats                 CommunityChat[]
+  communityFeedItems    CommunityFeedItem[]
+  invitations           CommunityInvitation[]
+  labelImports          CommunityLabelImport[]
+  members               CommunityMember[]
+  posts                 Post[]
+  communityJoinRequests CommunityJoinRequest[]
 
   @@index([rating])
 }
@@ -275,6 +280,30 @@ model Superuser {
   user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model CommunityJoinRequest {
+  id          String @id @default(uuid())
+  communityId String
+  userId      String
+
+  status JoinRequestStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([communityId, userId])
+  @@index([communityId])
+  @@index([userId])
+}
+
+enum JoinRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum CommunityRole {
   ADMIN
   MODERATOR
@@ -317,6 +346,12 @@ enum FeedScope {
   LOCAL
   COUNTRY
   GLOBAL
+}
+
+enum JoinPolicy {
+  OPEN
+  APPROVAL_REQUIRED
+  INVITE_ONLY
 }
 
 enum ContentRating {
