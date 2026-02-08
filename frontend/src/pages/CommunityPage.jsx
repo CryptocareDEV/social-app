@@ -26,6 +26,9 @@ export default function CommunityPage({ theme }) {
   const [editingIntention, setEditingIntention] = useState(false)
   const [intentionDraft, setIntentionDraft] = useState("")
   const [savingIntention, setSavingIntention] = useState(false)
+  const isMember = !!myRole
+  const isAdmin = myRole === "ADMIN"
+
 
 
 
@@ -33,27 +36,41 @@ export default function CommunityPage({ theme }) {
      Load community meta
   ====================== */
   useEffect(() => {
-    let mounted = true
-    setLoading(true)
+  let mounted = true
+  setLoading(true)
+  setError("")
 
-    api(`/communities/${id}`)
-      .then((data) => {
+  api(`/communities/${id}`)
+    .then((data) => {
+      if (!mounted) return
+      setCommunity(data)
+      setMyRole(data.myRole || null)
+      setIntentionDraft(data.intention || "")
+    })
+    .catch(async (err) => {
+      // 👇 FALLBACK TO PUBLIC VIEW
+      try {
+        const publicData = await api(`/communities/${id}/public`)
         if (!mounted) return
-    setCommunity(data)
-    setMyRole(data.myRole || null)
-    setIntentionDraft(data.intention || "")
-      })
-      .catch(() => {
-        if (mounted) setError("Failed to load community")
-      })
-      .finally(() => {
-        if (mounted) setLoading(false)
-      })
 
-    return () => {
-      mounted = false
-    }
-  }, [id])
+        setCommunity(publicData.community)
+        setPosts(publicData.posts || [])
+        setMyRole(null) // 🔒 not a member
+      } catch {
+        if (mounted) setError("Failed to load community")
+      }
+    })
+    .finally(() => {
+      if (mounted) setLoading(false)
+    })
+
+  return () => {
+    mounted = false
+  }
+}, [id])
+
+
+  
   useEffect(() => {
   setActiveTab("feed")
 }, [id])
@@ -62,7 +79,7 @@ export default function CommunityPage({ theme }) {
      Load feed
   ====================== */
   useEffect(() => {
-    if (activeTab !== "feed") return
+    if (activeTab !== "feed" || !isMember) return
 
     let mounted = true
     setLoadingFeed(true)
@@ -162,6 +179,27 @@ export default function CommunityPage({ theme }) {
           {community.scope} · {community.rating}
         </div>
       </div>
+      {!isMember && (
+  <div style={{ marginBottom: 20 }}>
+    <button
+      style={{
+        padding: "10px 16px",
+        borderRadius: 12,
+        border: `1px solid ${colors.border}`,
+        background: colors.surface,
+        cursor: "pointer",
+        fontSize: 14,
+        fontWeight: 500,
+      }}
+      onClick={() => {
+        alert("Join request flow comes next step")
+      }}
+    >
+      Request to join
+    </button>
+  </div>
+)}
+
 
       {/* TABS */}
       <div
@@ -174,8 +212,11 @@ export default function CommunityPage({ theme }) {
           fontSize: 13,
         }}
       >
-        {["feed", "chat", "members", ...(myRole === "ADMIN" ? ["settings"] : [])]
-  .map((tab) => (
+        {[
+  "feed",
+  ...(isMember ? ["chat", "members"] : []),
+  ...(isAdmin ? ["settings"] : []),
+].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -328,6 +369,8 @@ export default function CommunityPage({ theme }) {
 </div>
 
 
+
+
     {/* Labels placeholder */}
     <div
       style={{
@@ -363,20 +406,30 @@ export default function CommunityPage({ theme }) {
         borderBottom: `1px solid ${colors.border}`,
       }}
     >
-      <PostComposer
-        theme={theme}
-        feedMode="COMMUNITY"
-        activeCommunity={community}
-        onPostCreated={async () => {
-          setLoadingFeed(true)
-          try {
-            const data = await api(`/communities/${id}/feed`)
-            setPosts(Array.isArray(data) ? data : [])
-          } finally {
-            setLoadingFeed(false)
-          }
-        }}
-      />
+      {isMember && (
+  <div
+    style={{
+      paddingBottom: 16,
+      borderBottom: `1px solid ${colors.border}`,
+    }}
+  >
+    <PostComposer
+      theme={theme}
+      feedMode="COMMUNITY"
+      activeCommunity={community}
+      onPostCreated={async () => {
+        setLoadingFeed(true)
+        try {
+          const data = await api(`/communities/${id}/feed`)
+          setPosts(Array.isArray(data) ? data : [])
+        } finally {
+          setLoadingFeed(false)
+        }
+      }}
+    />
+  </div>
+)}
+
     </div>
 
     {/* Feed */}
@@ -434,10 +487,13 @@ export default function CommunityPage({ theme }) {
         boxSizing: "border-box",
       }}
     >
-      <CommunityChat
-        communityId={id}
-        isMember
-      />
+      {isMember ? (
+  <CommunityChat communityId={id} isMember />
+) : (
+  <p style={{ opacity: 0.6, fontSize: 13 }}>
+    Join this community to participate in chat.
+  </p>
+)}
     </div>
   </div>
 )}

@@ -42,8 +42,16 @@ export const getUserPosts = async (req, res) => {
     const posts = await prisma.post.findMany({
       where: { userId: id },
       orderBy: { createdAt: "desc" },
-      include: {
-        _count: { select: { likes: true } },
+      select: {
+        id: true,
+        type: true,
+        caption: true,
+        mediaUrl: true,
+        communityId: true, // 🔑 THIS IS THE KEY LINE
+        createdAt: true,
+        _count: {
+          select: { likes: true },
+        },
       },
     })
 
@@ -53,6 +61,7 @@ export const getUserPosts = async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch user posts" })
   }
 }
+
 
 /**
  * GET /api/v1/users/me
@@ -177,5 +186,41 @@ export const updateMe = async (req, res) => {
     return res.status(500).json({
       error: "Failed to update profile",
     })
+  }
+}
+
+
+export const getUserCommunities = async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const memberships = await prisma.communityMember.findMany({
+      where: { userId: id },
+      include: {
+        community: {
+          select: {
+            id: true,
+            name: true,
+            intention: true,
+            scope: true,
+          },
+        },
+      },
+      orderBy: { joinedAt: "desc" },
+    })
+
+    return res.json(
+      memberships.map((m) => ({
+        id: m.community.id,
+        name: m.community.name,
+        intention: m.community.intention,
+        scope: m.community.scope,
+      }))
+    )
+  } catch (err) {
+    console.error("GET USER COMMUNITIES ERROR", err)
+    return res
+      .status(500)
+      .json({ error: "Failed to fetch user communities" })
   }
 }

@@ -221,6 +221,7 @@ model FeedProfile {
   userId      String
   name        String
   isActive    Boolean  @default(false)
+  isDefault   Boolean  @default(false)
   preferences Json
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

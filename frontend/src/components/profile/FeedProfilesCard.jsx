@@ -1,5 +1,6 @@
 import { getThemeColors } from "../../ui/theme"
 
+
 export default function FeedProfilesCard({
   theme,
   profiles = [],
@@ -35,6 +36,8 @@ export default function FeedProfilesCard({
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {profiles.map((p) => {
           const isActive = p.id === activeProfileId
+          const isDefault = p.name === "Default"
+
 
           return (
             <div
@@ -67,13 +70,19 @@ export default function FeedProfilesCard({
       </button>
     )}
 
-    <button onClick={() => onEdit?.(p)}>
-      Edit
-    </button>
+    {!isDefault && (
+  <button onClick={() => onEdit?.(p)}>
+    Edit
+  </button>
+)}
 
-    <button onClick={() => onDelete?.(p)}>
-      Delete
-    </button>
+{!isDefault && (
+  <button onClick={() => onDelete?.(p)}>
+    Delete
+  </button>
+)}
+
+
   </div>
 </div>
           )

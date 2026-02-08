@@ -40,6 +40,9 @@ import {
   getCommunityModerationReports,
 } from "../controllers/communityModeration.controller.js"
 import { updateCommunityIntention } from "../controllers/community.controller.js"
+import {
+  getCommunityPublicView,
+} from "../controllers/community.controller.js"
 
 
 
@@ -80,12 +83,21 @@ router.patch(
 
 
 router.get("/my", requireAuth, getMyCommunities)
+
+router.get(
+  "/:id/public",
+  requireAuth,
+  getCommunityPublicView
+)
+
 router.get(
   "/:id/feed",
   requireAuth,
   rateLimit({ windowMs: 10_000, max: 20 }),
   getCommunityFeed
 )
+
+
 router.get("/:id", requireAuth, getCommunityById)
 router.post(
   "/invitations/:id/revoke",
@@ -128,6 +140,11 @@ router.patch(
   requireAuth,
   updateCommunityCategories
 )
+
+
+
+
+
 router.get("/:id/members", requireAuth, getCommunityMembers)
 router.post("/:id/members/:userId/remove", requireAuth, removeCommunityMember)
 router.post("/:id/members/:userId/role", requireAuth, changeCommunityMemberRole)

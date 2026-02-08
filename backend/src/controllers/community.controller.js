@@ -1346,3 +1346,72 @@ export const updateCommunityIntention = async (req, res) => {
     })
   }
 }
+
+
+// ============================================================
+// PUBLIC COMMUNITY VIEW (NON-MEMBERS)
+// GET /communities/:id/public
+// ============================================================
+export const getCommunityPublicView = async (req, res) => {
+  try {
+    const { id } = req.params
+
+    // 1️⃣ Load basic community info (SAFE fields only)
+    const community = await prisma.community.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        intention: true,
+        scope: true,
+        rating: true,
+        createdAt: true,
+        _count: {
+          select: {
+            members: true,
+            posts: true,
+          },
+        },
+      },
+    })
+
+    if (!community) {
+      return res.status(404).json({ error: "Community not found" })
+    }
+
+    // 2️⃣ Load PUBLIC posts only
+    const posts = await prisma.communityFeedItem.findMany({
+  where: {
+    communityId: id,
+    post: {
+      isRemoved: false,
+      rating: "SAFE",
+    },
+  },
+  orderBy: { rank: "asc" },
+  take: 20,
+  include: {
+    post: {
+      include: {
+        user: {
+          select: { id: true, username: true, avatarUrl: true },
+        },
+        _count: { select: { likes: true } },
+      },
+    },
+  },
+})
+
+
+    return res.json({
+      community,
+      posts: posts.map(i => i.post),
+      canRequestJoin: true,
+    })
+  } catch (err) {
+    console.error("GET COMMUNITY PUBLIC VIEW ERROR:", err)
+    return res.status(500).json({
+      error: "Failed to load community",
+    })
+  }
+}

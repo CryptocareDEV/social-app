@@ -5,6 +5,7 @@ import {
   getMe,
   getMyInvitations,
   updateMe,
+  getUserCommunities,
 } from "../controllers/user.controller.js"
 import { requireAuth } from "../middleware/auth.middleware.js"
 
@@ -27,5 +28,7 @@ router.get("/me/invitations", requireAuth, getMyInvitations)
 // ✅ GENERIC USER ROUTES LAST
 router.get("/:id/posts", getUserPosts)
 router.get("/:id", getUserProfile)
+router.get("/:id/communities", requireAuth, getUserCommunities)
+
 
 export default router

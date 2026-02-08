@@ -472,3 +472,48 @@ export const getPostOrigin = async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch origin post" })
   }
 }
+
+
+/* ============================================================
+   DELETE POST (SOFT DELETE)
+============================================================ */
+
+export const deletePost = async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const { id } = req.params
+
+    const post = await prisma.post.findUnique({
+      where: { id },
+      select: {
+        userId: true,
+        isRemoved: true,
+      },
+    })
+
+    if (!post || post.isRemoved) {
+      return res.status(404).json({
+        error: "Post not found",
+      })
+    }
+
+    // 🔒 Ownership guard
+    if (post.userId !== userId) {
+      return res.status(403).json({
+        error: "You are not allowed to delete this post",
+      })
+    }
+
+    await prisma.post.update({
+      where: { id },
+      data: { isRemoved: true },
+    })
+
+    return res.json({ success: true })
+  } catch (err) {
+    console.error("DELETE POST ERROR:", err)
+    return res
+      .status(500)
+      .json({ error: "Failed to delete post" })
+  }
+}
