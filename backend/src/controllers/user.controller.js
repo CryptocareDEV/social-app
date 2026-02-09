@@ -4,7 +4,8 @@ export const getUserProfile = async (req, res) => {
   try {
     const { id } = req.params
 
-    const user = await prisma.user.findUnique({
+    // 1️⃣ First try: treat param as UUID (existing behavior)
+    let user = await prisma.user.findUnique({
       where: { id },
       select: {
         id: true,
@@ -13,17 +14,33 @@ export const getUserProfile = async (req, res) => {
         createdAt: true,
         _count: { select: { posts: true } },
         profile: {
-          select: {
-            bio: true,
-          },
+          select: { bio: true },
         },
       },
     })
+
+    // 2️⃣ Fallback: treat param as username (NEW, safe)
+    if (!user) {
+      user = await prisma.user.findUnique({
+        where: { username: id },
+        select: {
+          id: true,
+          username: true,
+          avatarUrl: true,
+          createdAt: true,
+          _count: { select: { posts: true } },
+          profile: {
+            select: { bio: true },
+          },
+        },
+      })
+    }
 
     if (!user) {
       return res.status(404).json({ error: "User not found" })
     }
 
+    // 3️⃣ Preserve exact response shape
     return res.json({
       ...user,
       bio: user.profile?.bio ?? "",
@@ -33,6 +50,7 @@ export const getUserProfile = async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch profile" })
   }
 }
+
 
 
 export const getUserPosts = async (req, res) => {

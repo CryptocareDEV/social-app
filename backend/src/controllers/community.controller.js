@@ -160,12 +160,16 @@ export const getCommunityById = async (req, res) => {
     const community = await prisma.community.findUnique({
       where: { id: communityId },
       include: {
-        categories: {
-          select: {
-            categoryKey: true,
-          },
-        },
-      },
+  categories: {
+    select: { categoryKey: true },
+  },
+  labelImports: {
+    select: {
+      categoryKey: true,
+      importMode: true,
+    },
+  },
+},
     })
 
     if (!community) {
@@ -845,6 +849,75 @@ export const createCommunityInvitation = async (req, res) => {
     const { username } = req.body
     const invitedById = req.user.userId
 
+    // ================================
+// JOIN REQUEST (user → community)
+// ================================
+// If NO username is provided, this is a join request
+if (!username) {
+  // 1. Load community
+  const community = await prisma.community.findUnique({
+    where: { id: communityId },
+  })
+
+  if (!community) {
+    return res.status(404).json({ error: "Community not found" })
+  }
+
+  // 2. Minor safety
+  if (community.rating === "NSFW" && req.user.isMinor) {
+    return res.status(403).json({
+      error: "Minors cannot join NSFW communities",
+    })
+  }
+
+  // 3. Already a member?
+  const existingMember = await prisma.communityMember.findFirst({
+    where: {
+      communityId,
+      userId: invitedById,
+    },
+  })
+
+  if (existingMember) {
+    return res.status(400).json({
+      error: "You are already a member",
+    })
+  }
+
+  // 4. Existing pending request?
+  const existingRequest =
+    await prisma.communityInvitation.findFirst({
+      where: {
+        communityId,
+        invitedUserId: invitedById,
+        status: "PENDING",
+      },
+    })
+
+  if (existingRequest) {
+    return res.status(400).json({
+      error: "Join request already sent",
+    })
+  }
+
+  // 5. Create join request
+  const invitation =
+    await prisma.communityInvitation.create({
+      data: {
+        communityId,
+        invitedById,
+        invitedUserId: invitedById,
+        expiresAt: new Date(
+          Date.now() + 7 * 24 * 60 * 60 * 1000
+        ),
+      },
+    })
+
+  return res.status(201).json(invitation)
+}
+
+
+
     if (!username || typeof username !== "string") {
       return res.status(400).json({
         error: "username is required",
@@ -889,7 +962,6 @@ export const createCommunityInvitation = async (req, res) => {
       })
     }
 
-    const invitedUserId = invitedUser.id
 
     // 4. 🔞 Minor safety: block NSFW invitations entirely
     if (community.rating === "NSFW") {
@@ -989,7 +1061,7 @@ export const createCommunityInvitation = async (req, res) => {
 export const acceptCommunityInvitation = async (req, res) => {
   try {
     const { id } = req.params
-    const userId = req.user.userId
+    const actorId = req.user.userId
 
     const invitation = await prisma.communityInvitation.findUnique({
       where: { id },
@@ -999,33 +1071,70 @@ export const acceptCommunityInvitation = async (req, res) => {
       return res.status(404).json({ error: "Invitation not found" })
     }
 
-    if (invitation.invitedUserId !== userId) {
-      return res.status(403).json({ error: "Not your invitation" })
-    }
-
     if (invitation.status !== "PENDING") {
       return res.status(400).json({ error: "Invitation no longer valid" })
     }
 
-    if (invitation.expiresAt < new Date()) {
-  await prisma.communityInvitation.update({
-    where: { id },
-    data: { status: "EXPIRED" },
-  })
-  return res.status(400).json({ error: "Invitation expired" })
-}
+    // 🔑 Detect join request vs admin invite
+    const isJoinRequest =
+      invitation.invitedById === invitation.invitedUserId
 
+    let userToAddId = null
 
-    // Add user as member
+    if (isJoinRequest) {
+      // ============================
+      // ADMIN approves join request
+      // ============================
+      const admin = await prisma.communityMember.findFirst({
+        where: {
+          communityId: invitation.communityId,
+          userId: actorId,
+          role: "ADMIN",
+        },
+      })
+
+      if (!admin) {
+        return res.status(403).json({
+          error: "Only ADMIN can approve join requests",
+        })
+      }
+
+      userToAddId = invitation.invitedUserId
+    } else {
+      // ============================
+      // User accepts admin invite
+      // ============================
+      if (invitation.invitedUserId !== actorId) {
+        return res.status(403).json({ error: "Not your invitation" })
+      }
+
+      userToAddId = actorId
+    }
+
+    // 🛑 Safety: prevent double membership
+    const existing = await prisma.communityMember.findFirst({
+      where: {
+        communityId: invitation.communityId,
+        userId: userToAddId,
+      },
+    })
+
+    if (existing) {
+      return res.status(400).json({
+        error: "User already a member",
+      })
+    }
+
+    // ✅ Add correct user as member
     await prisma.communityMember.create({
       data: {
         communityId: invitation.communityId,
-        userId,
+        userId: userToAddId,
         role: "MEMBER",
       },
     })
 
-    // Mark invitation accepted
+    // ✅ Mark invitation accepted
     await prisma.communityInvitation.update({
       where: { id },
       data: { status: "ACCEPTED" },
@@ -1033,10 +1142,13 @@ export const acceptCommunityInvitation = async (req, res) => {
 
     return res.json({ success: true })
   } catch (err) {
-    console.error("ACCEPT INVITE ERROR:", err)
-    return res.status(500).json({ error: "Failed to accept invitation" })
+    console.error("ACCEPT INVITATION ERROR:", err)
+    return res.status(500).json({
+      error: "Failed to accept invitation",
+    })
   }
 }
+
 
 /**
  * POST /communities/invitations/:id/decline
@@ -1123,24 +1235,28 @@ export const getMyInvitations = async (req, res) => {
     const userId = req.user.userId
 
     const invitations = await prisma.communityInvitation.findMany({
-      where: {
-        invitedUserId: userId,
-        status: "PENDING",
+  where: {
+    invitedUserId: userId,
+    status: "PENDING",
+    // 🔑 EXCLUDE join requests
+    NOT: {
+      invitedById: userId,
+    },
+  },
+  include: {
+    community: {
+      select: {
+        id: true,
+        name: true,
+        scope: true,
       },
-      include: {
-        community: {
-          select: {
-            id: true,
-            name: true,
-            scope: true,
-          },
-        },
-        invitedBy: {
-          select: {
-            username: true,
-          },
-        },
+    },
+    invitedBy: {
+      select: {
+        username: true,
       },
+    },
+  },
       orderBy: { createdAt: "desc" },
     })
 
@@ -1403,11 +1519,30 @@ export const getCommunityPublicView = async (req, res) => {
 })
 
 
-    return res.json({
-      community,
-      posts: posts.map(i => i.post),
-      canRequestJoin: true,
-    })
+    // 3️⃣ Check if current user already has a pending join request
+let myInvitationStatus = null
+
+if (req.user?.userId) {
+  const myInvitation = await prisma.communityInvitation.findFirst({
+    where: {
+      communityId: id,
+      invitedUserId: req.user.userId,
+      status: "PENDING",
+    },
+  })
+
+  if (myInvitation) {
+    myInvitationStatus = myInvitation.status
+  }
+}
+
+return res.json({
+  community,
+  posts: posts.map(i => i.post),
+  canRequestJoin: true,
+  myInvitationStatus,
+})
+
   } catch (err) {
     console.error("GET COMMUNITY PUBLIC VIEW ERROR:", err)
     return res.status(500).json({
