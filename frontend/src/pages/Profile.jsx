@@ -97,6 +97,7 @@ const meUser = await api("/me")
 // 2️⃣ Load profile owner explicitly
 const u = await api(`/users/${id}`)
 
+
 // 3️⃣ Decide ownership based on actual user identity
 const viewingOwnProfile = u.id === meUser.id
 
