@@ -5,16 +5,18 @@ export const buttonBase = (theme) => {
   const c = getThemeColors(theme)
 
   return {
-    padding: "8px 16px",
+    padding: "10px 18px",              // more breathing room
     borderRadius: theme.radius.pill,
-    fontSize: 14,
+    fontSize: 15,                      // readable baseline
     fontWeight: 500,
+    lineHeight: 1.4,
     cursor: "pointer",
-    transition: "background 0.15s ease, color 0.15s ease",
+    transition:
+      "background 0.15s ease, color 0.15s ease, border-color 0.15s ease",
     outline: "none",
+    whiteSpace: "nowrap",
   }
 }
-
 
 export const primaryButton = (theme) => {
   const c = getThemeColors(theme)
@@ -22,7 +24,7 @@ export const primaryButton = (theme) => {
   return {
     ...buttonBase(theme),
     background: c.primary,
-    color: "#fff",
+    color: "#ffffff",
     border: "none",
   }
 }
@@ -44,7 +46,7 @@ export const ghostButton = (theme) => {
   return {
     ...buttonBase(theme),
     background: "transparent",
-    color: c.textMuted,
+    color: c.text,                     // was too faint before
     border: "none",
   }
 }
@@ -55,18 +57,23 @@ export const dangerButton = (theme) => {
   return {
     ...buttonBase(theme),
     background: c.danger,
-    color: "#fff",
+    color: "#ffffff",
     border: "none",
   }
 }
 
+/* =========================
+   Header-specific buttons
+   ========================= */
+
 export const headerSelect = (theme) => {
-  const c = theme.colors[theme.mode]
+  const c = getThemeColors(theme)
 
   return {
-    padding: "6px 28px 6px 12px",
+    padding: "8px 32px 8px 14px",       // larger click target
     borderRadius: theme.radius.pill,
-    fontSize: 13,
+    fontSize: 14,
+    lineHeight: 1.4,
     background: c.surface,
     color: c.text,
     border: `1px solid ${c.border}`,
@@ -77,24 +84,31 @@ export const headerSelect = (theme) => {
   }
 }
 
-export const headerPrimaryButton = (theme) => ({
-  padding: "6px 12px",
-  borderRadius: theme.radius.pill,
-  fontSize: 13,
-  fontWeight: 500,
-  background: theme.colors[theme.mode].primary,
-  color: "#fff",
-  border: "none",
-  cursor: "pointer",
-})
+export const headerPrimaryButton = (theme) => {
+  const c = getThemeColors(theme)
 
-export const headerGhostButton = (theme) => ({
-  padding: "6px 10px",
-  borderRadius: theme.radius.pill,
-  fontSize: 13,
-  background: "transparent",
-  color: theme.colors[theme.mode].textMuted,
-  border: "none",
-  cursor: "pointer",
-})
+  return {
+    padding: "8px 14px",
+    borderRadius: theme.radius.pill,
+    fontSize: 14,
+    fontWeight: 500,
+    background: c.primary,
+    color: "#ffffff",
+    border: "none",
+    cursor: "pointer",
+  }
+}
 
+export const headerGhostButton = (theme) => {
+  const c = getThemeColors(theme)
+
+  return {
+    padding: "8px 12px",
+    borderRadius: theme.radius.pill,
+    fontSize: 14,
+    background: "transparent",
+    color: c.textMuted,
+    border: "none",
+    cursor: "pointer",
+  }
+}

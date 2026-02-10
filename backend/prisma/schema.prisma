@@ -31,6 +31,8 @@ model User {
   lastRejectedAt        DateTime?
   lastRejectedSeverity  String?
   chats                 CommunityChat[]
+  comments           Comment[]
+
   sentInvitations       CommunityInvitation[]  @relation("InvitedBy")
   receivedInvitations   CommunityInvitation[]  @relation("InvitedUser")
   communityMemberships  CommunityMember[]
@@ -70,6 +72,8 @@ model Post {
   user               User                @relation(fields: [userId], references: [id])
   categories         PostCategory[]
   reports            Report[]
+  comments           Comment[]
+
 
   @@index([userId])
   @@index([scope])
@@ -77,6 +81,34 @@ model Post {
   @@index([communityId])
   @@index([rating])
 }
+
+
+model Comment {
+  id          String   @id @default(uuid())
+  postId      String
+  userId      String
+
+  body        String?
+  mediaUrl    String?
+  mediaType   CommentMediaType?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  isRemoved   Boolean  @default(false)
+  removedAt   DateTime?
+  removedBy   String?
+  removedReason String?
+
+  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+
 
 model Like {
   id        String   @id @default(uuid())
@@ -97,8 +129,6 @@ model Community {
   createdBy String
   createdAt DateTime       @default(now())
   rating    ContentRating  @default(SAFE)
-
-  joinPolicy JoinPolicy @default(APPROVAL_REQUIRED)
 
   categories            CommunityCategory[]
   chats                 CommunityChat[]
@@ -327,6 +357,14 @@ enum PostType {
   VIDEO
   MEME
 }
+
+enum CommentMediaType {
+  IMAGE
+  GIF
+  VIDEO
+}
+
+
 
 enum InvitationStatus {
   PENDING

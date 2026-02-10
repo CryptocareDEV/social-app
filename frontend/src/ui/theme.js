@@ -36,6 +36,59 @@ export const theme = {
       danger: "#f87171",
     },
   },
+    
+    typography: {
+    fontFamily:
+      'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+
+    // Base text (feeds, descriptions, posts)
+    body: {
+      size: 17,               
+      lineHeight: 1.65,
+      weight: 400,
+    },
+
+    // Secondary / helper text
+    small: {
+      size: 14,
+      lineHeight: 1.55,
+      weight: 400,
+    },
+
+    // Headings — hierarchy by size, not weight
+    h1: {
+      size: 34,               // page titles
+      lineHeight: 1.2,
+      weight: 600,
+    },
+    h2: {
+      size: 28,               // section titles
+      lineHeight: 1.25,
+      weight: 600,
+    },
+    h3: {
+      size: 22,               // subsection
+      lineHeight: 1.35,
+      weight: 600,
+    },
+    h4: {
+      size: 18,               // labels / cards
+      lineHeight: 1.45,
+      weight: 600,
+    },
+  },
+
+
+      spacing: {
+    xs: 4,
+    sm: 8,
+    md: 16,     // 👈 was 12, now matches body rhythm
+    lg: 24,     // 👈 clearer section separation
+    xl: 32,
+    xxl: 56,    // 👈 page-level breathing
+  },
+
+
 
   radius: {
     sm: 6,

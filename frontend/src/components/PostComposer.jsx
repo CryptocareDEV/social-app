@@ -12,6 +12,8 @@ export default function PostComposer({
   theme,
 }) {
   const colors = getThemeColors(theme)
+  const [open, setOpen] = useState(true)
+
   const inputStyle = {
   width: "100%",
   padding: "10px 12px",
@@ -20,6 +22,9 @@ export default function PostComposer({
   border: `1px solid ${colors.border}`,
   fontSize: 14,
   boxSizing: "border-box",
+  background: colors.surface,
+color: colors.text,
+
 }
 
 const textareaStyle = {
@@ -33,6 +38,9 @@ const textareaStyle = {
   resize: "vertical",
   marginBottom: 8,
   boxSizing: "border-box",
+  color: colors.text,
+background: colors.surface,
+
 }
 
 const selectStyle = {
@@ -42,7 +50,10 @@ const selectStyle = {
   border: `1px solid ${colors.border}`,
   fontSize: 14,
   marginBottom: 8,
+  background: colors.surface,
+  color: colors.text,
 }
+
 
   const [type, setType] = useState("TEXT")
   const [caption, setCaption] = useState("")
@@ -79,14 +90,18 @@ const selectStyle = {
 
   // 🔹 Toggle existing label
   const toggleLabel = (key) => {
-    setSelectedLabels((prev) => {
-      if (prev.includes(key)) {
-        return prev.filter((k) => k !== key)
-      }
-      if (prev.length >= 3) return prev
-      return [...prev, key]
-    })
-  }
+  setSelectedLabels((prev) => {
+    if (prev.includes(key)) {
+      return prev.filter((k) => k !== key)
+    }
+    if (prev.length >= 3) return prev
+    return [...prev, key]
+  })
+
+ 
+  setLabelInput("")
+}
+
 
   // 🔹 Create/select label on Enter
   const handleLabelInputKeyDown = async (e) => {
@@ -193,33 +208,47 @@ const effectiveCommunityId =
   }
 
   return (
-    <form
-      onSubmit={submit}
-      style={{
-  background: colors.surface,
-  borderRadius: theme.radius.lg,
-  padding: 16,
-  marginBottom: 24,
-  border: `1px solid ${colors.border}`,
-  boxShadow: theme.shadow.sm,
-}}
-    >
-      <h3
-        style={{
-          marginBottom: 12,
-          fontSize: 15,
-          fontWeight: 600,
-          color: "#0f172a",
-        }}
-      >
-        Create post
-      </h3>
+  <div
+    style={{
+      background: colors.surface,
+      borderRadius: theme.radius.lg,
+      marginBottom: 24,
+      border: `1px solid ${colors.border}`,
+      boxShadow: theme.shadow.sm,
+    }}
+  >
+<div
+  onClick={() => setOpen((v) => !v)}
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    cursor: "pointer",
+    userSelect: "none",
+  }}
+>
+  <h3
+    style={{
+      margin: 0,
+      fontSize: 15,
+      fontWeight: 600,
+      color: colors.text,
+    }}
+  >
+    Create post
+  </h3>
 
-      {error && (
-        <p style={{ color: "#dc2626", fontSize: 13, marginBottom: 8 }}>
-          {error}
-        </p>
-      )}
+  <span style={{ fontSize: 13, color: colors.textMuted }}>
+    {open ? "Hide" : "Show"}
+  </span>
+</div>
+{open && (
+  <form onSubmit={submit} style={{ padding: 16 }}>
+
+      
+
+      
 
       {/* Type */}
       <select
@@ -265,10 +294,11 @@ const effectiveCommunityId =
         <div
           style={{
             marginTop: 6,
-            border: "1px solid #e5e7eb",
+            border: `1px solid ${colors.border}`,
+            background: colors.surface,
             borderRadius: 12,
             padding: 6,
-            background: "#191414",
+            background: colors.surface,
             boxShadow: "0 6px 20px rgba(0,0,0,0.08)",
           }}
         >
@@ -288,7 +318,7 @@ const effectiveCommunityId =
                   fontSize: 13,
                   cursor: "pointer",
                   borderRadius: 8,
-                }}
+                  color: colors.text,  }}
               >
                 #{label.key}
               </div>
@@ -298,15 +328,15 @@ const effectiveCommunityId =
 
       {/* Labels */}
       <div
-        style={{
-          marginTop: 10,
-          padding: 10,
-          borderRadius: 12,
-          background: "#f8fafc",
-          border: "1px solid #e5e7eb",
-        }}
-      >
-        <p style={{ fontSize: 12, color: "#475569", marginBottom: 6 }}>
+  style={{
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 12,
+    background: colors.surfaceMuted,
+    border: `1px solid ${colors.border}`,
+  }}
+>
+        <p style={{ fontSize: 12, color: colors.textMuted, marginBottom: 6 }}>
           Select up to 3 labels
         </p>
 
@@ -319,8 +349,9 @@ const effectiveCommunityId =
                   padding: "4px 10px",
                   borderRadius: 999,
                   fontSize: 12,
-                  background: "#0284c7",
-                  color: "#1d1919",
+                  background: colors.primarySoft,
+  color: colors.primary,
+  border: `1px solid ${colors.primary}`,
                   display: "flex",
                   alignItems: "center",
                   gap: 6,
@@ -337,7 +368,7 @@ const effectiveCommunityId =
                   style={{
                     background: "transparent",
                     border: "none",
-                    color: "#1e1d1d",
+                    color: colors.primary,
                     cursor: "pointer",
                     fontSize: 12,
                   }}
@@ -368,8 +399,8 @@ const effectiveCommunityId =
         marginBottom: 10,
         padding: "8px 12px",
         borderRadius: 10,
-        background: "#f8fafc",
-        border: "1px solid #e5e7eb",
+        background: colors.surfaceMuted,
+border: `1px solid ${colors.border}`,
         fontSize: 13,
       }}
     >
@@ -420,7 +451,9 @@ const effectiveCommunityId =
     </button>
   </div>
 </div>
-    </form>
-  )
-}
+        </form>
+)}
 
+  </div>
+)
+}

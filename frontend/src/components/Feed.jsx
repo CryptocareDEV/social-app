@@ -17,9 +17,10 @@ export default function Feed({
       <div
         style={{
           textAlign: "center",
-          padding: "40px 0",
+          padding: `${theme.spacing.xxl}px 0`,
           color: colors.textMuted,
-          fontSize: 14,
+          fontSize: theme.typography.body.size,
+          lineHeight: theme.typography.body.lineHeight,
         }}
       >
         Loading feed…
@@ -33,9 +34,10 @@ export default function Feed({
       <div
         style={{
           textAlign: "center",
-          padding: "40px 0",
+          padding: `${theme.spacing.xxl}px 0`,
           color: colors.textMuted,
-          fontSize: 14,
+          fontSize: theme.typography.body.size,
+          lineHeight: theme.typography.body.lineHeight,
         }}
       >
         Nothing here yet.
@@ -49,7 +51,7 @@ export default function Feed({
       style={{
         display: "flex",
         flexDirection: "column",
-        gap: 18,
+        gap: theme.spacing.lg,
       }}
     >
       {posts.map((post) => (

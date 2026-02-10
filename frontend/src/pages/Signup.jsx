@@ -1,11 +1,17 @@
 import { useState } from "react"
 import { api } from "../api/client"
 import { useNavigate, Link } from "react-router-dom"
-import { theme } from "../styles/theme"
+import { getThemeColors } from "../ui/theme"
+import { theme as baseTheme } from "../ui/theme"
+import { primaryButton } from "../ui/buttonStyles"
 
-export default function Signup({ onAuth }) {
+export default function Signup() {
+  const theme = baseTheme
+  const colors = getThemeColors(theme)
+
   const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
+  const [dateOfBirth, setDateOfBirth] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -14,24 +20,47 @@ export default function Signup({ onAuth }) {
 
   const submit = async (e) => {
     e.preventDefault()
+    if (loading) return
+
     setError("")
     setLoading(true)
 
     try {
-      const res = await api("/auth/signup", {
+      await api("/auth/signup", {
         method: "POST",
         body: JSON.stringify({
           username,
           email,
           password,
+          dateOfBirth,
         }),
       })
 
-      localStorage.setItem("token", res.token)
-      onAuth(res.user)
-      navigate("/")
+      // ✅ Signup successful → go to login with message
+      navigate("/login", {
+        replace: true,
+        state: {
+          message:
+            "Your account has been created. Please log in to continue.",
+        },
+      })
     } catch (err) {
-      setError(err?.error || "Signup failed")
+      const message = err?.error || err?.message || ""
+
+      // 🟡 Existing user → same destination, calmer tone
+      if (message.toLowerCase().includes("exist")) {
+        navigate("/login", {
+          replace: true,
+          state: {
+            message:
+              "An account already exists. Please log in.",
+          },
+        })
+        return
+      }
+
+      // 🔴 Genuine failure
+      setError(message || "Signup failed")
     } finally {
       setLoading(false)
     }
@@ -39,106 +68,221 @@ export default function Signup({ onAuth }) {
 
   const inputStyle = {
     width: "100%",
-    padding: "10px 12px",
-    marginBottom: 12,
-    borderRadius: 8,
-    border: `1px solid ${theme.colors.border}`,
-    fontSize: 14,
     boxSizing: "border-box",
+    padding: "12px 14px",
+    borderRadius: theme.radius.md,
+    border: `1px solid ${colors.border}`,
+    background: colors.surface,
+    color: colors.text,
+    fontSize: theme.typography.body.size,
+    lineHeight: theme.typography.body.lineHeight,
+  }
+
+  const featureTitleStyle = {
+    fontSize: theme.typography.body.size,
+    fontWeight: 600,
+    letterSpacing: "0.01em",
+    color: colors.text,
+    marginBottom: 4,
+  }
+
+  const featureBodyStyle = {
+    fontSize: theme.typography.body.size,
+    lineHeight: theme.typography.body.lineHeight,
+    color: colors.textMuted,
   }
 
   return (
     <div
       style={{
-        maxWidth: 360,
-        margin: "120px auto",
-        padding: 24,
-        borderRadius: theme.radius.lg,
-        background: theme.colors.card,
-        boxShadow: theme.shadow.md,
+        minHeight: "100vh",
+        background: colors.bg,
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "center",
+        paddingTop: 48,
+        paddingBottom: 48,
       }}
     >
-      <h2
+      <div
         style={{
-          marginBottom: 16,
-          textAlign: "center",
-          color: theme.colors.text,
+          maxWidth: 900,
+          width: "100%",
+          display: "grid",
+          gridTemplateColumns: "1.1fr 0.9fr",
+          gap: 48,
+          alignItems: "start",
         }}
       >
-        Create your account
-      </h2>
+        {/* LEFT */}
+        <div>
+          <div
+            style={{
+              fontSize: theme.typography.h1.size,
+              fontWeight: 600,
+              lineHeight: theme.typography.h1.lineHeight,
+              marginBottom: 16,
+              color: colors.text,
+            }}
+          >
+            🌱 A calmer way to see the world
+          </div>
 
-      {error && (
-        <p
+          <p
+            style={{
+              fontSize: theme.typography.body.size,
+              lineHeight: theme.typography.body.lineHeight,
+              color: colors.textMuted,
+              marginBottom: 32,
+            }}
+          >
+            This is a place for intentional communities and thoughtful
+            conversations, not engagement farming.
+          </p>
+
+          <div style={{ display: "grid", gap: 20 }}>
+            <div>
+              <div style={featureTitleStyle}>
+                Multiple perspectives
+              </div>
+              <div style={featureBodyStyle}>
+                Create different feed profiles and experience the same
+                world through different lenses.
+              </div>
+            </div>
+
+            <div>
+              <div style={featureTitleStyle}>
+                Labels over algorithms
+              </div>
+              <div style={featureBodyStyle}>
+                Choose topics and communities deliberately, no opaque
+                ranking tricks.
+              </div>
+            </div>
+
+            <div>
+              <div style={featureTitleStyle}>
+                Governed, not chaotic
+              </div>
+              <div style={featureBodyStyle}>
+                Communities have rules, roles, and accountability built
+                in.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT: FORM */}
+        <div
           style={{
-            marginBottom: 12,
-            color: theme.colors.danger,
-            textAlign: "center",
-            fontSize: 14,
+            background: colors.surface,
+            padding: 24,
+            borderRadius: theme.radius.lg,
+            border: `1px solid ${colors.border}`,
+            boxShadow: theme.shadow.md,
           }}
         >
-          {error}
-        </p>
-      )}
+          <div
+            style={{
+              fontSize: theme.typography.h2.size,
+              fontWeight: 600,
+              marginBottom: 20,
+              color: colors.text,
+            }}
+          >
+            Create your account
+          </div>
 
-      <form onSubmit={submit}>
-        <input
-          placeholder="Username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          style={inputStyle}
-          required
-        />
+          {error && (
+            <div
+              style={{
+                marginBottom: 16,
+                padding: 10,
+                borderRadius: 10,
+                background: "#fef2f2",
+                color: colors.danger,
+                fontSize: 14,
+              }}
+            >
+              {error}
+            </div>
+          )}
 
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={inputStyle}
-          required
-        />
+          <form onSubmit={submit}>
+            <div style={{ marginBottom: 12 }}>
+              <input
+                placeholder="Username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                style={inputStyle}
+                required
+              />
+            </div>
 
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={inputStyle}
-          required
-        />
+            <div style={{ marginBottom: 12 }}>
+              <input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                style={inputStyle}
+                required
+              />
+            </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            width: "100%",
-            padding: "10px 16px",
-            borderRadius: 999,
-            border: "none",
-            background: theme.colors.primary,
-            color: "#fff",
-            fontWeight: 500,
-            cursor: "pointer",
-            opacity: loading ? 0.6 : 1,
-          }}
-        >
-          {loading ? "Creating account…" : "Sign up"}
-        </button>
-      </form>
+            <div style={{ marginBottom: 12 }}>
+              <input
+                type="date"
+                value={dateOfBirth}
+                onChange={(e) => setDateOfBirth(e.target.value)}
+                style={{
+                  ...inputStyle,
+                  colorScheme: theme.mode,
+                }}
+                required
+              />
+            </div>
 
-      <p
-        style={{
-          marginTop: 14,
-          textAlign: "center",
-          fontSize: 14,
-        }}
-      >
-        Already have an account?{" "}
-        <Link to="/login" style={{ color: theme.colors.primary }}>
-          Login
-        </Link>
-      </p>
+            <div style={{ marginBottom: 16 }}>
+              <input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                style={inputStyle}
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                ...primaryButton(theme),
+                width: "100%",
+                opacity: loading ? 0.6 : 1,
+              }}
+            >
+              {loading ? "Creating account…" : "Sign up"}
+            </button>
+          </form>
+
+          <div
+            style={{
+              marginTop: 16,
+              fontSize: 14,
+              color: colors.textMuted,
+              textAlign: "center",
+            }}
+          >
+            Already have an account?{" "}
+            <Link to="/login" style={{ color: colors.primary }}>
+              Log in
+            </Link>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

@@ -27,13 +27,10 @@ export default function CommunityChat({ communityId, isMember = true }) {
     setLoading(true)
 
     try {
-      const msg = await api(
-        `/communities/${communityId}/chat`,
-        {
-          method: "POST",
-          body: JSON.stringify({ text }),
-        }
-      )
+      const msg = await api(`/communities/${communityId}/chat`, {
+        method: "POST",
+        body: JSON.stringify({ text }),
+      })
 
       setMessages((prev) => [...prev, msg])
       setText("")
@@ -48,20 +45,34 @@ export default function CommunityChat({ communityId, isMember = true }) {
     <div
       style={{
         marginTop: 24,
-        padding: 12,
-        borderRadius: 12,
+        padding: 14,
+        borderRadius: 14,
         border: "1px solid #e5e7eb",
         background: "#ffffff",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
-      <strong style={{ fontSize: 14 }}>Community chat</strong>
-
+      {/* Header */}
       <div
         style={{
-          marginTop: 8,
+          fontSize: 14,
+          fontWeight: 600,
+          color: "#0f172a",
+          marginBottom: 10,
+        }}
+      >
+        Community chat
+      </div>
+
+      {/* Messages */}
+      <div
+        style={{
+          flex: 1,
           maxHeight: 220,
           overflowY: "auto",
           fontSize: 13,
+          paddingRight: 4,
         }}
       >
         {messages.length === 0 && (
@@ -69,16 +80,48 @@ export default function CommunityChat({ communityId, isMember = true }) {
         )}
 
         {messages.map((m) => (
-          <div key={m.id} style={{ marginBottom: 6 }}>
-            <strong>@{m.user.username}</strong>: {m.text}
+          <div key={m.id} style={{ marginBottom: 10 }}>
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 500,
+                color: "#475569",
+                marginBottom: 2,
+              }}
+            >
+              @{m.user.username}
+            </div>
+
+            <div
+              style={{
+                padding: "6px 10px",
+                borderRadius: 10,
+                background: "#f1f5f9",
+                color: "#0f172a",
+                lineHeight: 1.45,
+                maxWidth: "100%",
+                wordBreak: "break-word",
+              }}
+            >
+              {m.text}
+            </div>
           </div>
         ))}
 
-        {/* 👇 auto-scroll anchor */}
+        {/* auto-scroll anchor */}
         <div ref={bottomRef} />
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+      {/* Input */}
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          marginTop: 10,
+          paddingTop: 10,
+          borderTop: "1px solid #e5e7eb",
+        }}
+      >
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -91,8 +134,11 @@ export default function CommunityChat({ communityId, isMember = true }) {
           style={{
             flex: 1,
             padding: "8px 10px",
-            borderRadius: 8,
+            borderRadius: 10,
             border: "1px solid #d1d5db",
+            fontSize: 13,
+            color: "#0f172a",
+            background: "#ffffff",
             opacity: isMember ? 1 : 0.6,
             cursor: isMember ? "text" : "not-allowed",
           }}
@@ -103,10 +149,11 @@ export default function CommunityChat({ communityId, isMember = true }) {
           disabled={loading || !isMember}
           style={{
             padding: "6px 14px",
-            borderRadius: 8,
-            border: "1px solid #e5e7eb",
+            borderRadius: 10,
+            border: "none",
             background: "#0284c7",
-            color: "#fff",
+            color: "#ffffff",
+            fontSize: 13,
             cursor:
               loading || !isMember
                 ? "not-allowed"

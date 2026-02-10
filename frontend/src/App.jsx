@@ -486,7 +486,7 @@ useEffect(() => {
     zIndex: 10,
     background: colors.surface,
     borderBottom: `1px solid ${colors.border}`,
-    padding: "10px 20px",
+    padding: "14px 20px",
   }}
 >
   <div
@@ -496,25 +496,41 @@ useEffect(() => {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
+      gap: 16,
     }}
   >
     {/* App title */}
-    <strong>🌱 Social</strong>
+    <div
+  style={{
+    fontSize: theme.typography.h3.size,
+    fontWeight: 600,
+    letterSpacing: "-0.01em",
+  }}
+>
+  🌱 Social
+</div>
+
 
     {/* Right side controls */}
     {activeFeedProfileName && (
   <div
-    style={{
-      fontSize: 12,
-      padding: "4px 10px",
-      borderRadius: 999,
-      background: colors.surfaceMuted,
-      border: `1px solid ${colors.border}`,
-      opacity: 0.85,
-    }}
-  >
-    👁 Viewing as: <strong>{activeFeedProfileName}</strong>
-  </div>
+  style={{
+    fontSize: 13,
+    padding: "6px 12px",
+    borderRadius: 999,
+    background: colors.surfaceMuted,
+    border: `1px solid ${colors.border}`,
+    color: colors.textMuted,
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+  }}
+>
+  <span>Viewing as</span>
+  <strong style={{ color: colors.text }}>
+    {activeFeedProfileName}
+  </strong>
+</div>
 )}
 
     <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
@@ -598,7 +614,7 @@ useEffect(() => {
         <Link
   to={`/profile/${user.id}`}
   style={{
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: 600,
     color: colors.text,
     textDecoration: "none",

@@ -15,6 +15,8 @@ import reportRoutes from "./routes/report.routes.js"
 import moderationRoutes from "./routes/moderation.routes.js"
 import feedProfileRoutes from "./routes/feedProfile.routes.js"
 import mediaRoutes from "./routes/media.routes.js"
+import commentRoutes from "./routes/comment.routes.js"
+
 
 
 
@@ -32,6 +34,8 @@ app.use("/api/v1/communities", communityRoutes)
 app.use("/api/v1", feedProfileRoutes)
 app.use("/api/v1", profileRoutes)
 app.use("/api/v1/media", mediaRoutes)
+app.use("/api/v1/comments", commentRoutes)
+
 
 
 

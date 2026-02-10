@@ -73,7 +73,14 @@ export default function CommunityPage({ theme }) {
   ...data,
   labelImports: data.labelImports || [],
 })
-      setMyRole(data.myRole || null)
+      const role =
+  data.myRole ??
+  data.membership?.role ??
+  data.member?.role ??
+  null
+
+setMyRole(role)
+console.log("Community role resolved →", role)
       setIntentionDraft(data.intention || "")
     })
     .catch(async (err) => {
@@ -132,7 +139,7 @@ export default function CommunityPage({ theme }) {
     return () => {
       mounted = false
     }
-  }, [activeTab, id])
+  }, [activeTab, id, isMember])
 
 useEffect(() => {
   if (!showAddLabel || !community) return
@@ -265,6 +272,25 @@ useEffect(() => {
         <div style={{ fontSize: 20, fontWeight: 700 }}>
           {community.name}
         </div>
+<div
+  style={{
+    marginTop: 4,
+    fontSize: 12,
+    color: colors.textMuted,
+    display: "flex",
+    gap: 6,
+    alignItems: "center",
+    flexWrap: "wrap",
+  }}
+>
+  <span>
+    {isMember ? "You’re a member here" : "You’re viewing as a guest"}
+  </span>
+  <span>·</span>
+  <span>
+    {community._count?.members ?? "—"} people gathering
+  </span>
+</div>
 
         {community.intention && (
           <div
@@ -372,13 +398,17 @@ useEffect(() => {
             key={tab}
             onClick={() => setActiveTab(tab)}
             style={{
-              background: "transparent",
-              border: "none",
-              padding: 0,
-              cursor: "pointer",
-              color: activeTab === tab ? colors.text : colors.textMuted,
-              fontWeight: activeTab === tab ? 600 : 400,
-            }}
+  background: "transparent",
+  border: "none",
+  padding: "4px 0",
+  cursor: "pointer",
+  color: activeTab === tab ? colors.text : colors.textMuted,
+  fontWeight: activeTab === tab ? 600 : 400,
+  borderBottom:
+    activeTab === tab
+      ? `2px solid ${colors.primary}`
+      : "2px solid transparent",
+}}
           >
             {tab}
           </button>
@@ -396,26 +426,36 @@ useEffect(() => {
         }}
       >
         {activeTab === "settings" && myRole === "ADMIN" && (
-  <div style={{ maxWidth: 520 }}>
+  <div
+  style={{
+    maxWidth: 520,
+    display: "flex",
+    flexDirection: "column",
+    gap: 24,
+  }}
+>
     <div
-      style={{
-        fontSize: 14,
-        fontWeight: 600,
-        marginBottom: 12,
-      }}
-    >
-      Community settings
-    </div>
+  style={{
+    fontSize: 15,
+    fontWeight: 600,
+    color: colors.text,
+    letterSpacing: 0.2,
+  }}
+>
+  Community settings
+</div>
+
 
 {/* Join requests */}
 <div style={{ marginTop: 20 }}>
   <div
-    style={{
-      fontSize: 14,
-      fontWeight: 600,
-      marginBottom: 8,
-    }}
-  >
+  style={{
+    fontSize: 13,
+    fontWeight: 600,
+    color: colors.text,
+    marginBottom: 10,
+  }}
+>
     Join requests
   </div>
 
@@ -432,14 +472,14 @@ useEffect(() => {
       <div
         key={req.id}
         style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "8px 10px",
-          borderRadius: 10,
-          border: `1px solid ${colors.border}`,
-          marginBottom: 8,
-        }}
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  padding: "10px 12px",
+  borderRadius: 12,
+  border: `1px solid ${colors.border}`,
+  background: colors.surfaceMuted,
+}}
       >
         <span style={{ fontSize: 13 }}>
           @{req.invitedUser.username}
@@ -463,6 +503,8 @@ useEffect(() => {
               background: colors.primary,
               color: "#fff",
               cursor: "pointer",
+              color: colors.text,
+    lineHeight: 1.5,
             }}
           >
             Approve
@@ -481,9 +523,11 @@ useEffect(() => {
               fontSize: 12,
               padding: "4px 8px",
               borderRadius: 8,
-              border: `1px solid ${colors.border}`,
-              background: colors.surface,
-              cursor: "pointer",
+              border: `1px solid #fecaca`,
+background: "transparent",
+color: "#dc2626",
+cursor: "pointer",
+fontWeight: 500,
             }}
           >
             Reject
@@ -494,6 +538,14 @@ useEffect(() => {
   )}
 </div>
 
+<hr
+  style={{
+    margin: "20px 0",
+    border: "none",
+    borderTop: `1px solid ${colors.border}`,
+    opacity: 0.6,
+  }}
+/>
 
 
     {/* Intention */}
@@ -516,8 +568,10 @@ useEffect(() => {
         borderRadius: 12,
         border: `1px solid ${colors.border}`,
         background: colors.surfaceMuted,
-        fontSize: 14,
-        lineHeight: 1.5,
+fontSize: 13,
+lineHeight: 1.6,
+color: colors.text,
+minHeight: 44,
         whiteSpace: "pre-wrap",
         cursor: "pointer",
       }}
@@ -541,6 +595,9 @@ useEffect(() => {
           resize: "none",
           fontSize: 14,
           marginBottom: 8,
+          color: colors.text,
+lineHeight: 1.6,
+
         }}
       />
 
@@ -561,7 +618,8 @@ useEffect(() => {
             padding: "6px 10px",
             borderRadius: 10,
             border: `1px solid ${colors.border}`,
-            background: colors.surface,
+            background: colors.surfaceMuted,
+color: colors.textMuted,
             cursor: "pointer",
           }}
         >
@@ -596,6 +654,8 @@ useEffect(() => {
             borderRadius: 10,
             border: "none",
             background: colors.primary,
+            fontWeight: 500,
+boxShadow: theme.shadow.xs,
             color: "#fff",
             cursor: "pointer",
             opacity: savingIntention ? 0.6 : 1,
@@ -614,7 +674,8 @@ useEffect(() => {
   <div
     style={{
       fontSize: 13,
-      fontWeight: 600,
+fontWeight: 600,
+color: colors.text,
       marginBottom: 8,
     }}
   >
@@ -635,7 +696,8 @@ useEffect(() => {
             padding: "6px 10px",
             borderRadius: 10,
             background: colors.surfaceMuted,
-            border: `1px solid ${colors.border}`,
+border: `1px solid ${colors.border}`,
+color: colors.text,
             display: "flex",
             justifyContent: "space-between",
           }}
@@ -670,19 +732,21 @@ useEffect(() => {
     }
   }}
   style={{
-    fontSize: 12,
-    padding: "4px 8px",
-    borderRadius: 8,
-    border: `1px solid ${colors.border}`,
-    background: colors.surface,
-  }}
+  fontSize: 12,
+  padding: "4px 8px",
+  borderRadius: 8,
+  border: `1px solid ${colors.border}`,
+  background: colors.surface,
+  color: colors.text,
+  cursor: "pointer",
+}}
 >
   <option value="SAFE_ONLY">safe only</option>
   <option value="NSFW_ONLY">nsfw only</option>
   <option value="BOTH">both</option>
 </select>
 ) : (
-  <span style={{ color: colors.textMuted }}>
+  <span style={{ color: colors.textMuted, fontSize: 12 }}>
     {li.importMode.toLowerCase()}
   </span>
 )}
@@ -701,8 +765,10 @@ useEffect(() => {
         padding: "6px 12px",
         borderRadius: 10,
         border: `1px solid ${colors.border}`,
-        background: colors.surface,
-        cursor: "pointer",
+        background: colors.surfaceMuted,
+color: colors.text,
+cursor: "pointer",
+fontWeight: 500,
       }}
     >
       + Import another label
@@ -736,12 +802,8 @@ useEffect(() => {
       }}
     >
       {isMember && (
-  <div
-    style={{
-      paddingBottom: 16,
-      borderBottom: `1px solid ${colors.border}`,
-    }}
-  >
+  <div style={{ marginBottom: 12 }}>
+
     <PostComposer
       theme={theme}
       feedMode="COMMUNITY"
@@ -781,18 +843,20 @@ useEffect(() => {
 
         {activeTab === "chat" && (
   <div
-    style={{
-      display: "flex",
-      flexDirection: "column",
-      height: 420,
-      maxHeight: "60vh",
-      overflow: "hidden",
-      borderRadius: 12,
-      border: `1px solid ${colors.border}`,
-      background: colors.surface,
-      boxSizing: "border-box",
-    }}
-  >
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    height: 420,
+    maxHeight: "60vh",
+    overflow: "hidden",
+    borderRadius: 12,
+    border: `1px solid ${colors.border}`,
+    background: colors.surface,
+    color: colors.text,          
+    boxSizing: "border-box",
+  }}
+>
+
     {/* Header */}
     <div
       style={{
@@ -800,7 +864,7 @@ useEffect(() => {
         fontSize: 13,
         fontWeight: 600,
         borderBottom: `1px solid ${colors.border}`,
-        color: colors.textMuted,
+        color: colors.text,
         flexShrink: 0,
       }}
     >
@@ -817,7 +881,7 @@ useEffect(() => {
       }}
     >
       {isMember ? (
-  <CommunityChat communityId={id} isMember />
+  <CommunityChat communityId={id} isMember={isMember} />
 ) : (
   <p style={{ opacity: 0.6, fontSize: 13 }}>
     Join this community to participate in chat.
@@ -858,9 +922,16 @@ useEffect(() => {
       @{m.username}
     </Link>
 
-    <span style={{ color: colors.textMuted }}>
-      · {m.role.toLowerCase()}
-    </span>
+    <span
+  style={{
+    color: colors.textMuted,
+    fontSize: 11,
+    textTransform: "capitalize",
+  }}
+>
+  · {m.role.toLowerCase()}
+</span>
+
   </div>
 ))
     )}
@@ -886,6 +957,8 @@ useEffect(() => {
         borderRadius: 16,
         background: colors.surface,
         border: `1px solid ${colors.border}`,
+        color: colors.text,
+    lineHeight: 1.5,
       }}
     >
       <h4 style={{ marginBottom: 12 }}>
@@ -987,8 +1060,11 @@ useEffect(() => {
           }}
           style={{
             fontSize: 12,
-            background: "transparent",
-            border: "none",
+            background: colors.surfaceMuted,
+border: `1px solid ${colors.border}`,
+borderRadius: 10,
+padding: "6px 10px",
+color: colors.textMuted,
             cursor: "pointer",
           }}
         >
@@ -1041,6 +1117,8 @@ useEffect(() => {
             borderRadius: 10,
             border: "none",
             background: colors.primary,
+            fontWeight: 500,
+boxShadow: theme.shadow.xs,
             color: "#fff",
             cursor: "pointer",
             opacity:

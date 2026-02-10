@@ -311,8 +311,11 @@ export const getScopedFeed = async (req, res) => {
           select: { id: true },
         },
         _count: {
-          select: { likes: true },
-        },
+  select: {
+    likes: true,
+    comments: true,
+  }
+},
         originPost: {
     select: {
       id: true,

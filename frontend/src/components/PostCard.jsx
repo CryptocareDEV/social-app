@@ -1,7 +1,33 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Link } from "react-router-dom"
 import { getThemeColors } from "../ui/theme"
 import { api } from "../api/client"
+import { fetchComments, createComment } from "../api/comments"
+
+function formatTimeAgo(dateString) {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now - date
+  const diffSec = Math.floor(diffMs / 1000)
+
+  if (diffSec < 10) return "just now"
+  if (diffSec < 60) return `${diffSec}s ago`
+
+  const diffMin = Math.floor(diffSec / 60)
+  if (diffMin < 60) return `${diffMin}m ago`
+
+  const diffHr = Math.floor(diffMin / 60)
+  if (diffHr < 24) return `${diffHr}h ago`
+
+  const diffDay = Math.floor(diffHr / 24)
+  if (diffDay === 1) return "yesterday"
+
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  })
+}
+
 
 export default function PostCard({
   post,
@@ -11,134 +37,219 @@ export default function PostCard({
   onLabelClick,
   theme,
 }) {
-  if (post.isRemoved) {
-  return null
-}
+  if (post.isRemoved) return null
+
   const [showReason, setShowReason] = useState(false)
+  const [showComments, setShowComments] = useState(false)
+const [comments, setComments] = useState([])
+
+
+const [commentsLoading, setCommentsLoading] = useState(false)
+const [commentsError, setCommentsError] = useState(null)
+const [commentBody, setCommentBody] = useState("")
+const [commentSubmitting, setCommentSubmitting] = useState(false)
+const [commentSubmitError, setCommentSubmitError] = useState(null)
+const [commentsCursor, setCommentsCursor] = useState(null)
+const [hasMoreComments, setHasMoreComments] = useState(false)
+const [loadingMore, setLoadingMore] = useState(false)
+const commentInputRef = useRef(null)
+const commentsEndRef = useRef(null)
+const [optimisticCountDelta, setOptimisticCountDelta] = useState(0)
+
+
+
+
   const [reportCooldownUntil, setReportCooldownUntil] = useState(null)
   const [hasReported, setHasReported] = useState(false)
 
-  const severityCopy = {
-  LOW: {
-    tone: "#64748b",
-    text: "Content may be low quality or off-topic",
-  },
-  MEDIUM: {
-    tone: "#92400e",
-    text: "Content visibility is limited due to reports",
-  },
-  HIGH: {
-    tone: "#7c2d12",
-    text: "Content removed for policy violations",
-  },
-  CRITICAL: {
-    tone: "#7f1d1d",
-    text: "Sensitive content restricted for safety",
-  },
-}
 
   const colors = getThemeColors(theme)
-  // 🔑 Render post's own media (MEME and IMAGE are first-class)
   const imageSrc = post.mediaUrl || null
 
-
+  const severityCopy = {
+    LOW: { tone: "#64748b", text: "Content may be low quality or off-topic" },
+    MEDIUM: { tone: "#92400e", text: "Content visibility is limited due to reports" },
+    HIGH: { tone: "#7c2d12", text: "Content removed for policy violations" },
+    CRITICAL: { tone: "#7f1d1d", text: "Sensitive content restricted for safety" },
+  }
 
   const severity = (() => {
-  if (!post?.rating) return null
+    if (!post?.rating) return null
+    if (post.rating === "NSFW") return "CRITICAL"
+    if (post.reason?.autoLimited) return "MEDIUM"
+    if (post.reason?.moderationOutcome === "REMOVED") return "HIGH"
+    return null
+  })()
 
-  if (post.rating === "NSFW") return "CRITICAL"
+  const baseCommentCount =
+  typeof post._count?.comments === "number"
+    ? post._count.comments
+    : 0
 
-  if (post.reason?.autoLimited) return "MEDIUM"
+  const displayCommentCount = baseCommentCount + optimisticCountDelta
 
-  if (post.reason?.moderationOutcome === "REMOVED")
-    return "HIGH"
-
-  return null
-})()
-
+  
 
   /* ================================
      🔎 Load user cooldown (once)
   ================================= */
   useEffect(() => {
     let mounted = true
-
     const loadMe = async () => {
       try {
         const me = await api("/users/me")
         if (mounted && me?.reportCooldownUntil) {
-         setReportCooldownUntil(me.reportCooldownUntil)
+          setReportCooldownUntil(me.reportCooldownUntil)
         }
-      } catch {
-        // backend still enforces cooldown
-      }
+      } catch {}
     }
-
     loadMe()
-    return () => {
-      mounted = false
-    }
+    return () => { mounted = false }
   }, [])
 
-  /* ================================
-     ⛔ Derived cooldown state
-  ================================= */
-  const isOnReportCooldown =
-    reportCooldownUntil &&
-    new Date(reportCooldownUntil) > new Date()
 
-  /* ================================
-     🚩 Report handler
-  ================================= */
-  const handleReport = async () => {
-  if (isOnReportCooldown) {
-    alert("Reporting is temporarily disabled due to cooldown")
+
+  useEffect(() => {
+  if (!showComments) {
+    // reset comment UI state when closing
+    setComments([])
+    setCommentsCursor(null)
+    setHasMoreComments(false)
+    setCommentsLoading(false)
+    setCommentsError(null)
+    setCommentBody("")
+    setCommentSubmitError(null)
     return
   }
 
-  if (hasReported) {
-    return
-  }
 
-  try {
-    await api("/reports", {
-      method: "POST",
-      body: JSON.stringify({
-        postId: post.id,
-        reason: "OTHER",
-      }),
+  let cancelled = false
+  setCommentsLoading(true)
+  setCommentsError(null)
+
+  fetchComments({ postId: post.id })
+    .then((res) => {
+      if (!cancelled) {
+        setComments(res.items || [])
+        setCommentsCursor(res.nextCursor)
+        setHasMoreComments(!!res.nextCursor)
+      }
+    })
+    .catch(() => {
+      if (!cancelled) {
+        setCommentsError("Failed to load comments")
+      }
+    })
+    .finally(() => {
+      if (!cancelled) {
+        setCommentsLoading(false)
+      }
     })
 
-    setHasReported(true)
-    alert("Report submitted. Thank you for helping keep the community safe.")
+  return () => {
+    cancelled = true
+  }
+}, [showComments, post.id])
+
+  useEffect(() => {
+  if (showComments && commentInputRef.current) {
+    commentInputRef.current.focus()
+  }
+}, [showComments])
+
+
+
+
+  const isOnReportCooldown =
+    reportCooldownUntil && new Date(reportCooldownUntil) > new Date()
+
+  const handleReport = async () => {
+    if (isOnReportCooldown || hasReported) return
+    try {
+      await api("/reports", {
+        method: "POST",
+        body: JSON.stringify({ postId: post.id, reason: "OTHER" }),
+      })
+      setHasReported(true)
+      alert("Report submitted. Thank you for helping keep the community safe.")
+    } catch (err) {
+      alert(err?.error || "Failed to report post")
+    }
+  }
+  
+  const handleSubmitComment = async () => {
+  if (!commentBody.trim() || commentSubmitting) return
+
+  setCommentSubmitting(true)
+  setCommentSubmitError(null)
+
+  try {
+    const newComment = await createComment({
+      postId: post.id,
+      body: commentBody.trim(),
+    })
+
+    // optimistic append (safe)
+    setComments((prev) => [...prev, newComment])
+    setOptimisticCountDelta((d) => d + 1)
+    setCommentBody("")
+    requestAnimationFrame(() => {
+  commentsEndRef.current?.scrollIntoView({
+    behavior: "smooth",
+    block: "end",
+  })
+  commentInputRef.current?.focus()
+})
+
   } catch (err) {
-    alert(err?.error || "Failed to report post")
+    setCommentSubmitError("Failed to post comment")
+  } finally {
+    setCommentSubmitting(false)
+  }
+}
+  
+  const handleLoadMoreComments = async () => {
+  if (!commentsCursor || loadingMore) return
+
+  setLoadingMore(true)
+
+  try {
+    const res = await fetchComments({
+      postId: post.id,
+      cursor: commentsCursor,
+    })
+
+    setComments((prev) => [...prev, ...res.items])
+    setCommentsCursor(res.nextCursor)
+    setHasMoreComments(!!res.nextCursor)
+  } finally {
+    setLoadingMore(false)
   }
 }
 
 
-const actionButtonStyle = {
-  fontSize: 12,
-  padding: "6px 10px",
-  borderRadius: theme.radius.pill,
-  border: `1px solid ${colors.border}`,
-  background: "transparent",
-  color: colors.textMuted,
-  cursor: "pointer",
-  transition: "background 0.15s ease, color 0.15s ease",
-}
 
+  const actionButtonStyle = {
+    fontSize: 13,
+    padding: "6px 12px",
+    borderRadius: theme.radius.pill,
+    border: `1px solid ${colors.border}`,
+    background: "transparent",
+    color: colors.textMuted,
+    cursor: "pointer",
+    transition: "background 0.15s ease, color 0.15s ease",
+  }
 
   return (
     <article
-  style={{
-    background: colors.surface,
-    borderRadius: theme.radius.lg,
-    padding: 18,
-    border: `1px solid ${colors.border}`,
-    boxShadow: theme.shadow.sm,
-    transition: "box-shadow 0.18s ease, transform 0.18s ease",
-  }}
+      style={{
+        background: colors.surface,
+        borderRadius: theme.radius.lg,
+        padding: theme.spacing.xl + 4,
+        border: `1px solid ${colors.border}`,
+        boxShadow: theme.shadow.sm,
+        transition: "box-shadow 0.15s ease",
+      }}
   onMouseEnter={(e) => {
     e.currentTarget.style.boxShadow = theme.shadow.md
     e.currentTarget.style.transform = "translateY(-1px)"
@@ -162,19 +273,20 @@ const actionButtonStyle = {
     <Link
       to={`/profile/${post.user.id}`}
       style={{
-        color: colors.text,
-        fontWeight: 600,
-        textDecoration: "none",
-      }}
+  color: colors.text,
+  fontWeight: 600,
+  fontSize: 14,
+  textDecoration: "none",
+}}
     >
       @{post.user.username}
     </Link>
 
     <span
   style={{
-    fontSize: 12,
+    fontSize: 11,
     color: colors.textMuted,
-    opacity: 0.75,
+    opacity: 0.70,
   }}
 >
   {post.scope}
@@ -230,11 +342,12 @@ onMouseLeave={(e) => {
       {post.caption && (
         <p
           style={{
-            color: colors.text,
-            lineHeight: 1.6,
-            marginBottom: 12,
-            whiteSpace: "pre-wrap",
-          }}
+  color: colors.text,
+  lineHeight: theme.typography.body.lineHeight,
+  fontSize: theme.typography.body.size,
+  marginBottom: theme.spacing.md,
+  whiteSpace: "pre-wrap",
+}}
         >
           {post.caption}
         </p>
@@ -244,7 +357,7 @@ onMouseLeave={(e) => {
 {imageSrc && (
   <div
     style={{
-      marginTop: 12,
+      marginTop: theme.spacing.md,
       borderRadius: theme.radius.md,
       overflow: "hidden",
       border: `1px solid ${colors.border}`,
@@ -432,10 +545,10 @@ onMouseLeave={(e) => {
   </div>
 )}
 
-      {/* FOOTER */}
+  {/* FOOTER */}
       <footer
         style={{
-          marginTop: 16,
+          marginTop: theme.spacing.lg,
           display: "flex",
           gap: 12,
           alignItems: "center",
@@ -453,6 +566,26 @@ onMouseLeave={(e) => {
 >
   {post.likedByMe ? "💙" : "🤍"} {post._count.likes}
 </button>
+
+<button
+  type="button"
+  onClick={() => setShowComments((v) => !v)}
+  style={{
+    ...actionButtonStyle,
+    fontWeight: 500,
+  }}
+>
+  💬{" "}
+{showComments
+  ? "Hide"
+  : displayCommentCount > 0
+  ? `${displayCommentCount} ${
+      displayCommentCount === 1 ? "Comment" : "Comments"
+    }`
+  : "Comments"}
+
+</button>
+
 
 {/* MEME (image-only) */}
   {["IMAGE", "MEME"].includes(post.type) && imageSrc && (
@@ -476,13 +609,184 @@ onMouseLeave={(e) => {
       e.currentTarget.style.opacity = 0.75
     }}
   >
-    🖼️ Meme
+    🖼️ Meme this post
   </button>
 )}
 
 
         
       </footer>
+      {showComments && (
+  <div
+    style={{
+      marginTop: theme.spacing.md,
+      padding: theme.spacing.md,
+      borderRadius: theme.radius.md,
+      background: colors.surfaceMuted,
+      border: `1px solid ${colors.border}`,
+    }}
+  >
+    {commentsLoading && (
+      <div style={{ fontSize: 13, color: colors.textMuted }}>
+        Loading responses…
+      </div>
+    )}
+
+    {commentsError && (
+      <div style={{ fontSize: 13, color: colors.danger }}>
+        {commentsError}
+      </div>
+    )}
+
+    {!commentsLoading && comments.length === 0 && (
+      <div style={{ fontSize: 13, color: colors.textMuted }}>
+        No responses yet.
+      </div>
+    )}
+
+    {comments.map((comment) => (
+      <div
+        key={comment.id}
+        style={{
+          marginTop: theme.spacing.sm,
+          paddingTop: theme.spacing.sm,
+          borderTop: `1px solid ${colors.border}`,
+        }}
+      >
+        <div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    fontSize: 12,
+    marginBottom: 2,
+  }}
+>
+  <span
+    style={{
+      fontWeight: 600,
+      color: colors.text,
+    }}
+  >
+    @{comment.user.username}
+  </span>
+
+  <span
+    style={{
+      color: colors.textMuted,
+      fontSize: 11,
+    }}
+  >
+    · {formatTimeAgo(comment.createdAt)}
+  </span>
+</div>
+
+
+        <div
+          style={{
+            fontSize: 14,
+            lineHeight: 1.5,
+            color: colors.text,
+            marginTop: 2,
+          }}
+        >
+          {comment.body}
+        </div>
+      </div>
+      
+
+      
+    ))}
+    
+
+
+<div ref={commentsEndRef} />
+{hasMoreComments && (
+  <button
+    onClick={handleLoadMoreComments}
+    disabled={loadingMore}
+    style={{
+      marginTop: 8,
+      fontSize: 12,
+      background: "none",
+      border: "none",
+      color: colors.textMuted,
+      cursor: "pointer",
+    }}
+  >
+    {loadingMore ? "Loading…" : "Load more responses"}
+  </button>
+)}
+
+    {/* ✍️ Comment composer */}
+<div
+  style={{
+    marginTop: theme.spacing.md,
+    display: "flex",
+    gap: 8,
+  }}
+>
+  <input
+    ref={commentInputRef}
+    value={commentBody}
+    onChange={(e) => {
+  setCommentBody(e.target.value)
+  if (commentSubmitError) setCommentSubmitError(null)
+}}
+    onKeyDown={(e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      handleSubmitComment()
+    }
+  }}
+  
+    placeholder="Add a thoughtful response…"
+    style={{
+      flex: 1,
+      padding: "10px 12px",
+      borderRadius: theme.radius.md,
+      border: `1px solid ${colors.border}`,
+      background: colors.surface,
+      fontSize: 13,
+      color: colors.text,
+    }}
+    disabled={commentSubmitting}
+  />
+
+  <button
+    onClick={handleSubmitComment}
+    disabled={commentSubmitting || !commentBody.trim()}
+    style={{
+      fontSize: 12,
+      padding: "6px 12px",
+      borderRadius: theme.radius.pill,
+      border: `1px solid ${colors.border}`,
+      background: "transparent",
+      color: colors.textMuted,
+      cursor: commentSubmitting ? "not-allowed" : "pointer",
+      opacity: commentSubmitting ? 0.6 : 1,
+    }}
+  >
+    {commentSubmitting ? "Posting…" : "Post"}
+  </button>
+  
+</div>
+
+{commentSubmitError && (
+  <div
+    style={{
+      marginTop: 6,
+      fontSize: 12,
+      color: colors.danger,
+    }}
+  >
+    {commentSubmitError}
+  </div>
+)}
+
+  </div>
+)}
+
     </article>
   )
 }
