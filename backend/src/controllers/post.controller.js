@@ -38,6 +38,18 @@ export const createPost = async (req, res) => {
     } = req.body
 
     const userId = req.user.userId
+        // 🌍 Get user's stored location
+    const userLocation = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        countryCode: true,
+        regionCode: true,
+      },
+    })
+
+    const userCountry = userLocation?.countryCode || null
+    const userRegion = userLocation?.regionCode || null
+
 
     /* 🔞 NSFW guards */
     if (rating === "NSFW" && req.user.isMinor) {
@@ -202,6 +214,16 @@ console.log("🧠 CREATING POST", {
         userId,
         communityId,
         isCommunityOnly,
+        countryCode:
+  scope === "COUNTRY" || scope === "LOCAL"
+    ? userCountry
+    : null,
+
+regionCode:
+  scope === "LOCAL"
+    ? userRegion
+    : null,
+    
         originPostId: type === "MEME" ? originPostId : null,
         originType: "USER",
         categories: {
@@ -216,6 +238,21 @@ console.log("🧠 CREATING POST", {
         },
       },
     })
+
+    if (scope === "COUNTRY" && !userCountry) {
+  return res.status(400).json({
+    error: "Country not set for user",
+  })
+}
+
+if (scope === "LOCAL" && (!userCountry || !userRegion)) {
+  return res.status(400).json({
+    error: "Local region not set for user",
+  })
+}
+
+
+
 
     if (communityId) {
       await materializeCommunityFeed(communityId)
@@ -252,6 +289,26 @@ export const getScopedFeed = async (req, res) => {
     }
 
     const userId = req.user.userId
+        // 🌍 Get user's stored location
+    const userLocation = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        countryCode: true,
+        regionCode: true,
+      },
+    })
+
+    const userCountry = userLocation?.countryCode || null
+    const userRegion = userLocation?.regionCode || null
+
+    if (scope === "COUNTRY" && !userCountry) {
+  return res.json([])
+}
+
+if (scope === "LOCAL" && (!userCountry || !userRegion)) {
+  return res.json([])
+}
+
 
     /* 🔑 Load active feed profile */
     const feedProfile = await getActiveFeedProfile(userId)
@@ -282,6 +339,15 @@ export const getScopedFeed = async (req, res) => {
         communityId: null,
         isRemoved: false,
         ...nsfwFilter,
+        ...(scope === "COUNTRY" && userCountry
+      ? { countryCode: userCountry }
+      : {}),
+    ...(scope === "LOCAL" && userRegion && userCountry
+  ? {
+      regionCode: userRegion,
+      countryCode: userCountry,
+    }
+  : {}),
         ...(labelPrefs.length > 0 && {
           categories: {
             some: {

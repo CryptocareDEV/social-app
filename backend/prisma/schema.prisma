@@ -31,7 +31,12 @@ model User {
   lastRejectedAt        DateTime?
   lastRejectedSeverity  String?
   chats                 CommunityChat[]
-  comments           Comment[]
+  comments              Comment[]
+  countryCode           String?
+  regionCode            String?
+  locationUpdatedAt     DateTime?
+  lastKnownIp           String?
+
 
   sentInvitations       CommunityInvitation[]  @relation("InvitedBy")
   receivedInvitations   CommunityInvitation[]  @relation("InvitedUser")
@@ -54,6 +59,9 @@ model Post {
   watermarkUrl       String?
   createdAt          DateTime            @default(now())
   scope              FeedScope
+  countryCode        String?
+  regionCode         String?
+
   communityId        String?
   isCommunityOnly    Boolean             @default(false)
   rating             ContentRating       @default(SAFE)
@@ -80,6 +88,9 @@ model Post {
   @@index([originPostId])
   @@index([communityId])
   @@index([rating])
+  @@index([countryCode])
+  @@index([regionCode])
+
 }
 
 
