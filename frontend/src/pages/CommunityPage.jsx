@@ -704,48 +704,81 @@ color: colors.text,
         >
           <span>#{li.categoryKey}</span>
           {myRole === "ADMIN" ? (
-          <select
-  value={li.importMode}
-  onChange={async (e) => {
-    const newMode = e.target.value
+  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+    <select
+      value={li.importMode}
+      onChange={async (e) => {
+        const newMode = e.target.value
 
-    try {
-      await api(`/communities/${community.id}/label-imports`, {
-        method: "POST",
-        body: JSON.stringify({
-          categoryKey: li.categoryKey,
-          importMode: newMode,
-        }),
-      })
+        try {
+          await api(`/communities/${community.id}/label-imports`, {
+            method: "POST",
+            body: JSON.stringify({
+              categoryKey: li.categoryKey,
+              importMode: newMode,
+            }),
+          })
 
-      // update local state (no refetch)
-      setCommunity((prev) => ({
-        ...prev,
-        labelImports: prev.labelImports.map((x) =>
-          x.categoryKey === li.categoryKey
-            ? { ...x, importMode: newMode }
-            : x
-        ),
-      }))
-    } catch (err) {
-      alert(err?.error || "Failed to update label import")
-    }
-  }}
-  style={{
-  fontSize: 12,
-  padding: "4px 8px",
-  borderRadius: 8,
-  border: `1px solid ${colors.border}`,
-  background: colors.surface,
-  color: colors.text,
-  cursor: "pointer",
-}}
->
-  <option value="SAFE_ONLY">safe only</option>
-  <option value="NSFW_ONLY">nsfw only</option>
-  <option value="BOTH">both</option>
-</select>
+          setCommunity((prev) => ({
+            ...prev,
+            labelImports: prev.labelImports.map((x) =>
+              x.categoryKey === li.categoryKey
+                ? { ...x, importMode: newMode }
+                : x
+            ),
+          }))
+        } catch (err) {
+          alert(err?.error || "Failed to update label import")
+        }
+      }}
+      style={{
+        fontSize: 12,
+        padding: "4px 8px",
+        borderRadius: 8,
+        border: `1px solid ${colors.border}`,
+        background: colors.surface,
+        color: colors.text,
+        cursor: "pointer",
+      }}
+    >
+      <option value="SAFE_ONLY">safe only</option>
+      <option value="NSFW_ONLY">nsfw only</option>
+      <option value="BOTH">both</option>
+    </select>
+
+    <button
+      onClick={async () => {
+        try {
+          await api(
+            `/communities/${community.id}/label-imports/${li.categoryKey}`,
+            { method: "DELETE" }
+          )
+
+          setCommunity((prev) => ({
+            ...prev,
+            labelImports: prev.labelImports.filter(
+              (x) => x.categoryKey !== li.categoryKey
+            ),
+          }))
+        } catch (err) {
+          alert(err?.error || "Failed to delete label import")
+        }
+      }}
+      style={{
+        fontSize: 11,
+        padding: "4px 8px",
+        borderRadius: 8,
+        border: `1px solid ${colors.border}`,
+        background: "transparent",
+        color: colors.textMuted,
+        cursor: "pointer",
+      }}
+    >
+      Remove
+    </button>
+  </div>
 ) : (
+
   <span style={{ color: colors.textMuted, fontSize: 12 }}>
     {li.importMode.toLowerCase()}
   </span>

@@ -1,5 +1,13 @@
 import { useEffect, useState } from "react"
+import { Link } from "react-router-dom"
 import { api } from "../api/client"
+import { theme, getThemeColors } from "../ui/theme"
+import {
+  secondaryButton,
+  dangerButton,
+  ghostButton,
+} from "../ui/buttonStyles"
+
 
 /* ================================
    Severity helpers (TOP LEVEL)
@@ -30,28 +38,6 @@ const outcomeExplanation = {
 }
 
 
-const severityStyles = {
-  CRITICAL: {
-    bg: "#fee2e2",
-    color: "#7f1d1d",
-    label: "CRITICAL",
-  },
-  HIGH: {
-    bg: "#ffedd5",
-    color: "#7c2d12",
-    label: "HIGH",
-  },
-  MEDIUM: {
-    bg: "#fef3c7",
-    color: "#92400e",
-    label: "MEDIUM",
-  },
-  LOW: {
-    bg: "#f1f5f9",
-    color: "#334155",
-    label: "LOW",
-  },
-}
 const ACTIONS = ["NO_ACTION", "LIMITED", "REMOVED"]
 
 export default function ModerationDashboard() {
@@ -59,6 +45,30 @@ export default function ModerationDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [actingOn, setActingOn] = useState(null)
+  const [me, setMe] = useState(null)
+
+  const colors = getThemeColors(theme)
+  const textStyle = {
+  fontSize: theme.typography.body.size,
+  lineHeight: theme.typography.body.lineHeight,
+  color: colors.text,
+}
+
+const mutedTextStyle = {
+  fontSize: theme.typography.small.size,
+  color: colors.textMuted,
+}
+
+
+const priorityLabels = {
+  CRITICAL: "Priority 1",
+  HIGH: "Priority 2",
+  MEDIUM: "Priority 3",
+  LOW: "Priority 4",
+}
+
+
+
 
 const applyAction = async (report, outcome) => {
   const confirmed = window.confirm(
@@ -99,6 +109,8 @@ const applyAction = async (report, outcome) => {
 
     const loadReports = async () => {
       try {
+        const meData = await api("/users/me")
+if (mounted) setMe(meData)
         const data = await api("/moderation/reports")
         console.log("MODERATION REPORTS RESPONSE:", data)
 
@@ -139,8 +151,67 @@ const applyAction = async (report, outcome) => {
      Render
   ================================= */
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: 20 }}>
-      <h2 style={{ marginBottom: 16 }}>🛡 Moderation Dashboard</h2>
+    <div
+  style={{
+    maxWidth: 900,
+    margin: "0 auto",
+    padding: theme.spacing.lg,
+    background: colors.bg,
+    minHeight: "100vh",
+  }}
+>
+      <div style={{ marginBottom: theme.spacing.lg }}>
+
+  {/* Top Row: Profile Link */}
+  {me?.id && (
+    <div style={{ marginBottom: theme.spacing.sm }}>
+      <Link
+        to={`/profile/${me.id}`}
+        style={{
+          textDecoration: "none",
+          color: colors.primary,
+          fontWeight: 500,
+          fontSize: theme.typography.small.size,
+        }}
+      >
+        ← Back to Profile
+      </Link>
+    </div>
+  )}
+
+  {/* Page Title */}
+  <h2
+    style={{
+      fontSize: theme.typography.h2.size,
+      fontWeight: theme.typography.h2.weight,
+      marginBottom: theme.spacing.sm,
+      color: colors.text,
+    }}
+  >
+    Moderation Dashboard
+  </h2>
+
+  {/* Priority Guide */}
+  <div
+    style={{
+      background: colors.surface,
+      border: `1px solid ${colors.border}`,
+      borderRadius: theme.radius.md,
+      padding: theme.spacing.md,
+      fontSize: theme.typography.small.size,
+      color: colors.text,
+    }}
+  >
+    <strong>Priority Guide</strong>
+    <div style={{ marginTop: theme.spacing.xs }}>
+      Priority 1 – Immediate review required.
+    </div>
+    <div>Priority 2 – Significant policy concern.</div>
+    <div>Priority 3 – Moderate issue.</div>
+    <div>Priority 4 – Low impact report.</div>
+  </div>
+</div>
+
 
       {reports.length === 0 && (
         <p style={{ opacity: 0.7 }}>
@@ -150,49 +221,60 @@ const applyAction = async (report, outcome) => {
 
       {reports.map((r) => {
         const severity = getSeverity(r)
-        const s = severityStyles[severity]
+        const priorityLabel = priorityLabels[severity]
         const alreadyRemoved = r.post?.isRemoved
 
 
         return (
           <div
-            key={r.id}
-            style={{
-              border: "1px solid #e5e7eb",
-              borderRadius: 8,
-              padding: 12,
-              marginBottom: 12,
-            }}
-          >
+  key={r.id}
+  style={{
+    background: colors.surface,
+    border: `1px solid ${colors.border}`,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+    boxShadow: theme.shadow.sm,
+  }}
+>
+
+  
             {/* Severity badge */}
             <div
-              style={{
-                display: "inline-block",
-                marginBottom: 8,
-                padding: "2px 8px",
-                borderRadius: 999,
-                fontSize: 11,
-                fontWeight: 600,
-                background: s.bg,
-                color: s.color,
-              }}
-            >
-              {s.label}
-            </div>
+  style={{
+    display: "inline-block",
+    marginBottom: theme.spacing.sm,
+    padding: "4px 10px",
+    borderRadius: theme.radius.pill,
+    fontSize: theme.typography.small.size,
+    fontWeight: 500,
+    background: colors.surfaceMuted,
+    color: colors.textMuted,
+    border: `1px solid ${colors.border}`,
+  }}
+>
+  {priorityLabel}
+</div>
 
-            <div style={{ fontSize: 13, marginBottom: 4 }}>
+
+            <div style={{ ...textStyle, marginBottom: theme.spacing.xs }}>
               <strong>Reason:</strong> {r.reason}
             </div>
 
-            <div style={{ fontSize: 13, marginBottom: 4 }}>
+            <div style={{ ...textStyle, marginBottom: theme.spacing.xs }}>
               <strong>Post:</strong>{" "}
               {r.post?.caption || <em>(no caption)</em>}
             </div>
 
-            <div style={{ fontSize: 13 }}>
+            <div style={{ ...textStyle, marginBottom: theme.spacing.xs }}>
               <strong>Reporter:</strong> @{r.reporter?.username}
             </div>
-            <div style={{ fontSize: 12, marginTop: 6, color: "#475569" }}>
+            <div
+  style={{
+    ...mutedTextStyle,
+    marginTop: theme.spacing.sm,
+  }}
+>
   <strong>Reporter trust:</strong>{" "}
   {(r.reporter.reportAccuracy * 100).toFixed(0)}%
   {" · "}
@@ -219,26 +301,20 @@ const applyAction = async (report, outcome) => {
             <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
   {ACTIONS.map((action) => (
     <button
-      key={action}
-      title={outcomeExplanation[action]}
-      disabled={alreadyRemoved || actingOn === r.id}
-      onClick={() => applyAction(r, action)}
-      style={{
-        fontSize: 12,
-        padding: "4px 10px",
-        borderRadius: 6,
-        border: "1px solid #e5e7eb",
-        background:
-          action === "REMOVED"
-            ? "#fee2e2"
-            : action === "LIMITED"
-            ? "#fef3c7"
-            : "#f1f5f9",
-        cursor: actingOn === r.id ? "not-allowed" : "pointer",
-      }}
-    >
-      {action}
-    </button>
+  key={action}
+  title={outcomeExplanation[action]}
+  disabled={alreadyRemoved || actingOn === r.id}
+  onClick={() => applyAction(r, action)}
+  style={
+    action === "REMOVED"
+      ? dangerButton(theme)
+      : secondaryButton(theme)
+  }
+>
+  {action === "LIMITED" ? "Restrict Reach" :
+   action === "REMOVED" ? "Remove Content" :
+   "No Action"}
+</button>
   ))}
 </div>
           </div>
