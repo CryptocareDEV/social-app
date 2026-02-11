@@ -7,6 +7,7 @@ import {
   getMyCommunities,
   getCommunityById,
   addCommunityLabelImport,
+  deleteCommunityLabelImport,
   leaveCommunity,
 } from "../controllers/community.controller.js"
 import {
@@ -115,6 +116,14 @@ router.post(
   requireAuth,
   addCommunityLabelImport
 )
+
+router.delete(
+  "/:id/label-imports/:categoryKey",
+  requireAuth,
+  deleteCommunityLabelImport
+)
+
+
 
 router.post(
   "/invitations/:id/accept",

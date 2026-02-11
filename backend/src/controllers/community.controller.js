@@ -123,6 +123,7 @@ export const addCommunityLabelImport = async (req, res) => {
         importMode,
       },
     })
+await materializeCommunityFeed(communityId, new Date())
 
     res.status(201).json(rule)
   } catch (err) {
@@ -1547,6 +1548,50 @@ return res.json({
     console.error("GET COMMUNITY PUBLIC VIEW ERROR:", err)
     return res.status(500).json({
       error: "Failed to load community",
+    })
+  }
+}
+
+/**
+ * DELETE /communities/:id/label-imports/:categoryKey
+ */
+export const deleteCommunityLabelImport = async (req, res) => {
+  try {
+    const { id: communityId, categoryKey } = req.params
+    const userId = req.user.userId
+
+    // Ensure ADMIN
+    const membership = await prisma.communityMember.findFirst({
+      where: {
+        communityId,
+        userId,
+        role: "ADMIN",
+      },
+    })
+
+    if (!membership) {
+      return res.status(403).json({
+        error: "Only ADMIN can delete label imports",
+      })
+    }
+
+    await prisma.communityLabelImport.delete({
+      where: {
+        communityId_categoryKey: {
+          communityId,
+          categoryKey,
+        },
+      },
+    })
+
+    // 🔥 Rebuild today's feed
+    await materializeCommunityFeed(communityId, new Date())
+
+    return res.json({ success: true })
+  } catch (err) {
+    console.error("DELETE LABEL IMPORT ERROR:", err)
+    return res.status(500).json({
+      error: "Failed to delete label import",
     })
   }
 }

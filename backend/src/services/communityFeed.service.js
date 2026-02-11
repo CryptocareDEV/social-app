@@ -119,11 +119,11 @@ export const materializeCommunityFeed = async (
 
   // 5. Clear existing feed for the day
   await prisma.communityFeedItem.deleteMany({
-    where: {
-      communityId,
-      feedDate: startOfDay,
-    },
-  })
+  where: {
+    communityId,
+  },
+})
+
 
   // 6. Store materialized feed
   await prisma.communityFeedItem.createMany({
