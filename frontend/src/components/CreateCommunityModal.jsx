@@ -1,6 +1,9 @@
 import { useState } from "react"
 import { api } from "../api/client"
-import { primaryButton, secondaryButton } from "../ui/buttonStyles"
+import {
+  primaryButton,
+  secondaryButton,
+} from "../ui/buttonStyles"
 import { getThemeColors } from "../ui/theme"
 
 export default function CreateCommunityModal({
@@ -19,7 +22,21 @@ export default function CreateCommunityModal({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
+  const inputStyle = {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "12px 14px",
+    borderRadius: theme.radius.md,
+    border: `1px solid ${c.border}`,
+    background: c.surfaceMuted,
+    color: c.text,
+    fontSize: theme.typography.body.size,
+    lineHeight: theme.typography.body.lineHeight,
+    outline: "none",
+  }
+
   const submit = async () => {
+    if (loading) return
     if (!name.trim()) return setError("Community name is required")
     if (labels.length === 0)
       return setError("Add at least one label")
@@ -34,7 +51,7 @@ export default function CreateCommunityModal({
           name: name.trim(),
           intention: intention.trim(),
           scope,
-          categories: labels, // ✅ CRITICAL FIX
+          categories: labels,
         }),
       })
 
@@ -56,112 +73,184 @@ export default function CreateCommunityModal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(0,0,0,0.6)",
+        background: "rgba(15,23,42,0.55)",
+        backdropFilter: "blur(4px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         zIndex: 1000,
+        padding: theme.spacing.lg,
       }}
     >
       <div
         style={{
           background: c.surface,
           color: c.text,
-          padding: 20,
-          width: 420,
-          borderRadius: 16,
+          width: 520,
+          maxWidth: "100%",
+          borderRadius: theme.radius.lg,
+          border: `1px solid ${c.border}`,
           boxShadow: theme.shadow.md,
+          padding: theme.spacing.xl,
+          display: "flex",
+          flexDirection: "column",
+          gap: theme.spacing.lg,
         }}
       >
-        <h3 style={{ marginBottom: 12 }}>Create community</h3>
-
-        {error && (
-          <p style={{ color: c.danger, fontSize: 13 }}>{error}</p>
-        )}
-
-        <input
-          placeholder="Community name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          style={{ width: "100%", marginBottom: 8 }}
-        />
-
-        <textarea
-          placeholder="Why does this community exist?"
-          value={intention}
-          onChange={(e) => setIntention(e.target.value)}
-          style={{ width: "100%", marginBottom: 8 }}
-        />
-
-        <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-          <input
-            placeholder="Add label"
-            value={labelInput}
-            onChange={(e) => setLabelInput(e.target.value)}
-            style={{ flex: 1 }}
-          />
-          <button
-            onClick={() => {
-              const key = labelInput.trim().toLowerCase()
-              if (key && !labels.includes(key)) {
-                setLabels((p) => [...p, key])
-              }
-              setLabelInput("")
+        {/* Header */}
+        <div>
+          <div
+            style={{
+              fontSize: theme.typography.h3.size,
+              fontWeight: theme.typography.h3.weight,
+              lineHeight: theme.typography.h3.lineHeight,
+              marginBottom: 4,
             }}
           >
-            Add
-          </button>
+            Create a community
+          </div>
+
+          <div
+            style={{
+              fontSize: theme.typography.small.size,
+              color: c.textMuted,
+            }}
+          >
+            Define its intention and labels clearly.
+          </div>
         </div>
 
-        {labels.length > 0 && (
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {labels.map((l) => (
-              <span
-                key={l}
-                onClick={() =>
-                  setLabels((p) => p.filter((x) => x !== l))
-                }
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: 999,
-                  background: c.primarySoft,
-                  fontSize: 12,
-                  cursor: "pointer",
-                }}
-              >
-                #{l}
-              </span>
-            ))}
+        {error && (
+          <div
+            style={{
+              padding: 10,
+              borderRadius: theme.radius.md,
+              background: c.primarySoft,
+              color: c.danger,
+              fontSize: theme.typography.small.size,
+            }}
+          >
+            {error}
           </div>
         )}
 
-        <select
-          value={scope}
-          onChange={(e) => setScope(e.target.value)}
-          style={{ width: "100%", marginTop: 10 }}
-        >
-          <option value="GLOBAL">🌍 Global</option>
-          <option value="COUNTRY">🏳️ Country</option>
-          <option value="LOCAL">📍 Local</option>
-        </select>
+        {/* Name */}
+        <div>
+          <input
+            placeholder="Community name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            style={inputStyle}
+          />
+        </div>
 
+        {/* Intention */}
+        <div>
+          <textarea
+            placeholder="Why does this community exist?"
+            value={intention}
+            onChange={(e) => setIntention(e.target.value)}
+            style={{
+              ...inputStyle,
+              minHeight: 90,
+              resize: "vertical",
+            }}
+          />
+        </div>
+
+        {/* Labels */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              placeholder="Add label"
+              value={labelInput}
+              onChange={(e) => setLabelInput(e.target.value)}
+              style={{ ...inputStyle, flex: 1 }}
+            />
+            <button
+              type="button"
+              style={secondaryButton(theme)}
+              onClick={() => {
+                const key = labelInput.trim().toLowerCase()
+                if (key && !labels.includes(key)) {
+                  setLabels((p) => [...p, key])
+                }
+                setLabelInput("")
+              }}
+            >
+              Add
+            </button>
+          </div>
+
+          {labels.length > 0 && (
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                flexWrap: "wrap",
+              }}
+            >
+              {labels.map((l) => (
+                <span
+                  key={l}
+                  onClick={() =>
+                    setLabels((p) => p.filter((x) => x !== l))
+                  }
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: theme.radius.pill,
+                    background: c.primarySoft,
+                    color: c.primary,
+                    fontSize: theme.typography.small.size,
+                    fontWeight: 500,
+                    cursor: "pointer",
+                  }}
+                >
+                  #{l}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Scope */}
+        <div>
+          <select
+            value={scope}
+            onChange={(e) => setScope(e.target.value)}
+            style={{ ...inputStyle, cursor: "pointer" }}
+          >
+            <option value="GLOBAL">🌍 Global</option>
+            <option value="COUNTRY">🏳️ Country</option>
+            <option value="LOCAL">📍 Local</option>
+          </select>
+        </div>
+
+        {/* Buttons */}
         <div
           style={{
             display: "flex",
             justifyContent: "flex-end",
-            gap: 8,
-            marginTop: 16,
+            gap: theme.spacing.md,
           }}
         >
-          <button onClick={onClose} style={secondaryButton(theme)}>
+          <button
+            onClick={onClose}
+            style={secondaryButton(theme)}
+          >
             Cancel
           </button>
+
           <button
             onClick={submit}
             disabled={loading}
-            style={primaryButton(theme)}
+            style={{
+              ...primaryButton(theme),
+              opacity: loading ? 0.6 : 1,
+              pointerEvents: loading ? "none" : "auto",
+            }}
           >
-            {loading ? "Creating…" : "Create"}
+            {loading ? "Creating…" : "Create community"}
           </button>
         </div>
       </div>

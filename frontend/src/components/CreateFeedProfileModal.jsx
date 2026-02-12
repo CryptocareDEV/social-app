@@ -127,29 +127,52 @@ const profile = await api(endpoint, {
 
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.4)",
-        zIndex: 1000,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
+  style={{
+    position: "fixed",
+    inset: 0,
+    background: "rgba(15,23,42,0.55)",
+    backdropFilter: "blur(6px)",
+    zIndex: 1000,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  }}
+>
+
       <div
-        style={{
-          width: "100%",
-          maxWidth: 460,
-          background: colors.surface,
-          borderRadius: 20,
-          padding: 20,
-          border: `1px solid ${colors.border}`,
-        }}
-      >
-        <h3 style={{ marginBottom: 12 }}>
-          Create feed profile
-        </h3>
+  style={{
+    width: "100%",
+    maxWidth: 520,
+    background: colors.surface,
+    borderRadius: theme.radius.lg,
+    padding: 28,
+    border: `1px solid ${colors.border}`,
+    boxShadow: theme.shadow.md,
+    display: "flex",
+    flexDirection: "column",
+    gap: 18,
+  }}
+>
+
+        <div
+  style={{
+    fontSize: theme.typography.h3.size,
+    fontWeight: theme.typography.h3.weight,
+  }}
+>
+  {editingProfile ? "Edit feed profile" : "Create feed profile"}
+</div>
+
+<div
+  style={{
+    fontSize: theme.typography.small.size,
+    color: colors.textMuted,
+  }}
+>
+  Shape how your feed prioritizes content.
+</div>
+
 
         {/* Name */}
         <input
@@ -157,24 +180,33 @@ const profile = await api(endpoint, {
           value={name}
           onChange={(e) => setName(e.target.value)}
           style={{
-            width: "100%",
-            padding: "10px 12px",
-            borderRadius: 12,
-            border: `1px solid ${colors.border}`,
-            marginBottom: 12,
-          }}
+  width: "100%",
+  padding: "12px 14px",
+  borderRadius: theme.radius.md,
+  border: `1px solid ${colors.border}`,
+  background: colors.surfaceMuted,
+  color: colors.text,
+  fontSize: 15,
+  boxSizing: "border-box",
+}}
         />
 
         {/* NSFW */}
-        <label style={{ fontSize: 14 }}>
-          <input
-            type="checkbox"
-            checked={allowNSFW}
-            onChange={(e) => setAllowNSFW(e.target.checked)}
-            style={{ marginRight: 6 }}
-          />
-          Allow NSFW content
-        </label>
+        <div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    fontSize: 14,
+  }}
+>
+  <input
+    type="checkbox"
+    checked={allowNSFW}
+    onChange={(e) => setAllowNSFW(e.target.checked)}
+  />
+  <span>Allow NSFW content</span>
+</div>
 
         {/* Scope selector */}
         <div style={{ marginTop: 16 }}>
@@ -182,80 +214,77 @@ const profile = await api(endpoint, {
             Label preferences
           </strong>
 
-          <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-            {["GLOBAL", "COUNTRY", "LOCAL"].map((s) => (
-              <button
-                key={s}
-                onClick={() => setScope(s)}
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: 999,
-                  border: `1px solid ${
-                    scope === s
-                      ? colors.primary
-                      : colors.border
-                  }`,
-                  background:
-                    scope === s
-                      ? colors.primarySoft
-                      : colors.surface,
-                  fontSize: 12,
-                }}
-              >
-                {s}
-              </button>
-            ))}
-            <div
-  style={{
-    display: "flex",
-    gap: 6,
-    flexWrap: "wrap",
-    marginTop: 10,
-    maxHeight: 120,
-    overflowY: "auto",
-    padding: 8,
-    borderRadius: 12,
-    border: `1px solid ${colors.border}`,
-    background: colors.surfaceMuted,
-  }}
->
+          <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+  {["GLOBAL", "COUNTRY", "LOCAL"].map((s) => (
+    <button
+      key={s}
+      onClick={() => setScope(s)}
+      style={{
+        padding: "6px 12px",
+        borderRadius: 999,
+        fontSize: 12,
+        cursor: "pointer",
+        border: `1px solid ${
+          scope === s ? colors.primary : colors.border
+        }`,
+        background:
+          scope === s
+            ? colors.primarySoft
+            : colors.surface,
+        color:
+          scope === s
+            ? colors.primary
+            : colors.textMuted,
+      }}
+    >
+      {s}
+    </button>
+  ))}
+</div>
 
+{/* Label search */}
 <input
   placeholder="Search labels…"
   value={labelSearch}
   onChange={(e) => setLabelSearch(e.target.value)}
   style={{
     width: "100%",
-    padding: "8px 10px",
-    borderRadius: 10,
+    padding: "10px 12px",
+    borderRadius: 12,
     border: `1px solid ${colors.border}`,
     background: colors.surface,
+    color: colors.text,
     fontSize: 13,
-    marginTop: 10,
+    marginTop: 12,
+    boxSizing: "border-box",
   }}
 />
 
-
-  {categories
-  .filter((c) =>
-    c.key.includes(labelSearch.toLowerCase())
-  )
-  .slice(0, 20) // 👈 HARD LIMIT (important)
-  .map((c) => {
-      const selected = labels[scope].includes(c.key)
-{labels[scope].length > 0 && (
-  <div
+{/* Label grid */}
+<div
   style={{
-    display: "flex",
-    gap: 8,
-    flexWrap: "wrap",
-    marginTop: 10,
-  }}
+  display: "flex",
+  gap: 6,
+  flexWrap: "wrap",
+  marginTop: 10,
+  maxHeight: 120,
+  overflowY: "auto",
+  padding: 10,
+  borderRadius: theme.radius.md,
+  border: `1px solid ${colors.border}`,
+  background: colors.surfaceMuted,
+  scrollbarWidth: "thin",
+transition: "background 0.2s ease",
+}}
 >
+  {categories
+    .filter((c) =>
+      c.key.includes(labelSearch.toLowerCase())
+    )
+    .slice(0, 20)
+    .map((c) => {
+      const selected = labels[scope].includes(c.key)
 
-    Selected: {labels[scope].map((l) => `#${l}`).join(", ")}
-  </div>
-)}
       return (
         <button
           key={c.key}
@@ -268,36 +297,34 @@ const profile = await api(endpoint, {
             }))
           }
           style={{
-  padding: "6px 12px",
-  borderRadius: 999,
-  fontSize: 12,
-  cursor: "pointer",
-  whiteSpace: "nowrap",
-
-  background: selected
-    ? colors.primarySoft
-    : colors.surface,
-
-  border: selected
-    ? `1px solid ${colors.primary}`
-    : `1px solid ${colors.border}`,
-
-  color: selected
-    ? colors.primary
-    : colors.textMuted,
-}}
+            padding: "6px 12px",
+            borderRadius: 999,
+            fontSize: 12,
+            cursor: "pointer",
+            background: selected
+              ? colors.primarySoft
+              : colors.surface,
+            border: selected
+              ? `1px solid ${colors.primary}`
+              : `1px solid ${colors.border}`,
+            color: selected
+              ? colors.primary
+              : colors.textMuted,
+          }}
         >
           #{c.key}
         </button>
       )
     })}
-    {labels[scope].length > 0 && (
+</div>
+
+{/* Selected labels */}
+{labels[scope].length > 0 && (
   <div
     style={{
       marginTop: 10,
       fontSize: 12,
       color: colors.textMuted,
-      lineHeight: 1.4,
     }}
   >
     Selected:{" "}
@@ -307,8 +334,6 @@ const profile = await api(endpoint, {
   </div>
 )}
 
-</div>
-          </div>
 
           
         </div>
