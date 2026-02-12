@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react"
 import { api } from "../api/client"
+import { useParams } from "react-router-dom"
+
 
 /* ================================
    Severity helpers (TOP LEVEL)
@@ -59,6 +61,8 @@ export default function ModerationDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [actingOn, setActingOn] = useState(null)
+  const { id: communityId } = useParams()
+
 
 const applyAction = async (report, outcome) => {
   const confirmed = window.confirm(
