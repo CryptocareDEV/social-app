@@ -30,16 +30,15 @@ model User {
   reportCooldownUntil   DateTime?
   lastRejectedAt        DateTime?
   lastRejectedSeverity  String?
-  chats                 CommunityChat[]
-  comments              Comment[]
   countryCode           String?
-  regionCode            String?
   locationUpdatedAt     DateTime?
+  regionCode            String?
   lastKnownIp           String?
-
-
+  comments              Comment[]
+  chats                 CommunityChat[]
   sentInvitations       CommunityInvitation[]  @relation("InvitedBy")
   receivedInvitations   CommunityInvitation[]  @relation("InvitedUser")
+  communityJoinRequests CommunityJoinRequest[]
   communityMemberships  CommunityMember[]
   profiles              FeedProfile[]
   likes                 Like[]
@@ -47,7 +46,6 @@ model User {
   reportsMade           Report[]
   superuser             Superuser?
   profile               UserProfile?
-  communityJoinRequests CommunityJoinRequest[]
 }
 
 model Post {
@@ -59,29 +57,27 @@ model Post {
   watermarkUrl       String?
   createdAt          DateTime            @default(now())
   scope              FeedScope
-  countryCode        String?
-  regionCode         String?
-
   communityId        String?
   isCommunityOnly    Boolean             @default(false)
   rating             ContentRating       @default(SAFE)
-  memeTopText        String?
-  memeBottomText     String?
-  originPostId       String?
-  originPost         Post?               @relation("PostOrigin", fields: [originPostId], references: [id])
-  derivedPosts       Post[]              @relation("PostOrigin")
   originCommunityId  String?
   originType         PostOriginType      @default(USER)
   isRemoved          Boolean             @default(false)
+  originPostId       String?
+  memeBottomText     String?
+  memeTopText        String?
+  countryCode        String?
+  regionCode         String?
+  comments           Comment[]
   communityFeedItems CommunityFeedItem[]
   likes              Like[]
   moderationActions  ModerationAction[]
   community          Community?          @relation(fields: [communityId], references: [id])
+  originPost         Post?               @relation("PostOrigin", fields: [originPostId], references: [id])
+  derivedPosts       Post[]              @relation("PostOrigin")
   user               User                @relation(fields: [userId], references: [id])
   categories         PostCategory[]
   reports            Report[]
-  comments           Comment[]
-
 
   @@index([userId])
   @@index([scope])
@@ -90,36 +86,28 @@ model Post {
   @@index([rating])
   @@index([countryCode])
   @@index([regionCode])
-
 }
 
-
 model Comment {
-  id          String   @id @default(uuid())
-  postId      String
-  userId      String
-
-  body        String?
-  mediaUrl    String?
-  mediaType   CommentMediaType?
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  isRemoved   Boolean  @default(false)
-  removedAt   DateTime?
-  removedBy   String?
+  id            String            @id @default(uuid())
+  postId        String
+  userId        String
+  body          String?
+  mediaUrl      String?
+  mediaType     CommentMediaType?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  isRemoved     Boolean           @default(false)
+  removedAt     DateTime?
+  removedBy     String?
   removedReason String?
-
-  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post          Post              @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([postId])
   @@index([userId])
   @@index([createdAt])
 }
-
-
 
 model Like {
   id        String   @id @default(uuid())
@@ -133,22 +121,21 @@ model Like {
 }
 
 model Community {
-  id        String         @id @default(uuid())
-  name      String
-  intention String
-  scope     CommunityScope
-  createdBy String
-  createdAt DateTime       @default(now())
-  rating    ContentRating  @default(SAFE)
-
+  id                    String                 @id @default(uuid())
+  name                  String                 @unique
+  intention             String
+  scope                 CommunityScope
+  createdBy             String
+  createdAt             DateTime               @default(now())
+  rating                ContentRating          @default(SAFE)
   categories            CommunityCategory[]
   chats                 CommunityChat[]
   communityFeedItems    CommunityFeedItem[]
   invitations           CommunityInvitation[]
+  communityJoinRequests CommunityJoinRequest[]
   labelImports          CommunityLabelImport[]
   members               CommunityMember[]
   posts                 Post[]
-  communityJoinRequests CommunityJoinRequest[]
 
   @@index([rating])
 }
@@ -267,10 +254,10 @@ model FeedProfile {
   userId      String
   name        String
   isActive    Boolean  @default(false)
-  isDefault   Boolean  @default(false)
   preferences Json
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  isDefault   Boolean  @default(false)
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, name])
@@ -322,17 +309,14 @@ model Superuser {
 }
 
 model CommunityJoinRequest {
-  id          String @id @default(uuid())
+  id          String            @id @default(uuid())
   communityId String
   userId      String
-
-  status JoinRequestStatus @default(PENDING)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status      JoinRequestStatus @default(PENDING)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  community   Community         @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([communityId, userId])
   @@index([communityId])
@@ -374,8 +358,6 @@ enum CommentMediaType {
   GIF
   VIDEO
 }
-
-
 
 enum InvitationStatus {
   PENDING

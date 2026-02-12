@@ -315,28 +315,32 @@ for (const raw of categories) {
 }
 
 
-    const community = await prisma.community.create({
-      data: {
-        name: name.trim(),
-        intention: intention.trim(),
-        scope,
-        rating,
-        createdBy: userId,
-        categories: {
-      create: categoryRecords,
-    },
+    let community
+
+try {
+  community = await prisma.community.create({
+    data: {
+      name: name.trim(),
+      intention: intention.trim(),
+      scope,
+      rating,
+      createdBy: userId,
+      categories: {
+        create: categoryRecords,
       },
-    })
-    if (categories?.length > 0) {
-  await prisma.communityLabelImport.createMany({
-    data: categories.map((key) => ({
-      communityId: community.id,
-      categoryKey: key,
-      importMode: "BOTH", // default
-    })),
-    skipDuplicates: true,
+    },
   })
+} catch (err) {
+  // Unique constraint violation
+  if (err.code === "P2002") {
+    return res.status(409).json({
+      error: "Community with this name already exists",
+    })
+  }
+
+  throw err
 }
+
 
 
     // 👤 Ensure creator is a member
