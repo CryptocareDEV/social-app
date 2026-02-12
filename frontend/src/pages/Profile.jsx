@@ -4,6 +4,7 @@ import { api } from "../api/client"
 import { getThemeColors } from "../ui/theme"
 import CreateFeedProfileModal from "../components/CreateFeedProfileModal"
 import FeedProfilesCard from "../components/profile/feedprofilescard"
+import CreateCommunityModal from "../components/CreateCommunityModal"
 
 
 export default function Profile({ theme, onFeedProfileChange }) {
@@ -11,6 +12,9 @@ export default function Profile({ theme, onFeedProfileChange }) {
   const [me, setMe] = useState(null)
   const navigate = useNavigate()
   const colors = getThemeColors(theme)
+  const [activeTab, setActiveTab] = useState("POSTS")
+
+
 
   const [user, setUser] = useState(null)
   const [profiles, setProfiles] = useState([])
@@ -26,10 +30,19 @@ export default function Profile({ theme, onFeedProfileChange }) {
   const [communities, setCommunities] = useState([])
   const [postView, setPostView] = useState("PUBLIC")
   const [isOwnProfile, setIsOwnProfile] = useState(false)
+  const [showCreateCommunity, setShowCreateCommunity] = useState(false)
+  const isSuperuser = me?.isSuperuser === true
+
+  const moderatedCommunities =
+  isOwnProfile
+    ? communities.filter(
+        (c) => c.role === "ADMIN" || c.role === "MODERATOR"
+      )
+    : []
 
 
   const sectionStyle = {
-  marginTop: 40,
+  marginTop: 8,
 }
   const publicPosts = posts.filter(
   (p) => !p.communityId
@@ -92,7 +105,7 @@ const renderPostMedia = (post) => {
   const loadProfile = async () => {
     try {
       // 1️⃣ Always load logged-in user
-const meUser = await api("/me")
+const meUser = await api("/users/me")
 
 // 2️⃣ Load profile owner explicitly
 const u = await api(`/users/${id}`)
@@ -353,18 +366,61 @@ const fps = await api("/me/feed-profiles")
       </div>
 </div>
 
-{isOwnProfile && (
-<div style={sectionStyle}>
-<h2
+{/* 🔹 Profile Tabs */}
+<div
   style={{
-    fontSize: 16,
-    fontWeight: 600,
-    marginTop: 32,
-    marginBottom: 12,
+    display: "flex",
+    gap: 8,
+    marginTop: 24,
+    marginBottom: 24,
+    borderBottom: `1px solid ${colors.border}`,
+    paddingBottom: 8,
   }}
 >
-  🧠 Feed Profiles
-</h2>
+
+  {["POSTS", "COMMUNITIES", "FEED", "MODERATION"].map((tab) => {
+    if (tab === "FEED" && !isOwnProfile) return null
+    if (tab === "MODERATION" && !isOwnProfile) return null
+
+    return (
+      <button
+        key={tab}
+        onClick={() => setActiveTab(tab)}
+        style={{
+          padding: "8px 14px",
+          borderRadius: 999,
+          fontSize: 13,
+          border: "none",
+          cursor: "pointer",
+          background:
+            activeTab === tab
+              ? colors.primarySoft
+              : "transparent",
+          color:
+            activeTab === tab
+              ? colors.primary
+              : colors.textMuted,
+        }}
+      >
+        {tab}
+      </button>
+    )
+  })}
+</div>
+
+{/* 🔹 Tab Content Container */}
+<div
+  style={{
+    background: colors.surface,
+    borderRadius: 16,
+    border: `1px solid ${colors.border}`,
+    padding: 20,
+  }}
+>
+
+{activeTab === "FEED" && isOwnProfile && (
+<div style={sectionStyle}>
+
 <p
   style={{
     fontSize: 13,
@@ -466,18 +522,57 @@ const fps = await api("/me/feed-profiles")
 )}
 
 
-{/* 🏛️ Communities */}
+{activeTab === "COMMUNITIES" && (
 <div style={sectionStyle}>
-<h2
-  style={{
-    fontSize: 16,
-    fontWeight: 600,
-    marginTop: 32,
-    marginBottom: 12,
-  }}
->
-  🏛️ Communities
-</h2>
+
+
+
+{isOwnProfile && (
+  <div
+    style={{
+      marginBottom: 16,
+      padding: 16,
+      borderRadius: theme.radius.lg,
+      background: colors.surface,
+      border: `1px solid ${colors.border}`,
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+    }}
+  >
+    <div>
+      <div style={{ fontSize: 14, fontWeight: 600 }}>
+        Create a new community
+      </div>
+      <div
+        style={{
+          fontSize: 12,
+          color: colors.textMuted,
+          marginTop: 4,
+        }}
+      >
+        Start a space with clear intention and labels.
+      </div>
+    </div>
+
+    <button
+      onClick={() => setShowCreateCommunity(true)}
+      style={{
+        padding: "8px 14px",
+        borderRadius: theme.radius.pill,
+        fontSize: 13,
+        fontWeight: 500,
+        background: colors.primary,
+        color: "#fff",
+        border: "none",
+        cursor: "pointer",
+      }}
+    >
+      + Create
+    </button>
+  </div>
+)}
+
 
 {communities.length === 0 ? (
   <p style={{ fontSize: 13, color: colors.textMuted }}>
@@ -597,22 +692,82 @@ const fps = await api("/me/feed-profiles")
   </div>
 )}
 </div>
+)}
+
+{/* 🛡 Moderation */}
+{activeTab === "MODERATION" &&
+  isOwnProfile &&
+  (isSuperuser || moderatedCommunities.length > 0) && (
+  <div style={sectionStyle}>
+    
+
+    <div
+      style={{
+        padding: 16,
+        borderRadius: theme.radius.lg,
+        background: colors.surface,
+        border: `1px solid ${colors.border}`,
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+      }}
+    >
+      {/* Platform moderation */}
+      {isSuperuser && (
+        <button
+          onClick={() => navigate("/moderation")}
+          style={{
+  padding: "12px 16px",
+  borderRadius: theme.radius.md,
+  border: `1px solid ${colors.border}`,
+  background: colors.surface,
+  color: colors.text,
+  cursor: "pointer",
+  fontSize: 14,
+  fontWeight: 500,
+  textAlign: "left",
+  transition: "all 0.15s ease",
+}}
+
+        >
+          🛡 Platform moderation dashboard
+        </button>
+      )}
+
+      {/* Community moderation */}
+      {moderatedCommunities.map((c) => (
+        <button
+          key={c.id}
+          onClick={() =>
+            navigate(`/communities/${c.id}/moderation`)
+          }
+          style={{
+  padding: "12px 16px",
+  borderRadius: theme.radius.md,
+  border: `1px solid ${colors.border}`,
+  background: colors.surface,
+  color: colors.text,
+  cursor: "pointer",
+  fontSize: 14,
+  fontWeight: 500,
+  textAlign: "left",
+  transition: "all 0.15s ease",
+}}
+
+        >
+          🏘️ Moderate {c.name}
+        </button>
+      ))}
+    </div>
+  </div>
+)}
 
 
-      {/* 📝 Posts */}
-      <div>
+
+      {activeTab === "POSTS" && (
+<div>
         <div style={sectionStyle}>
-        <h2
-  style={{
-    fontSize: 15,
-    fontWeight: 500,
-    opacity: 0.7,
-    marginBottom: 12,
-    marginTop: 32,
-  }}
->
-  📝 Posts
-</h2>
+        
 
 <div
   style={{
@@ -676,9 +831,9 @@ const fps = await api("/me/feed-profiles")
   <div
     key={post.id}
     style={{
-      marginBottom: 16,
-      padding: 16,
-      borderRadius: 14,
+      marginBottom: 12,
+      padding: 14,
+      borderRadius: 12,
       background:
         postView === "COMMUNITY"
           ? colors.surfaceMuted
@@ -754,6 +909,9 @@ const fps = await api("/me/feed-profiles")
 
       </div>
       </div>
+      )}
+      </div>
+
 
       {showCreateProfile && (
   <CreateFeedProfileModal
@@ -782,6 +940,19 @@ const fps = await api("/me/feed-profiles")
     }}
   />
 )}
+{showCreateCommunity && (
+  <CreateCommunityModal
+    theme={theme}
+    onClose={() => setShowCreateCommunity(false)}
+    onCreated={async () => {
+      setShowCreateCommunity(false)
+      const updated = await api("/communities/my")
+      setCommunities(updated || [])
+    }}
+  />
+)}
+
+
     </div>
   )
 }

@@ -6,7 +6,6 @@ import { Link, useNavigate } from "react-router-dom"
 
 
 
-import ModerationDashboard from "./pages/ModerationDashboard"
 
 import Login from "./pages/Login"
 import Feed from "./components/Feed"
@@ -14,6 +13,8 @@ import PostComposer from "./components/PostComposer"
 import Profile from "./pages/Profile"
 import MemeEditor from "./components/MemeEditor"
 import CreateCommunityModal from "./components/CreateCommunityModal"
+import CommunityModerationDashboard from "./pages/CommunityModerationDashboard"
+import ModerationDashboard from "./pages/ModerationDashboard"
 import CommunityChat from "./components/CommunityChat"
 import CommunityActionBar from "./components/CommunityActionBar"
 import Signup from "./pages/Signup"
@@ -26,7 +27,7 @@ import {
   headerGhostButton,
   headerSelect, // 👈 ADD THIS
 } from "./ui/buttonStyles"
-import CommunityModerationDashboard from "./pages/CommunityModerationDashboard"
+
 import CommunityPage from "./pages/CommunityPage"
 
 
@@ -534,28 +535,9 @@ useEffect(() => {
 )}
 
     <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-      <button
-  onClick={() => setShowCreateCommunity(true)}
-  style={headerPrimaryButton(theme)}
->
-  + Community
-</button>
+      
 
-{user?.isSuperuser && (
-  <Link to="/moderation" style={{ textDecoration: "none" }}>
-  <button style={secondaryButton(theme)}>
-    🛡 Platform moderation
-  </button>
-</Link>
-)}
 
-{isCommunityModerator && activeCommunity && (
-  <Link to={`/communities/${activeCommunity.id}/moderation`} style={{ textDecoration: "none" }}>
-  <button style={secondaryButton(theme)}>
-    🏘️ Community moderation
-  </button>
-</Link>
-)}
 
 
 
@@ -1233,19 +1215,7 @@ border: `1px solid ${colors.border}`,
                 />
               )}
 
-              {showCreateCommunity && (
-  <CreateCommunityModal
-    onClose={() => setShowCreateCommunity(false)}
-    onCreated={async () => {
-  setShowCreateCommunity(false)
-  await loadCommunities()
-  setSelectedCommunity("GLOBAL")
-  setFeedMode("GLOBAL")
-}}
-    setCooldownInfo={setCooldownInfo}
-    theme={theme}
-  />
-)}
+              
             </>
           )
         }
