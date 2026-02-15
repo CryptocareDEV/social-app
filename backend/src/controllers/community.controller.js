@@ -255,25 +255,48 @@ export const getCommunityInvitations = async (req, res) => {
  */
 export const createCommunity = async (req, res) => {
   try {
-    const { name, intention, scope, categories = [] } = req.body
+    const {
+  name,
+  intention,
+  scope,
+  categories = [],
+  rating = "SAFE",
+  visibility = "PUBLIC",
+} = req.body
+
     /* =========================
    🔞 COMMUNITY CREATION GUARDS
 ========================= */
 
-const { rating = "SAFE" } = req.body
+/* ================================
+   🎚 Rating Validation
+================================ */
 
-if (!["SAFE", "NSFW"].includes(rating)) {
-  return res.status(400).json({
-    error: "Invalid community rating",
-  })
+const allowedRatings = ["SAFE", "NSFW"]
+
+let finalRating = "SAFE"
+
+if (allowedRatings.includes(rating)) {
+  finalRating = rating
 }
 
-// 🚫 Minors cannot create NSFW communities
-if (rating === "NSFW" && req.user.isMinor) {
-  return res.status(403).json({
-    error: "Minors cannot create NSFW communities",
-  })
+// 🔒 Hard ceiling for minors
+if (req.user.isMinor) {
+  finalRating = "SAFE"
 }
+
+/* ================================
+   🔐 Visibility Validation
+================================ */
+
+const allowedVisibility = ["PUBLIC", "PRIVATE"]
+
+let finalVisibility = "PUBLIC"
+
+if (allowedVisibility.includes(visibility)) {
+  finalVisibility = visibility
+}
+
 
     const userId = req.user.userId
 
@@ -323,7 +346,8 @@ try {
       name: name.trim(),
       intention: intention.trim(),
       scope,
-      rating,
+      rating: finalRating,
+visibility: finalVisibility,
       createdBy: userId,
       categories: {
         create: categoryRecords,
@@ -358,7 +382,7 @@ await prisma.communityLabelImport.createMany({
     communityId: community.id,
     categoryKey: c.categoryKey,
     importMode:
-      rating === "SAFE" ? "SAFE_ONLY" : "BOTH",
+      finalRating === "SAFE" ? "SAFE_ONLY" : "BOTH",
   })),
 })
 

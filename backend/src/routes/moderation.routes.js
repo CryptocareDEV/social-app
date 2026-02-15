@@ -5,13 +5,26 @@ import {
 } from "../controllers/moderation.controller.js"
 import { applyModerationAction } from "../controllers/moderation.controller.js"
 import { enforceCooldown } from "../middleware/enforceCooldown.middleware.js"
+import { requireSuperuserRole } from "../middleware/requireSuperuserRole.middleware.js"
 
 
 
 const router = express.Router()
 
-router.get("/reports", requireAuth, getModerationReports)
-router.post("/actions", requireAuth, enforceCooldown, applyModerationAction)
+router.get(
+  "/reports",
+  requireAuth,
+  requireSuperuserRole(["MODERATOR", "ADMIN", "LEGAL"]),
+  getModerationReports
+)
+
+router.post(
+  "/actions",
+  requireAuth,
+  requireSuperuserRole(["MODERATOR", "ADMIN"]),
+  applyModerationAction
+)
+
 
 export default router
 

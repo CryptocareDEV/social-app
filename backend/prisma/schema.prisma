@@ -35,6 +35,10 @@ model User {
   regionCode            String?
   lastKnownIp           String?
   comments              Comment[]
+  nsfwEnabled           Boolean                @default(false)
+  themeMode             ThemeMode              @default(LIGHT)
+  accentTheme           AccentTheme            @default(CALM)
+
   chats                 CommunityChat[]
   sentInvitations       CommunityInvitation[]  @relation("InvitedBy")
   receivedInvitations   CommunityInvitation[]  @relation("InvitedUser")
@@ -425,3 +429,29 @@ enum SuperuserRole {
   ADMIN
   LEGAL
 }
+
+
+enum ThemeMode {
+  LIGHT
+  DARK
+}
+
+enum AccentTheme {
+  CALM
+  FOREST
+  SAND
+  LAVENDER
+  SLATE
+  SUNSET
+  SAGE
+  LAVENDER_MIST
+  OCEAN_SLATE
+  REDDIT
+SUN_ORANGE
+SKY_BLUE
+TURQUOISE
+SOFT_GREEN
+
+}
+
+

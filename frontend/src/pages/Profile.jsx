@@ -2,14 +2,19 @@ import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { api } from "../api/client"
 import { getThemeColors } from "../ui/theme"
+import { secondaryButton } from "../ui/buttonStyles"
 import CreateFeedProfileModal from "../components/CreateFeedProfileModal"
 import FeedProfilesCard from "../components/profile/feedprofilescard"
 import CreateCommunityModal from "../components/CreateCommunityModal"
 
 
-export default function Profile({ theme, onFeedProfileChange }) {
+export default function Profile({
+  theme,
+  setTheme,
+  currentUser,
+  onFeedProfileChange,
+}) {
   const { id } = useParams()
-  const [me, setMe] = useState(null)
   const navigate = useNavigate()
   const colors = getThemeColors(theme)
   const [activeTab, setActiveTab] = useState("POSTS")
@@ -31,7 +36,8 @@ export default function Profile({ theme, onFeedProfileChange }) {
   const [postView, setPostView] = useState("PUBLIC")
   const [isOwnProfile, setIsOwnProfile] = useState(false)
   const [showCreateCommunity, setShowCreateCommunity] = useState(false)
-  const isSuperuser = me?.isSuperuser === true
+  const isSuperuser = currentUser?.isSuperuser === true
+
 
   const moderatedCommunities =
   isOwnProfile
@@ -103,36 +109,34 @@ const renderPostMedia = (post) => {
   setLoading(true)
 
   const loadProfile = async () => {
-    try {
-      // 1️⃣ Always load logged-in user
-const meUser = await api("/users/me")
-
+    
+try {
 // 2️⃣ Load profile owner explicitly
 const u = await api(`/users/${id}`)
 
 
 // 3️⃣ Decide ownership based on actual user identity
-const viewingOwnProfile = u.id === meUser.id
+const viewingOwnProfile = u.id === currentUser?.id
+
 
 
 // 4️⃣ Load posts for profile owner
 const userPosts = await api(`/users/${u.id}/posts`)
 
 // 5️⃣ Load my feed profiles (ONLY mine)
-const fps = await api("/me/feed-profiles")
+const fps = viewingOwnProfile
+        ? await api("/me/feed-profiles")
+        : []
 
 
       if (!mounted) return
 
       setUser(u)
-      setMe(meUser)
       setPosts(userPosts || [])
       setProfiles(fps || [])
       setBio(u.bio || "")
 
-      setIsOwnProfile(u.username === meUser.username)
-
-
+      setIsOwnProfile(viewingOwnProfile)
 
       const communitiesData = viewingOwnProfile
   ? await api("/communities/my")
@@ -157,12 +161,15 @@ const fps = await api("/me/feed-profiles")
     }
   }
 
-  loadProfile()
+  if (currentUser) {
+    loadProfile()
+  }
 
   return () => {
     mounted = false
   }
-}, [id])
+}, [id, currentUser])
+
 
 
   const activateProfile = async (profile) => {
@@ -245,7 +252,7 @@ const fps = await api("/me/feed-profiles")
 <div style={{ marginTop: 16 }}>
   <div
     style={{
-      fontSize: 12,
+      fontSize: 14,
       fontWeight: 600,
       marginBottom: 6,
       color: colors.textMuted,
@@ -282,12 +289,12 @@ const fps = await api("/me/feed-profiles")
         }}
         style={{
           marginTop: 6,
-          fontSize: 12,
+          fontSize: 14,
           background: "transparent",
           border: "none",
           padding: 0,
           cursor: "pointer",
-          color: colors.textMuted,
+          color: colors.text,
         }}
       >
         Edit bio
@@ -328,7 +335,7 @@ const fps = await api("/me/feed-profiles")
             background: "transparent",
             border: "none",
             cursor: "pointer",
-            color: colors.textMuted,
+            color: colors.text,
           }}
         >
           Cancel
@@ -348,7 +355,7 @@ const fps = await api("/me/feed-profiles")
             setEditingBio(false)
           }}
           style={{
-            fontSize: 12,
+            fontSize: 14,
             cursor: "pointer",
           }}
         >
@@ -378,9 +385,11 @@ const fps = await api("/me/feed-profiles")
   }}
 >
 
-  {["POSTS", "COMMUNITIES", "FEED", "MODERATION"].map((tab) => {
+  {["POSTS", "COMMUNITIES", "FEED", "SETTINGS", "MODERATION"].map((tab) => {
     if (tab === "FEED" && !isOwnProfile) return null
     if (tab === "MODERATION" && !isOwnProfile) return null
+    if (tab === "SETTINGS" && !isOwnProfile) return null
+
 
     return (
       <button
@@ -423,7 +432,7 @@ const fps = await api("/me/feed-profiles")
 
 <p
   style={{
-    fontSize: 13,
+    fontSize: 14,
     color: colors.textMuted,
     marginBottom: 16,
     lineHeight: 1.6,
@@ -763,6 +772,211 @@ const fps = await api("/me/feed-profiles")
 )}
 
 
+{activeTab === "SETTINGS" && isOwnProfile && (
+  <div style={sectionStyle}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 24,
+      }}
+    >
+      {/* Section Card */}
+      <div
+        style={{
+          padding: 20,
+          borderRadius: 16,
+          background: colors.surface,
+          border: `1px solid ${colors.border}`,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 16,
+            fontWeight: 600,
+            marginBottom: 12,
+          }}
+        >
+          Content Preferences
+        </div>
+
+        <div
+          style={{
+            fontSize: 13,
+            color: colors.textMuted,
+            marginBottom: 12,
+          }}
+        >
+          Control what type of content you see across the platform.
+        </div>
+
+        {!currentUser?.isMinor && (
+  <label
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      fontSize: 14,
+      color: colors.text,
+    }}
+  >
+    <input
+      type="checkbox"
+      checked={currentUser?.nsfwEnabled || false}
+      onChange={async (e) => {
+        const value = e.target.checked
+
+        try {
+          const updated = await api("/users/me", {
+            method: "PATCH",
+            body: JSON.stringify({
+              nsfwEnabled: value,
+            }),
+          })
+
+          
+        } catch (err) {
+          alert(err?.error || "Update failed")
+        }
+      }}
+    />
+    Allow NSFW content
+  </label>
+)}
+
+
+      </div>
+
+      {/* Appearance Card */}
+      <div
+        style={{
+          padding: 20,
+          borderRadius: 16,
+          background: colors.surface,
+          border: `1px solid ${colors.border}`,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 16,
+            fontWeight: 600,
+            marginBottom: 12,
+          }}
+        >
+          Appearance
+        </div>
+
+        {/* Theme Mode */}
+        <div style={{ marginBottom: 16 }}>
+          <div
+            style={{
+              fontSize: 13,
+              color: colors.textMuted,
+              marginBottom: 6,
+            }}
+          >
+            Theme Mode
+          </div>
+
+          <button
+            onClick={() => {
+              const next =
+                theme.mode === "light" ? "DARK" : "LIGHT"
+
+              api("/users/me", {
+                method: "PATCH",
+                body: JSON.stringify({
+                  themeMode: next,
+                }),
+              }).then((updated) => {
+                setTheme((t) => ({
+                  ...t,
+                  mode:
+                    updated.themeMode === "DARK"
+                      ? "dark"
+                      : "light",
+                }))
+              })
+            }}
+            style={secondaryButton(theme)}
+          >
+            Switch to{" "}
+            {theme.mode === "light"
+              ? "Dark Mode"
+              : "Light Mode"}
+          </button>
+        </div>
+
+        {/* Accent */}
+        <div>
+          <div
+            style={{
+              fontSize: 13,
+              color: colors.textMuted,
+              marginBottom: 6,
+            }}
+          >
+            Accent Color
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              flexWrap: "wrap",
+            }}
+          >
+            {[
+              "REDDIT",
+              "SUN_ORANGE",
+              "SKY_BLUE",
+              "TURQUOISE",
+              "SOFT_GREEN",
+            ].map((a) => (
+              <button
+                key={a}
+                onClick={async () => {
+                  const updated = await api(
+                    "/users/me",
+                    {
+                      method: "PATCH",
+                      body: JSON.stringify({
+                        accentTheme: a,
+                      }),
+                    }
+                  )
+
+                  setTheme((t) => ({
+                    ...t,
+                    accent: updated.accentTheme,
+                  }))
+                }}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 999,
+                  border:
+                    theme.accent === a
+                      ? `2px solid ${colors.text}`
+                      : `1px solid ${colors.border}`,
+                  background:
+                    getThemeColors({
+                      ...theme,
+                      accent: a,
+                    }).primary,
+                  cursor: "pointer",
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
+
+
 
       {activeTab === "POSTS" && (
 <div>
@@ -917,6 +1131,7 @@ const fps = await api("/me/feed-profiles")
   <CreateFeedProfileModal
     theme={theme}
     editingProfile={editingProfile}
+    isMinor={currentUser?.isMinor}
     onClose={() => {
       setShowCreateProfile(false)
       setEditingProfile(null)

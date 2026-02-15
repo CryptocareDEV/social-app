@@ -7,17 +7,8 @@ import { applyReporterCooldownIfNeeded } from "../lib/reporterCooldown.js"
  */
 export const getModerationReports = async (req, res) => {
   try {
-    const userId = req.user.userId
-
-    const isSuperuser =
-  (await prisma.superuser.findUnique({ where: { userId },
-   }))
-
-if (!isSuperuser) {
-  return res.status(403).json({
-    error: "Superuser only",
-  })
-}
+    // 🔐 Authorization handled at route level
+// Root override already supported by middleware
 
     const reports = await prisma.report.findMany({
   orderBy: { createdAt: "desc" },
@@ -50,8 +41,26 @@ if (!isSuperuser) {
   },
 })
 
+// ================================
+// Split reports into active + resolved
+// ================================
 
-    return res.json(reports)
+const activeReports = reports.filter(r => {
+  const outcome = r.post?.moderationActions?.[0]?.outcome
+  return !outcome || outcome === "ESCALATED"
+})
+
+const resolvedReports = reports.filter(r => {
+  const outcome = r.post?.moderationActions?.[0]?.outcome
+  return outcome && outcome !== "ESCALATED"
+})
+
+
+    return res.json({
+  active: activeReports,
+  resolved: resolvedReports,
+})
+
   } catch (err) {
     console.error(err)
     return res.status(500).json({ error: "Failed to load reports" })
@@ -102,18 +111,6 @@ if (["MINOR_SAFETY", "NSFW_EXPOSURE"].includes(note)) {
 }
 
 
-    /* ================================
-       1️⃣ Permission check
-    ================================= */
-
-    const isSuperuser =
-  (await prisma.superuser.findUnique({
-    where: { userId },
-  })) !== null
-
-if (!isSuperuser) {
-  return res.status(403).json({ error: "Superuser only" })
-}
 
 
     /* ================================
@@ -312,15 +309,20 @@ await prisma.user.update({
     /* ================================
        6️⃣ Audit log
     ================================= */
-    await prisma.moderationLog.create({
-      data: {
-        actorId,
-        actorType: isSuperuser ? "SUPERUSER" : "MODERATOR",
-        action: `APPLY_${outcome}`,
-        targetId: postId,
-        reason: note || null,
-      },
-    })
+    const actorType = req.user?.isSuperuser
+  ? "SUPERUSER"
+  : "MODERATOR"
+
+await prisma.moderationLog.create({
+  data: {
+    actorId,
+    actorType,
+    action: `APPLY_${outcome}`,
+    targetId: postId,
+    reason: note || null,
+  },
+})
+
 
     return res.json({ success: true })
   } catch (err) {

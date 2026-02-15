@@ -104,6 +104,25 @@ export const theme = {
 }
 
 // helper
-export const getThemeColors = (theme) =>
-  theme.colors[theme.mode]
+export const getThemeColors = (theme) => {
+  const base = theme.colors[theme.mode]
 
+  const accents = {
+    REDDIT: "#ff4500",        // classic reddit orange
+    SUN_ORANGE: "#e07a3f",    // softer warm orange
+    SKY_BLUE: "#4ea8de",      // uplifting sky tone
+    TURQUOISE: "#2a9d8f",     // calm water
+    SOFT_GREEN: "#6a994e",    // peaceful earth green
+  }
+
+  const primary = accents[theme.accent] || accents.REDDIT
+
+  return {
+    ...base,
+    primary,
+    primarySoft:
+      theme.mode === "light"
+        ? "rgba(0,0,0,0.04)"
+        : "rgba(255,255,255,0.06)",
+  }
+}

@@ -12,6 +12,7 @@ export default function CreateFeedProfileModal({
   theme,
   onClose,
   onCreated,
+  isMinor = false,
   editingProfile = null,
 }) {
   const colors = getThemeColors(theme)
@@ -101,10 +102,10 @@ const method = editingProfile ? "PATCH" : "POST"
 const profile = await api(endpoint, {
   method,
   body: JSON.stringify({
-    name: name.trim(),
-    allowNSFW,
-    labelPreferences,
-  }),
+  name: name.trim(),
+  allowNSFW: isMinor ? false : allowNSFW,
+  labelPreferences,
+}),
 })
 
 
@@ -192,21 +193,24 @@ const profile = await api(endpoint, {
         />
 
         {/* NSFW */}
-        <div
-  style={{
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    fontSize: 14,
-  }}
->
-  <input
-    type="checkbox"
-    checked={allowNSFW}
-    onChange={(e) => setAllowNSFW(e.target.checked)}
-  />
-  <span>Allow NSFW content</span>
-</div>
+{!isMinor && (
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      fontSize: 14,
+    }}
+  >
+    <input
+      type="checkbox"
+      checked={allowNSFW}
+      onChange={(e) => setAllowNSFW(e.target.checked)}
+    />
+    <span>Allow NSFW content</span>
+  </div>
+)}
+
 
         {/* Scope selector */}
         <div style={{ marginTop: 16 }}>

@@ -44,8 +44,9 @@ export const applyReporterCooldownIfNeeded = async (user) => {
   }
 
   await prisma.user.update({
-    where: { id: user.id },
-    data: { cooldownUntil },
-  })
+  where: { id: user.id },
+  data: { reportCooldownUntil: cooldownUntil },
+})
+
 }
 

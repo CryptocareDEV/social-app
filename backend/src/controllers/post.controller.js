@@ -2,14 +2,25 @@ import prisma from "../lib/prisma.js"
 import { isValidLabel } from "../utils/labelValidation.js"
 import { materializeCommunityFeed } from "../services/communityFeed.service.js"
 import { getActiveFeedProfile } from "../lib/feedProfile.js"
+import sanitizeHtml from "sanitize-html"
+
 
 /* ============================================================
    HELPERS
 ============================================================ */
 
-const buildNsfwFilter = ({ isMinor, feedProfile }) => {
+const buildNsfwFilter = ({
+  isMinor,
+  nsfwEnabled,
+  feedProfile,
+}) => {
+  // 🔒 Hard ceiling: minors never see NSFW
   if (isMinor) return { rating: "SAFE" }
 
+  // 🔒 Hard ceiling: user disabled NSFW
+  if (!nsfwEnabled) return { rating: "SAFE" }
+
+  // 🧠 Feed profile preference
   const nsfwPref =
     feedProfile?.preferences?.nsfw?.posts === "SHOW"
       ? "SHOW"
@@ -17,6 +28,7 @@ const buildNsfwFilter = ({ isMinor, feedProfile }) => {
 
   return nsfwPref === "SHOW" ? {} : { rating: "SAFE" }
 }
+
 
 /* ============================================================
    CREATE POST
@@ -37,7 +49,45 @@ export const createPost = async (req, res) => {
       originPostId = null,
     } = req.body
 
+    /* ================================
+   🧼 Sanitize text inputs
+================================ */
+const cleanCaption = caption
+  ? sanitizeHtml(caption, {
+      allowedTags: [],
+      allowedAttributes: {},
+    })
+  : null
+
+const cleanMemeTopText = req.body.memeTopText
+  ? sanitizeHtml(req.body.memeTopText, {
+      allowedTags: [],
+      allowedAttributes: {},
+    })
+  : null
+
+const cleanMemeBottomText = req.body.memeBottomText
+  ? sanitizeHtml(req.body.memeBottomText, {
+      allowedTags: [],
+      allowedAttributes: {},
+    })
+  : null
+
+
     const userId = req.user.userId
+    /* ================================
+   ⛔ Enforce posting cooldown
+================================ */
+if (
+  req.user.cooldownUntil &&
+  new Date(req.user.cooldownUntil) > new Date()
+) {
+  return res.status(403).json({
+    error: "You are temporarily restricted from posting",
+    cooldownUntil: req.user.cooldownUntil,
+  })
+}
+
         // 🌍 Get user's stored location
     const userLocation = await prisma.user.findUnique({
       where: { id: userId },
@@ -49,7 +99,17 @@ export const createPost = async (req, res) => {
 
     const userCountry = userLocation?.countryCode || null
     const userRegion = userLocation?.regionCode || null
+if (scope === "COUNTRY" && !userCountry) {
+  return res.status(400).json({
+    error: "Country not set for user",
+  })
+}
 
+if (scope === "LOCAL" && (!userCountry || !userRegion)) {
+  return res.status(400).json({
+    error: "Local region not set for user",
+  })
+}
 
     /* 🔞 NSFW guards */
     if (rating === "NSFW" && req.user.isMinor) {
@@ -92,6 +152,45 @@ if (type === "MEME") {
   }
 }
 
+/* ================================
+   🧱 Backend character limits
+================================ */
+
+const MAX_CAPTION_LENGTH = 420
+const MAX_MEDIA_URL_LENGTH = 500
+const MAX_MEME_TEXT_LENGTH = 120
+
+if (caption && caption.length > MAX_CAPTION_LENGTH) {
+  return res.status(400).json({
+    error: "Caption exceeds maximum length",
+  })
+}
+
+if (mediaUrl && mediaUrl.length > MAX_MEDIA_URL_LENGTH) {
+  return res.status(400).json({
+    error: "Media URL too long",
+  })
+}
+
+if (type === "MEME") {
+  if (
+    req.body.memeTopText &&
+    req.body.memeTopText.length > MAX_MEME_TEXT_LENGTH
+  ) {
+    return res.status(400).json({
+      error: "Meme top text too long",
+    })
+  }
+
+  if (
+    req.body.memeBottomText &&
+    req.body.memeBottomText.length > MAX_MEME_TEXT_LENGTH
+  ) {
+    return res.status(400).json({
+      error: "Meme bottom text too long",
+    })
+  }
+}
 
 
     if (type === "TEXT" && !caption?.trim()) {
@@ -207,7 +306,7 @@ console.log("🧠 CREATING POST", {
     const post = await prisma.post.create({
       data: {
         type,
-        caption,
+        caption: cleanCaption,
         mediaUrl,
         scope: communityId ? "GLOBAL" : scope,
         rating,
@@ -239,17 +338,7 @@ regionCode:
       },
     })
 
-    if (scope === "COUNTRY" && !userCountry) {
-  return res.status(400).json({
-    error: "Country not set for user",
-  })
-}
-
-if (scope === "LOCAL" && (!userCountry || !userRegion)) {
-  return res.status(400).json({
-    error: "Local region not set for user",
-  })
-}
+    
 
 
 
@@ -328,10 +417,17 @@ if (scope === "LOCAL" && (!userCountry || !userRegion)) {
       labelPrefs
     )
 
-    const nsfwFilter = buildNsfwFilter({
-      isMinor: req.user.isMinor,
-      feedProfile,
-    })
+    const user = await prisma.user.findUnique({
+  where: { id: userId },
+  select: { nsfwEnabled: true },
+})
+
+const nsfwFilter = buildNsfwFilter({
+  isMinor: req.user.isMinor,
+  nsfwEnabled: user?.nsfwEnabled,
+  feedProfile,
+})
+
 
     const posts = await prisma.post.findMany({
       where: {
@@ -438,10 +534,17 @@ export const getPostsByLabel = async (req, res) => {
 
     const feedProfile = await getActiveFeedProfile(userId)
 
-    const nsfwFilter = buildNsfwFilter({
-      isMinor: req.user.isMinor,
-      feedProfile,
-    })
+    const user = await prisma.user.findUnique({
+  where: { id: userId },
+  select: { nsfwEnabled: true },
+})
+
+const nsfwFilter = buildNsfwFilter({
+  isMinor: req.user.isMinor,
+  nsfwEnabled: user?.nsfwEnabled,
+  feedProfile,
+})
+
 
     const posts = await prisma.post.findMany({
       where: {
@@ -499,48 +602,43 @@ export const getPostOrigin = async (req, res) => {
   try {
     const { id } = req.params
 
-    const post = await prisma.post.findUnique({
+    let current = await prisma.post.findUnique({
       where: { id },
       select: {
         id: true,
-        type: true,
         mediaUrl: true,
         originPostId: true,
-        originPost: {
-          select: {
-            id: true,
-            mediaUrl: true,
-            originPostId: true,
-            originPost: {
-              select: {
-                id: true,
-                mediaUrl: true,
-              },
-            },
-          },
-        },
       },
     })
 
-    if (!post) {
+    if (!current) {
       return res.status(404).json({ error: "Post not found" })
     }
 
-    // Walk up to the clean root
-    let root = post
-    while (root.originPost) {
-      root = root.originPost
+    // 🔁 Walk up dynamically until true root
+    while (current.originPostId) {
+      current = await prisma.post.findUnique({
+        where: { id: current.originPostId },
+        select: {
+          id: true,
+          mediaUrl: true,
+          originPostId: true,
+        },
+      })
+
+      if (!current) break
     }
 
     return res.json({
-      id: root.id,
-      mediaUrl: root.mediaUrl,
+      id: current.id,
+      mediaUrl: current.mediaUrl,
     })
   } catch (err) {
     console.error("GET POST ORIGIN ERROR", err)
     return res.status(500).json({ error: "Failed to fetch origin post" })
   }
 }
+
 
 
 /* ============================================================

@@ -8,6 +8,8 @@ export default function Feed({
   likingIds,
   onLabelClick,
   theme,
+  reportCooldownUntil,
+  refreshUserState,
 }) {
   const colors = getThemeColors(theme)
 
@@ -56,14 +58,16 @@ export default function Feed({
     >
       {posts.map((post) => (
         <PostCard
-          key={post.id}
-          post={post}
-          onLike={onLike}
-          onMeme={onMeme}
-          isLiking={likingIds?.has?.(post.id) ?? false}
-          onLabelClick={onLabelClick}
-          theme={theme}
-        />
+  key={post.id}
+  post={post}
+  onLike={onLike}
+  onMeme={onMeme}
+  isLiking={likingIds?.has?.(post.id) ?? false}
+  onLabelClick={onLabelClick}
+  theme={theme}
+  reportCooldownUntil={reportCooldownUntil}
+  refreshUserState={refreshUserState}
+/>
       ))}
     </div>
   )

@@ -5,12 +5,15 @@ import { getThemeColors } from "../ui/theme"
 
 export default function PostComposer({
   onPostCreated,
-  setCooldownInfo = () => {},
+  refreshUserState,
   activeCommunity = null,
   feedMode = "GLOBAL",
   cooldownInfo = null,
   theme,
+  isMinor = false,
+  nsfwEnabled = false,
 }) {
+
   const colors = getThemeColors(theme)
   const [open, setOpen] = useState(true)
 
@@ -195,14 +198,13 @@ const effectiveCommunityId =
 
       onPostCreated?.(post)
     } catch (err) {
-      if (err?.cooldownUntil) {
-        setCooldownInfo({
-          cooldownUntil: err.cooldownUntil,
-        })
-      }
+  if (err?.cooldownUntil) {
+    refreshUserState?.() // 🔥 important
+  }
 
-      setError(err?.error || "Failed to create post")
-    } finally {
+  setError(err?.error || "Failed to create post")
+}
+ finally {
       setLoading(false)
     }
   }
@@ -246,7 +248,22 @@ const effectiveCommunityId =
 {open && (
   <form onSubmit={submit} style={{ padding: 16 }}>
 
-      
+      {error && (
+  <div
+    style={{
+      marginBottom: 12,
+      padding: "10px 12px",
+      borderRadius: 10,
+      background: "rgba(255, 0, 0, 0.08)",
+      border: "1px solid rgba(255, 0, 0, 0.2)",
+      color: "#b00020",
+      fontSize: 13,
+    }}
+  >
+    {error}
+  </div>
+)}
+
 
       
 
@@ -272,13 +289,70 @@ const effectiveCommunityId =
         <option value="LOCAL">📍 Local</option>
       </select>
 
+      {/* NSFW Rating */}
+{!isMinor &&
+ nsfwEnabled &&
+ (!activeCommunity || activeCommunity.rating === "NSFW") && (
+
+  <div
+    style={{
+      marginTop: 8,
+      marginBottom: 8,
+      padding: "8px 12px",
+      borderRadius: 10,
+      background: colors.surfaceMuted,
+      border: `1px solid ${colors.border}`,
+      fontSize: 13,
+    }}
+  >
+    <label
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        cursor: "pointer",
+      }}
+    >
+      <input
+        type="checkbox"
+        checked={rating === "NSFW"}
+        onChange={(e) =>
+          setRating(e.target.checked ? "NSFW" : "SAFE")
+        }
+      />
+      Mark as NSFW
+    </label>
+  </div>
+)}
+
+
       {/* Caption */}
       <textarea
-        placeholder="What’s on your mind?"
-        value={caption}
-        onChange={(e) => setCaption(e.target.value)}
-        style={textareaStyle}
-      />
+  placeholder="What’s on your mind?"
+  value={caption}
+  onChange={(e) => {
+    setCaption(e.target.value)
+    if (error) setError("")
+  }}
+  style={textareaStyle}
+/>
+
+<div
+  style={{
+    textAlign: "right",
+    fontSize: 12,
+    marginTop: 4,
+    color:
+      caption.length > 420
+        ? "#b00020"
+        : caption.length > 380
+        ? "#cc8800"
+        : colors.textMuted,
+  }}
+>
+  {caption.length}/420
+</div>
+
 
       {/* Label input */}
       <input
@@ -428,7 +502,11 @@ border: `1px solid ${colors.border}`,
   <div style={{ display: "flex", justifyContent: "flex-end" }}>
     <button
       type="submit"
-      disabled={loading || !!cooldownInfo}
+      disabled={
+  loading ||
+  !!cooldownInfo ||
+  caption.length > 420
+}
       style={{
         padding: "8px 18px",
         borderRadius: 999,
@@ -444,10 +522,12 @@ border: `1px solid ${colors.border}`,
       }}
     >
       {loading
-        ? "Posting…"
-        : cooldownInfo
-        ? "On cooldown"
-        : "Post"}
+  ? "Posting…"
+  : cooldownInfo
+  ? "On cooldown"
+  : caption.length > 420
+  ? "Too long"
+  : "Post"}
     </button>
   </div>
 </div>

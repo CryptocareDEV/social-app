@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react"
 import { Routes, Route, Navigate } from "react-router-dom"
 import { Link, useNavigate } from "react-router-dom"
-
-
-
+import SuperuserDashboard from "./pages/SuperuserDashboard"
+import useNow from "./hooks/useNow"
 
 
 
@@ -25,14 +24,10 @@ import {
   dangerButton,
   headerPrimaryButton,
   headerGhostButton,
-  headerSelect, // 👈 ADD THIS
+  headerSelect, 
 } from "./ui/buttonStyles"
 
 import CommunityPage from "./pages/CommunityPage"
-
-
-
-
 
 
 import { theme as baseTheme, getThemeColors } from "./ui/theme"
@@ -44,20 +39,37 @@ export default function App() {
   const navigate = useNavigate()
 
   // 🎨 Theme (Phase 1 foundation)
-  const [theme, setTheme] = useState(() => {
-  const saved = localStorage.getItem("theme-mode")
-  return {
-    ...baseTheme,
-    mode: saved === "dark" ? "dark" : "light",
-  }
+  const [theme, setTheme] = useState({
+  ...baseTheme,
+  mode: "light",
+  accent: "CALM",
 })
-const toggleTheme = () => {
-  setTheme((t) => {
-    const nextMode = t.mode === "light" ? "dark" : "light"
-    localStorage.setItem("theme-mode", nextMode)
-    return { ...t, mode: nextMode }
-  })
+
+const toggleTheme = async () => {
+  const nextMode = theme.mode === "light" ? "DARK" : "LIGHT"
+
+  try {
+    const updated = await api("/users/me", {
+      method: "PATCH",
+      body: JSON.stringify({
+        themeMode: nextMode,
+      }),
+    })
+
+    setTheme((t) => ({
+      ...t,
+      mode: updated.themeMode === "DARK" ? "dark" : "light",
+    }))
+
+    setUser((prev) => ({
+      ...prev,
+      themeMode: updated.themeMode,
+    }))
+  } catch (err) {
+    alert("Failed to update theme")
+  }
 }
+
   const colors = getThemeColors(theme)
 
 
@@ -76,11 +88,44 @@ const toggleTheme = () => {
   const [cooldownInfo, setCooldownInfo] = useState(null)
 const [activeFeedProfileId, setActiveFeedProfileId] = useState(null)
 const [activeFeedProfileName, setActiveFeedProfileName] = useState(null)
+const now = useNow(1000)
+let cooldownRemaining = 0
+
+if (cooldownInfo?.until) {
+  cooldownRemaining =
+    new Date(cooldownInfo.until).getTime() - now
+}
+
+const isOnCooldown = cooldownRemaining > 0
+
   
   
 const handleLogout = () => {
   localStorage.removeItem("token")
   setUser(null)
+}
+const refreshUserState = async () => {
+  try {
+    const u = await api("/users/me")
+
+    setUser(u)
+
+    if (u.reportCooldownUntil) {
+      setCooldownInfo({
+        type: "REPORT",
+        until: u.reportCooldownUntil,
+      })
+    } else if (u.cooldownUntil) {
+      setCooldownInfo({
+        type: "ACTION",
+        until: u.cooldownUntil,
+      })
+    } else {
+      setCooldownInfo(null)
+    }
+  } catch (err) {
+    console.error("Failed to refresh user state")
+  }
 }
 
 
@@ -126,6 +171,11 @@ useEffect(() => {
   api("/users/me")
     .then((u) => {
       setUser(u)
+      setTheme((t) => ({
+  ...t,
+  mode: u.themeMode === "DARK" ? "dark" : "light",
+  accent: u.accentTheme || "CALM",
+}))
       loadInvitations()
       loadCommunities()
 
@@ -220,9 +270,11 @@ useEffect(() => {
 }, [user])
 
 
-
-
-
+useEffect(() => {
+  if (!isOnCooldown && cooldownInfo) {
+    setCooldownInfo(null)
+  }
+}, [isOnCooldown])
 
 
 useEffect(() => {
@@ -256,6 +308,9 @@ const loadFeed = async () => {
     }
 
     if (!endpoint) return
+
+    if (!user) return
+
 
     const data = await api(endpoint, {
   headers: activeFeedProfileId
@@ -348,7 +403,7 @@ useEffect(() => {
   // 🔁 Reload feed + communities
   // 🔁 Reload feed when feed inputs change
 useEffect(() => {
-  if (!user || !activeFeedProfileId) return
+  if (!user) return
   loadFeed()
 }, [
   user,
@@ -358,6 +413,7 @@ useEffect(() => {
   activeLabel,
   activeFeedProfileId,
 ])
+
 
 
 
@@ -420,12 +476,13 @@ useEffect(() => {
 
   return (
   <div
-    style={{
-      background: colors.bg,
-      color: colors.text,
-      minHeight: "100vh",
-    }}
-  >
+  style={{
+    background: colors.bg,
+    color: colors.text,
+    minHeight: "100vh",
+    transition: "background 0.4s ease",
+  }}
+>
     <Routes>
 
       <Route
@@ -446,11 +503,22 @@ useEffect(() => {
   <Route
   path="/moderation"
   element={
-    user && user.isSuperuser
+    user && (user.isSuperuser || user.isRoot)
       ? <ModerationDashboard />
       : <Navigate to="/" />
   }
 />
+
+<Route
+  path="/superusers"
+  element={
+    user && (user.isSuperuser || user.isRoot)
+      ? <SuperuserDashboard />
+      : <Navigate to="/" />
+  }
+/>
+
+
 
 <Route
   path="/communities/:id/moderation"
@@ -629,26 +697,30 @@ useEffect(() => {
   
 </header>
 
-{cooldownInfo?.type === "REPORT" && (
+{cooldownInfo?.type === "REPORT" && isOnCooldown && (
   <div
     style={{
       background: "#fff7ed",
-      color: "#7c2d12",
+      color: "#be7056",
       padding: "10px 16px",
       textAlign: "center",
       fontSize: 14,
       borderBottom: "1px solid #fed7aa",
     }}
   >
-    ⚠️ Reporting is temporarily paused until{" "}
-    <strong>
-      {new Date(cooldownInfo.until).toLocaleString()}
-    </strong>
+    ⚠️ Reporting paused for{" "}
+<strong>
+  {Math.floor(cooldownRemaining / 60000)}m{" "}
+  {Math.floor((cooldownRemaining % 60000) / 1000)}s
+</strong>
+
+
     <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>
-      This helps keep reports accurate and fair for everyone.
+      This helps keep reports accurate and fair.
     </div>
   </div>
 )}
+
 
               {/* MAIN */}
               <main
@@ -801,11 +873,15 @@ border: `1px solid ${colors.border}`,
 
                 <PostComposer
   onPostCreated={loadFeed}
-  setCooldownInfo={setCooldownInfo}
+  refreshUserState={refreshUserState}
   activeCommunity={activeCommunity}
   feedMode={feedMode}
   theme={theme}
+  isMinor={user?.isMinor}
+  nsfwEnabled={user?.nsfwEnabled}
 />
+
+
 
 
 
@@ -1042,6 +1118,7 @@ border: `1px solid ${colors.border}`,
         padding: 14,
         borderRadius: 16,
         background: colors.surface,
+backdropFilter: "blur(8px)",
         border: `1px solid ${colors.border}`,
       }}
     >
@@ -1148,21 +1225,58 @@ border: `1px solid ${colors.border}`,
 
                 {/* FEED SCOPE */}
                 {feedMode !== "COMMUNITY" && (
-  <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-    {["GLOBAL", "COUNTRY", "LOCAL"].map((s) => (
-      <button
-        key={s}
-        onClick={() => {
-          setFeedMode("GLOBAL")
-          setActiveLabel(null)
-          setFeedScope(s)
-        }}
-      >
-        {s}
-      </button>
-    ))}
+  <div
+    style={{
+      display: "flex",
+      gap: 8,
+      marginBottom: 20,
+      padding: 4,
+      borderRadius: 999,
+      background: colors.surfaceMuted,
+      border: `1px solid ${colors.border}`,
+      width: "fit-content",
+    }}
+  >
+    {[
+      { key: "GLOBAL", label: "🌍 Global" },
+      { key: "COUNTRY", label: "🏳️ Country" },
+      { key: "LOCAL", label: "📍 Local" },
+    ].map((s) => {
+      const isActive = feedScope === s.key
+
+      return (
+        <button
+          key={s.key}
+          onClick={() => {
+            setFeedMode("GLOBAL")
+            setActiveLabel(null)
+            setFeedScope(s.key)
+          }}
+          style={{
+            padding: "8px 14px",
+            borderRadius: 999,
+            fontSize: 13,
+            fontWeight: 500,
+            border: "none",
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+
+            background: isActive
+              ? colors.primary
+              : "transparent",
+
+            color: isActive
+              ? "#ffffff"
+              : colors.textMuted,
+          }}
+        >
+          {s.label}
+        </button>
+      )
+    })}
   </div>
 )}
+
 
 
                 {/* ACTIVE LABEL */}
@@ -1186,16 +1300,22 @@ border: `1px solid ${colors.border}`,
   }}
 >
                 <Feed
-                  posts={posts}
-                  onLike={handleLike}
-                  onMeme={(p) => setMemePost(p)}
-                  likingIds={likingIds}
-                  onLabelClick={(label) => {
-                    setFeedMode("LABEL")
-                    setActiveLabel(label)
-                  }}
-                  theme={theme}
-                />
+  posts={posts}
+  onLike={handleLike}
+  onMeme={(p) => setMemePost(p)}
+  likingIds={likingIds}
+  onLabelClick={(label) => {
+    setFeedMode("LABEL")
+    setActiveLabel(label)
+  }}
+  theme={theme}
+  reportCooldownUntil={
+    cooldownInfo?.type === "REPORT"
+      ? cooldownInfo.until
+      : null
+  }
+  refreshUserState={refreshUserState}
+/>
                 </div>
                 {feedMode === "COMMUNITY" &&
   selectedCommunity !== "GLOBAL" && (
@@ -1207,6 +1327,7 @@ border: `1px solid ${colors.border}`,
               {memePost && (
                 <MemeEditor
                   post={memePost}
+                  theme={theme}
                   onClose={() => setMemePost(null)}
                   onPosted={() => {
                     setMemePost(null)
@@ -1227,12 +1348,17 @@ border: `1px solid ${colors.border}`,
     user ? (
       <Profile
         theme={theme}
-        onFeedProfileChange={({ id, name }) => {
-          setActiveFeedProfileId(id)
-          setActiveFeedProfileName(name)
-          setFeedMode("GLOBAL")
-          setActiveLabel(null)
-        }}
+        setTheme={setTheme}
+        currentUser={user}
+        onFeedProfileChange={async ({ id, name }) => {
+  setActiveFeedProfileId(id)
+  setActiveFeedProfileName(name)
+  setFeedMode("GLOBAL")
+  setActiveLabel(null)
+
+  await loadFeed()   // 🔥 FORCE fresh reload AFTER activation
+}}
+
       />
     ) : (
       <Navigate to="/login" />

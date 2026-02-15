@@ -1,12 +1,17 @@
 import { useState, useRef, useEffect } from "react"
 import { api } from "../api/client"
-import { theme } from "../ui/theme"
+import { getThemeColors } from "../ui/theme"
 
-export default function MemeEditor({ post, onClose, onPosted }) {
+
+export default function MemeEditor({ post, theme, onClose, onPosted }) {
+
   const [topText, setTopText] = useState("")
   const [bottomText, setBottomText] = useState("")
+  const [caption, setCaption] = useState("")
   const [saving, setSaving] = useState(false)
   const [baseImageUrl, setBaseImageUrl] = useState(null)
+  const colors = getThemeColors(theme)
+
   
 
 
@@ -19,6 +24,8 @@ useEffect(() => {
     try {
       // 🔑 Always ask backend for canonical root image
       const res = await api(`/posts/${post.id}/origin`)
+      console.log("Origin response:", res)
+
 
 
       if (!res?.mediaUrl) {
@@ -61,11 +68,30 @@ useEffect(() => {
   })
 }
 
+const wrapText = (ctx, text, maxWidth) => {
+  const words = text.split(" ")
+  const lines = []
+  let currentLine = ""
+
+  for (let i = 0; i < words.length; i++) {
+    const testLine = currentLine + words[i] + " "
+    const metrics = ctx.measureText(testLine)
+    if (metrics.width > maxWidth && i > 0) {
+      lines.push(currentLine.trim())
+      currentLine = words[i] + " "
+    } else {
+      currentLine = testLine
+    }
+  }
+
+  lines.push(currentLine.trim())
+  return lines
+}
+
 const drawIntoCanvas = async (canvas, top, bottom) => {
   const ctx = canvas.getContext("2d")
   const img = await loadImageDirect()
 
-  // Size FIRST
   canvas.width = img.naturalWidth
   canvas.height = img.naturalHeight
 
@@ -75,37 +101,53 @@ const drawIntoCanvas = async (canvas, top, bottom) => {
   ctx.clearRect(0, 0, canvas.width, canvas.height)
   ctx.drawImage(img, 0, 0)
 
-  const fontSize = Math.max(
-    Math.floor(canvas.width / 12),
-    48
-  )
-
-  ctx.font = `bold ${fontSize}px Impact`
   ctx.fillStyle = "white"
   ctx.strokeStyle = "black"
   ctx.lineWidth = 4
   ctx.textAlign = "center"
 
-  if (top) {
-    ctx.textBaseline = "top"
-    ctx.strokeText(top, canvas.width / 2, padding)
-    ctx.fillText(top, canvas.width / 2, padding)
+  const drawTextBlock = (text, position) => {
+    if (!text) return
+
+    let fontSize = Math.floor(canvas.width / 12)
+
+    let lines
+    do {
+      ctx.font = `bold ${fontSize}px Impact`
+      lines = wrapText(ctx, text.toUpperCase(), maxWidth)
+      fontSize -= 2
+    } while (
+      lines.some(line => ctx.measureText(line).width > maxWidth) &&
+      fontSize > 24
+    )
+
+    const lineHeight = fontSize * 1.2
+
+    if (position === "top") {
+      let y = padding
+      ctx.textBaseline = "top"
+      lines.forEach(line => {
+        ctx.strokeText(line, canvas.width / 2, y)
+        ctx.fillText(line, canvas.width / 2, y)
+        y += lineHeight
+      })
+    }
+
+    if (position === "bottom") {
+      let y = canvas.height - padding - (lines.length * lineHeight)
+      ctx.textBaseline = "top"
+      lines.forEach(line => {
+        ctx.strokeText(line, canvas.width / 2, y)
+        ctx.fillText(line, canvas.width / 2, y)
+        y += lineHeight
+      })
+    }
   }
 
-  if (bottom) {
-    ctx.textBaseline = "bottom"
-    ctx.strokeText(
-      bottom,
-      canvas.width / 2,
-      canvas.height - padding
-    )
-    ctx.fillText(
-      bottom,
-      canvas.width / 2,
-      canvas.height - padding
-    )
-  }
+  drawTextBlock(top, "top")
+  drawTextBlock(bottom, "bottom")
 }
+
 
 
   const drawMemeToCanvas = async (top, bottom) => {
@@ -164,7 +206,7 @@ const memeDataUrl =
   method: "POST",
   body: JSON.stringify({
     type: "MEME",
-    caption: "", // heading intentionally empty
+    caption: caption.trim(),
     mediaUrl: memeDataUrl,   // 🔑 FINAL IMAGE WITH TEXT
     scope: post.scope,
     categories,
@@ -187,6 +229,22 @@ const memeDataUrl =
     }
   }
 
+const inputStyle = {
+  
+  width: "100%",
+  padding: "10px 12px",
+  borderRadius: 12,
+  border: `1px solid ${colors.border}`,
+  background: colors.surface,
+  color: colors.text,
+  fontSize: 14,
+  outline: "none",
+  boxSizing: "border-box",
+  marginBottom: 10,
+}
+
+
+
   return (
     <div
       style={{
@@ -196,20 +254,38 @@ const memeDataUrl =
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        padding: 16,
         zIndex: 1000,
       }}
     >
       <div
-        style={{
-          background: theme.colors.card,
-          padding: 20,
-          maxWidth: 620,
-          width: "100%",
-          borderRadius: theme.radius.lg,
-          boxShadow: theme.shadow.md,
-        }}
-      >
-        <h3 style={{ marginBottom: 12 }}>Create meme</h3>
+  style={{
+    background: theme.mode === "dark"
+  ? "#1e293b"
+  : colors.card,
+    padding: 20,
+    maxWidth: 560,
+    width: "100%",
+    maxHeight: "90vh",
+    overflowY: "auto",
+    borderRadius: theme.radius.lg,
+    boxShadow: theme.shadow.md,
+    display: "flex",
+    flexDirection: "column",
+  }}
+>
+        <h3
+  style={{
+    margin: 0,
+    marginBottom: 16,
+    fontSize: 18,
+    fontWeight: 600,
+    color: colors.text,
+  }}
+>
+  Create meme
+</h3>
+
 {baseImageUrl && (
   <div style={{ marginBottom: 8 }}>
     <a
@@ -229,14 +305,32 @@ const memeDataUrl =
 )}
 
         {/* Preview */}
-        <div style={{ position: "relative", marginBottom: 12 }}>
+        <div
+  style={{
+    position: "relative",
+    marginBottom: 16,
+    width: "100%",
+    display: "flex",
+    justifyContent: "center",
+  }}
+>
+
+
           
           {baseImageUrl ? (
   <img
-    src={baseImageUrl}
-    alt=""
-    style={{ maxWidth: "100%", borderRadius: 12 }}
-  />
+  src={baseImageUrl}
+  alt=""
+  style={{
+  maxWidth: "100%",
+  maxHeight: "65vh",
+  objectFit: "contain",
+  borderRadius: 12,
+  display: "block",
+}}
+
+/>
+
 ) : (
   <div style={{ padding: 40, textAlign: "center" }}>
     Loading image…
@@ -245,64 +339,150 @@ const memeDataUrl =
 
 
           <div
-            style={{
-              position: "absolute",
-              top: 10,
-              left: 0,
-              right: 0,
-              textAlign: "center",
-              fontSize: 32,
-              fontWeight: "bold",
-              color: "white",
-              textShadow: "2px 2px 4px black",
-            }}
-          >
-            {topText}
-          </div>
+  style={{
+    position: "absolute",
+    top: 10,
+    left: "50%",
+    transform: "translateX(-50%)",
+    width: "90%",
+    textAlign: "center",
+    fontSize: "clamp(14px, 3vw, 26px)",
+    fontWeight: 800,
+    color: "white",
+    textShadow: "2px 2px 4px black",
+    wordBreak: "break-word",
+    lineHeight: 1.2,
+  }}
+>
+  {topText.toUpperCase()}
+</div>
+
 
           <div
-            style={{
-              position: "absolute",
-              bottom: 10,
-              left: 0,
-              right: 0,
-              textAlign: "center",
-              fontSize: 32,
-              fontWeight: "bold",
-              color: "white",
-              textShadow: "2px 2px 4px black",
-            }}
-          >
-            {bottomText}
-          </div>
+  style={{
+    position: "absolute",
+    bottom: 10,
+    left: "50%",
+    transform: "translateX(-50%)",
+    width: "90%",
+    textAlign: "center",
+    fontSize: "clamp(14px, 3vw, 26px)",
+    fontWeight: 800,
+    color: "white",
+    textShadow: "2px 2px 4px black",
+    wordBreak: "break-word",
+    lineHeight: 1.2,
+  }}
+>
+  {bottomText.toUpperCase()}
+</div>
+
         </div>
 
         <input
           placeholder="Top text"
           value={topText}
           onChange={(e) => setTopText(e.target.value)}
-          style={{ width: "100%", marginBottom: 8 }}
+          style={inputStyle}
         />
 
         <input
-          placeholder="Bottom text"
-          value={bottomText}
-          onChange={(e) => setBottomText(e.target.value)}
-          style={{ width: "100%", marginBottom: 12 }}
-        />
+  placeholder="Bottom text"
+  value={bottomText}
+  onChange={(e) => setBottomText(e.target.value)}
+  style={inputStyle}
+/>
 
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <button onClick={downloadMeme}>Download</button>
 
-          <div>
-            <button onClick={onClose} style={{ marginRight: 8 }}>
-              Cancel
-            </button>
-            <button onClick={postMeme} disabled={saving}>
-              {saving ? "Posting…" : "Post meme"}
-            </button>
-          </div>
-        </div>
+        <textarea
+  placeholder="Add a caption (optional)…"
+  value={caption}
+  onChange={(e) => setCaption(e.target.value)}
+  maxLength={420}
+  style={{
+    ...inputStyle,
+    minHeight: 80,
+    resize: "vertical",
+  }}
+/>
+
+
+
+<div
+  style={{
+    fontSize: 11,
+    textAlign: "right",
+    marginBottom: 16,
+    color: colors.textMuted,
+  }}
+>
+  {caption.length}/420
+</div>
+
+
+
+        <div
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 12,
+  }}
+>
+  <button
+    onClick={downloadMeme}
+    style={{
+      fontSize: 13,
+      padding: "8px 14px",
+      borderRadius: 999,
+      border: `1px solid ${colors.border}`,
+      background: colors.surfaceMuted,
+      color: colors.text,
+      cursor: "pointer",
+    }}
+  >
+    Download
+  </button>
+
+  <div style={{ display: "flex", gap: 10 }}>
+    <button
+      onClick={onClose}
+      style={{
+        fontSize: 13,
+        padding: "8px 14px",
+        borderRadius: 999,
+        border: `1px solid ${colors.border}`,
+        background: "transparent",
+        color: colors.textMuted,
+        cursor: "pointer",
+      }}
+    >
+      Cancel
+    </button>
+
+    <button
+      onClick={postMeme}
+      disabled={saving}
+      style={{
+        fontSize: 13,
+        padding: "8px 18px",
+        borderRadius: 999,
+        border: "none",
+        background: colors.primary,
+        color: "#fff",
+        fontWeight: 600,
+        boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+        cursor: saving ? "not-allowed" : "pointer",
+        opacity: saving ? 0.7 : 1,
+      }}
+    >
+      {saving ? "Posting…" : "Post meme"}
+    </button>
+  </div>
+</div>
+
+
+
 
       
       </div>

@@ -41,11 +41,15 @@ const outcomeExplanation = {
 const ACTIONS = ["NO_ACTION", "LIMITED", "REMOVED"]
 
 export default function ModerationDashboard() {
-  const [reports, setReports] = useState([])
+  const [activeReports, setActiveReports] = useState([])
+const [resolvedReports, setResolvedReports] = useState([])
+
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [actingOn, setActingOn] = useState(null)
   const [me, setMe] = useState(null)
+  const [view, setView] = useState("ACTIVE")
+
 
   const colors = getThemeColors(theme)
   const textStyle = {
@@ -80,6 +84,7 @@ const applyAction = async (report, outcome) => {
   try {
     setActingOn(report.id)
 
+    // 1️⃣ Execute moderation
     await api("/moderation/actions", {
       method: "POST",
       body: JSON.stringify({
@@ -89,15 +94,22 @@ const applyAction = async (report, outcome) => {
       }),
     })
 
-    // 🔁 Reload reports (source of truth)
+    // 2️⃣ Reload reports
     const fresh = await api("/moderation/reports")
-    setReports(Array.isArray(fresh) ? fresh : [])
+
+    if (fresh && typeof fresh === "object") {
+      setActiveReports(Array.isArray(fresh.active) ? fresh.active : [])
+      setResolvedReports(Array.isArray(fresh.resolved) ? fresh.resolved : [])
+    }
+
   } catch (err) {
+    console.error("Moderation action failed:", err)
     alert(err?.error || "Failed to apply moderation action")
   } finally {
     setActingOn(null)
   }
 }
+
 
 
 
@@ -112,11 +124,12 @@ const applyAction = async (report, outcome) => {
         const meData = await api("/users/me")
 if (mounted) setMe(meData)
         const data = await api("/moderation/reports")
-        console.log("MODERATION REPORTS RESPONSE:", data)
+        
 
         if (!mounted) return
 
-        setReports(Array.isArray(data) ? data : [])
+        setActiveReports(Array.isArray(data.active) ? data.active : [])
+setResolvedReports(Array.isArray(data.resolved) ? data.resolved : [])
       } catch (err) {
         console.error("Failed to load moderation reports:", err)
         if (!mounted) return
@@ -212,114 +225,197 @@ if (mounted) setMe(meData)
   </div>
 </div>
 
+{/* View Switcher */}
+<div
+  style={{
+    display: "flex",
+    gap: 12,
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+  }}
+>
+  <button
+    onClick={() => setView("ACTIVE")}
+    style={{
+      padding: "6px 14px",
+      borderRadius: theme.radius.pill,
+      border: `1px solid ${colors.border}`,
+      background:
+        view === "ACTIVE" ? colors.primary : colors.surface,
+      color:
+        view === "ACTIVE" ? "#fff" : colors.text,
+      cursor: "pointer",
+    }}
+  >
+    Active ({activeReports.length})
+  </button>
 
-      {reports.length === 0 && (
-        <p style={{ opacity: 0.7 }}>
-  No active reports. The system is quiet — that’s good.
-</p>
-      )}
+  <button
+    onClick={() => setView("RESOLVED")}
+    style={{
+      padding: "6px 14px",
+      borderRadius: theme.radius.pill,
+      border: `1px solid ${colors.border}`,
+      background:
+        view === "RESOLVED" ? colors.primary : colors.surface,
+      color:
+        view === "RESOLVED" ? "#fff" : colors.text,
+      cursor: "pointer",
+    }}
+  >
+    Resolved ({resolvedReports.length})
+  </button>
+</div>
 
-      {reports.map((r) => {
-        const severity = getSeverity(r)
-        const priorityLabel = priorityLabels[severity]
-        const alreadyRemoved = r.post?.isRemoved
 
+{view === "ACTIVE" && (
+  <>
+    {activeReports.length === 0 && (
+      <p style={{ opacity: 0.7 }}>
+        No active reports. The system is quiet — that’s good.
+      </p>
+    )}
 
-        return (
+    {activeReports.map((r) => {
+      const severity = getSeverity(r)
+      const priorityLabel = priorityLabels[severity]
+      const alreadyRemoved = r.post?.isRemoved
+
+      return (
+        <div
+          key={r.id}
+          style={{
+            background: colors.surface,
+            border: `1px solid ${colors.border}`,
+            borderRadius: theme.radius.md,
+            padding: theme.spacing.md,
+            marginBottom: theme.spacing.md,
+            boxShadow: theme.shadow.sm,
+          }}
+        >
           <div
-  key={r.id}
-  style={{
-    background: colors.surface,
-    border: `1px solid ${colors.border}`,
-    borderRadius: theme.radius.md,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.md,
-    boxShadow: theme.shadow.sm,
-  }}
->
-
-  
-            {/* Severity badge */}
-            <div
-  style={{
-    display: "inline-block",
-    marginBottom: theme.spacing.sm,
-    padding: "4px 10px",
-    borderRadius: theme.radius.pill,
-    fontSize: theme.typography.small.size,
-    fontWeight: 500,
-    background: colors.surfaceMuted,
-    color: colors.textMuted,
-    border: `1px solid ${colors.border}`,
-  }}
->
-  {priorityLabel}
-</div>
-
-
-            <div style={{ ...textStyle, marginBottom: theme.spacing.xs }}>
-              <strong>Reason:</strong> {r.reason}
-            </div>
-
-            <div style={{ ...textStyle, marginBottom: theme.spacing.xs }}>
-              <strong>Post:</strong>{" "}
-              {r.post?.caption || <em>(no caption)</em>}
-            </div>
-
-            <div style={{ ...textStyle, marginBottom: theme.spacing.xs }}>
-              <strong>Reporter:</strong> @{r.reporter?.username}
-            </div>
-            <div
-  style={{
-    ...mutedTextStyle,
-    marginTop: theme.spacing.sm,
-  }}
->
-  <strong>Reporter trust:</strong>{" "}
-  {(r.reporter.reportAccuracy * 100).toFixed(0)}%
-  {" · "}
-  {r.reporter.reportsConfirmed}✔️ / {r.reporter.reportsRejected}❌
-  {" · "}
-  {r.reporter.reportsSubmitted} total
-</div>
-{r.reporter.reportCooldownUntil &&
-  new Date(r.reporter.reportCooldownUntil) > new Date() && (
-    <div
-      style={{
-        marginTop: 4,
-        fontSize: 12,
-        color: "#92400e",
-      }}
-    >
-      ⚠️ Reporter on cooldown until{" "}
-      {new Date(
-        r.reporter.reportCooldownUntil
-      ).toLocaleString()}
-    </div>
-  )}
-
-            <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-  {ACTIONS.map((action) => (
-    <button
-  key={action}
-  title={outcomeExplanation[action]}
-  disabled={alreadyRemoved || actingOn === r.id}
-  onClick={() => applyAction(r, action)}
-  style={
-    action === "REMOVED"
-      ? dangerButton(theme)
-      : secondaryButton(theme)
-  }
->
-  {action === "LIMITED" ? "Restrict Reach" :
-   action === "REMOVED" ? "Remove Content" :
-   "No Action"}
-</button>
-  ))}
-</div>
+            style={{
+              display: "inline-block",
+              marginBottom: theme.spacing.sm,
+              padding: "4px 10px",
+              borderRadius: theme.radius.pill,
+              fontSize: theme.typography.small.size,
+              fontWeight: 500,
+              background: colors.surfaceMuted,
+              color: colors.textMuted,
+              border: `1px solid ${colors.border}`,
+            }}
+          >
+            {priorityLabel}
           </div>
-        )
-      })}
+
+          <div style={{ ...textStyle, marginBottom: theme.spacing.xs }}>
+            <strong>Reason:</strong> {r.reason}
+          </div>
+
+          <div style={{ ...textStyle, marginBottom: theme.spacing.xs }}>
+            <strong>Post:</strong>{" "}
+            {r.post?.caption || <em>(no caption)</em>}
+          </div>
+
+          <div style={{ ...textStyle, marginBottom: theme.spacing.xs }}>
+            <strong>Reporter:</strong> @{r.reporter?.username}
+          </div>
+
+          <div style={{ ...mutedTextStyle, marginTop: theme.spacing.sm }}>
+            <strong>Reporter trust:</strong>{" "}
+            {(r.reporter.reportAccuracy * 100).toFixed(0)}%
+            {" · "}
+            {r.reporter.reportsConfirmed}✔️ / {r.reporter.reportsRejected}❌
+            {" · "}
+            {r.reporter.reportsSubmitted} total
+          </div>
+
+          {r.reporter.reportCooldownUntil &&
+            new Date(r.reporter.reportCooldownUntil) > new Date() && (
+              <div
+                style={{
+                  marginTop: 4,
+                  fontSize: 12,
+                  color: "#92400e",
+                }}
+              >
+                ⚠️ Reporter on cooldown until{" "}
+                {new Date(
+                  r.reporter.reportCooldownUntil
+                ).toLocaleString()}
+              </div>
+            )}
+
+          <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
+            {ACTIONS.map((action) => (
+              <button
+                key={action}
+                title={outcomeExplanation[action]}
+                disabled={alreadyRemoved || actingOn === r.id}
+                onClick={() => applyAction(r, action)}
+                style={
+                  action === "REMOVED"
+                    ? dangerButton(theme)
+                    : secondaryButton(theme)
+                }
+              >
+                {action === "LIMITED"
+                  ? "Restrict Reach"
+                  : action === "REMOVED"
+                  ? "Remove Content"
+                  : "No Action"}
+              </button>
+            ))}
+          </div>
+        </div>
+      )
+    })}
+  </>
+)}
+
+
+      {view === "RESOLVED" && (
+  <>
+    {resolvedReports.length === 0 && (
+      <p style={{ opacity: 0.7 }}>
+        No resolved reports yet.
+      </p>
+    )}
+
+    {resolvedReports.map((r) => (
+      <div
+        key={r.id}
+        style={{
+          background: colors.surface,
+          border: `1px solid ${colors.border}`,
+          borderRadius: theme.radius.md,
+          padding: theme.spacing.md,
+          marginBottom: theme.spacing.md,
+          boxShadow: theme.shadow.sm,
+        }}
+      >
+        <div style={{ ...textStyle, marginBottom: 6 }}>
+          <strong>Post:</strong>{" "}
+          {r.post?.caption || "(no caption)"}
+        </div>
+
+        <div style={{ ...textStyle, marginBottom: 6 }}>
+          <strong>Final Outcome:</strong>{" "}
+          {r.post?.moderationActions?.[0]?.outcome}
+        </div>
+
+        <div style={mutedTextStyle}>
+          Reporter: @{r.reporter?.username}
+        </div>
+      </div>
+    ))}
+  </>
+)}
+
+
     </div>
+
+    
   )
 }

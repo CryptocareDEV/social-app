@@ -25,13 +25,7 @@ export const requireAuth = async (req, res, next) => {
       return res.status(401).json({ error: "User not found" })
     }
 
-    // 2️⃣ Heal report accuracy (trust decay)
-const accuracyDecayedUser =
-  await applyReportAccuracyDecayIfEligible(user)
-
-// 3️⃣ Heal strikes
-const fullyDecayedUser =
-  await applyStrikeDecayIfEligible(accuracyDecayedUser)
+    
 
     /* ================================
        🔐 Permanent ban (hard stop)
@@ -46,10 +40,19 @@ const fullyDecayedUser =
        🧠 Superuser detection
     ================================= */
     const superuser = await prisma.superuser.findUnique({
-      where: { userId: user.id },
-    })
+  where: { userId: user.id },
+})
 
-    const isSuperuser = !!superuser
+const isSuperuser = !!superuser
+const superuserRole = superuser?.role || null
+
+/* ================================
+   👑 Root authority detection
+================================ */
+const isRoot =
+  user.email === process.env.PLATFORM_OWNER_EMAIL
+
+
 
     /* ================================
        🧮 Derive minor status
@@ -67,15 +70,12 @@ const fullyDecayedUser =
       isMinor = age < 18
     }
 
-    /* ================================
-       ⏳ Lazy strike decay
-    ================================= */
-    user = await applyStrikeDecayIfEligible(user)
+/* ================================
+   🧠 Apply decay once (ordered)
+================================ */
+user = await applyStrikeDecayIfEligible(user)
+user = await applyReportAccuracyDecayIfEligible(user)
 
-    /* ================================
-       📊 Lazy report accuracy decay
-    ================================= */
-    user = await applyReportAccuracyDecayIfEligible(user)
 
     /* ================================
        ✅ Attach safe user object
@@ -87,8 +87,11 @@ const fullyDecayedUser =
       email: user.email,
 
       // safety flags
-      isMinor,
+      isRoot,
       isSuperuser,
+      superuserRole,
+      isMinor,
+
 
       // enforcement state (read-only)
       cooldownUntil: user.cooldownUntil,

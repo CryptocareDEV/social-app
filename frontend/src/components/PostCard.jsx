@@ -36,6 +36,8 @@ export default function PostCard({
   isLiking,
   onLabelClick,
   theme,
+  reportCooldownUntil,
+  refreshUserState,
 }) {
   if (post.isRemoved) return null
 
@@ -47,6 +49,7 @@ const [comments, setComments] = useState([])
 const [commentsLoading, setCommentsLoading] = useState(false)
 const [commentsError, setCommentsError] = useState(null)
 const [commentBody, setCommentBody] = useState("")
+const [collapsed, setCollapsed] = useState(false)
 const [commentSubmitting, setCommentSubmitting] = useState(false)
 const [commentSubmitError, setCommentSubmitError] = useState(null)
 const [commentsCursor, setCommentsCursor] = useState(null)
@@ -56,10 +59,6 @@ const commentInputRef = useRef(null)
 const commentsEndRef = useRef(null)
 const [optimisticCountDelta, setOptimisticCountDelta] = useState(0)
 
-
-
-
-  const [reportCooldownUntil, setReportCooldownUntil] = useState(null)
   const [hasReported, setHasReported] = useState(false)
 
 
@@ -88,24 +87,6 @@ const [optimisticCountDelta, setOptimisticCountDelta] = useState(0)
 
   const displayCommentCount = baseCommentCount + optimisticCountDelta
 
-  
-
-  /* ================================
-     🔎 Load user cooldown (once)
-  ================================= */
-  useEffect(() => {
-    let mounted = true
-    const loadMe = async () => {
-      try {
-        const me = await api("/users/me")
-        if (mounted && me?.reportCooldownUntil) {
-          setReportCooldownUntil(me.reportCooldownUntil)
-        }
-      } catch {}
-    }
-    loadMe()
-    return () => { mounted = false }
-  }, [])
 
 
 
@@ -164,18 +145,30 @@ const [optimisticCountDelta, setOptimisticCountDelta] = useState(0)
     reportCooldownUntil && new Date(reportCooldownUntil) > new Date()
 
   const handleReport = async () => {
-    if (isOnReportCooldown || hasReported) return
-    try {
-      await api("/reports", {
-        method: "POST",
-        body: JSON.stringify({ postId: post.id, reason: "OTHER" }),
-      })
-      setHasReported(true)
-      alert("Report submitted. Thank you for helping keep the community safe.")
-    } catch (err) {
-      alert(err?.error || "Failed to report post")
+  if (isOnReportCooldown || hasReported) return
+
+  try {
+    await api("/reports", {
+      method: "POST",
+      body: JSON.stringify({ postId: post.id, reason: "OTHER" }),
+    })
+
+    setHasReported(true)
+
+    // 🔁 Always refresh user state after report
+    await refreshUserState?.()
+
+    alert("Report submitted. Thank you for helping keep the community safe.")
+  } catch (err) {
+    // If backend sets cooldown immediately
+    if (err?.reportCooldownUntil) {
+      await refreshUserState?.()
     }
+
+    alert(err?.error || "Failed to report post")
   }
+}
+
   
   const handleSubmitComment = async () => {
   if (!commentBody.trim() || commentSubmitting) return
@@ -293,7 +286,20 @@ const [optimisticCountDelta, setOptimisticCountDelta] = useState(0)
 </span>
   </div>
 
-<div style={{ marginLeft: "auto" }}>
+<div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+<button
+  onClick={() => setCollapsed((c) => !c)}
+  style={{
+    ...actionButtonStyle,
+    fontSize: 12,
+    padding: "4px 8px",
+    opacity: 0.6,
+  }}
+>
+  {collapsed ? "▸ Expand" : "▾ Collapse"}
+</button>
+
+
   <span
   title={
   hasReported
@@ -339,7 +345,7 @@ onMouseLeave={(e) => {
 </header>
 
       {/* CAPTION */}
-      {post.caption && (
+      {!collapsed && post.caption && (
         <p
           style={{
   color: colors.text,
@@ -354,7 +360,7 @@ onMouseLeave={(e) => {
       )}
 
 {/* IMAGE / MEME */}
-{imageSrc && (
+{!collapsed && imageSrc && (
   <div
     style={{
       marginTop: theme.spacing.md,

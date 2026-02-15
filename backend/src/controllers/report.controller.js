@@ -1,4 +1,6 @@
 import prisma from "../lib/prisma.js"
+import sanitizeHtml from "sanitize-html"
+
 
 /**
  * POST /api/v1/reports
@@ -59,6 +61,17 @@ export const createReport = async (req, res) => {
        📥 Input validation
     ================================= */
     const { postId, reason, context } = req.body
+    /* ================================
+   🧱 Report context length limit
+================================ */
+const MAX_CONTEXT_LENGTH = 500
+
+if (context && context.length > MAX_CONTEXT_LENGTH) {
+  return res.status(400).json({
+    error: "Report explanation too long",
+  })
+}
+
 
     if (!postId || !reason) {
       return res.status(400).json({
@@ -146,7 +159,12 @@ export const createReport = async (req, res) => {
         reporterId: userId,
         postId,
         reason,
-        context: context?.trim() || null,
+        context: context
+  ? sanitizeHtml(context.trim(), {
+      allowedTags: [],
+      allowedAttributes: {},
+    })
+  : null,
       },
     })
 

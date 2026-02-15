@@ -1,4 +1,5 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
+
 import { api } from "../api/client"
 import {
   primaryButton,
@@ -21,6 +22,17 @@ export default function CreateCommunityModal({
   const [labelInput, setLabelInput] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [rating, setRating] = useState("SAFE")
+  const [visibility, setVisibility] = useState("PUBLIC")
+  const [isMinor, setIsMinor] = useState(false)
+useEffect(() => {
+  api("/users/me")
+    .then((me) => {
+      setIsMinor(me?.isMinor === true)
+    })
+    .catch(() => {})
+}, [])
+
 
   const inputStyle = {
     width: "100%",
@@ -52,6 +64,8 @@ export default function CreateCommunityModal({
           intention: intention.trim(),
           scope,
           categories: labels,
+          rating: isMinor ? "SAFE" : rating,
+  visibility,
         }),
       })
 
@@ -79,19 +93,19 @@ export default function CreateCommunityModal({
         alignItems: "center",
         justifyContent: "center",
         zIndex: 1000,
-        padding: theme.spacing.lg,
+        padding: 24,
       }}
     >
       <div
         style={{
           background: c.surface,
           color: c.text,
-          width: 520,
+          width: 460,
           maxWidth: "100%",
           borderRadius: theme.radius.lg,
           border: `1px solid ${c.border}`,
           boxShadow: theme.shadow.md,
-          padding: theme.spacing.xl,
+          padding: 28,
           display: "flex",
           flexDirection: "column",
           gap: theme.spacing.lg,
@@ -225,6 +239,118 @@ export default function CreateCommunityModal({
             <option value="LOCAL">📍 Local</option>
           </select>
         </div>
+
+        {/* Rating */}
+<div>
+  <div
+    style={{
+      fontSize: theme.typography.small.size,
+      color: c.textMuted,
+      marginBottom: 6,
+    }}
+  >
+    Community rating
+  </div>
+
+  <div style={{ display: "flex", gap: 8 }}>
+    <button
+      type="button"
+      onClick={() => setRating("SAFE")}
+      style={{
+        padding: "6px 14px",
+        borderRadius: theme.radius.pill,
+        fontSize: 13,
+        border:
+          rating === "SAFE"
+            ? `1px solid ${c.primary}`
+            : `1px solid ${c.border}`,
+        background:
+          rating === "SAFE"
+            ? c.primarySoft
+            : c.surface,
+        color:
+          rating === "SAFE"
+            ? c.primary
+            : c.textMuted,
+        cursor: "pointer",
+      }}
+    >
+      SAFE
+    </button>
+
+    {!isMinor && (
+      <button
+        type="button"
+        onClick={() => setRating("NSFW")}
+        style={{
+          padding: "6px 14px",
+          borderRadius: theme.radius.pill,
+          fontSize: 13,
+          border:
+            rating === "NSFW"
+              ? `1px solid ${c.primary}`
+              : `1px solid ${c.border}`,
+          background:
+            rating === "NSFW"
+              ? c.primarySoft
+              : c.surface,
+          color:
+            rating === "NSFW"
+              ? c.primary
+              : c.textMuted,
+          cursor: "pointer",
+        }}
+      >
+        NSFW
+      </button>
+    )}
+  </div>
+</div>
+
+
+{/* Visibility */}
+<div>
+  <div
+    style={{
+      fontSize: theme.typography.small.size,
+      color: c.textMuted,
+      marginBottom: 6,
+    }}
+  >
+    Privacy
+  </div>
+
+  <div style={{ display: "flex", gap: 8 }}>
+    {["PUBLIC", "PRIVATE"].map((v) => (
+      <button
+        key={v}
+        type="button"
+        onClick={() => setVisibility(v)}
+        style={{
+          padding: "6px 14px",
+          borderRadius: theme.radius.pill,
+          fontSize: 13,
+          border:
+            visibility === v
+              ? `1px solid ${c.primary}`
+              : `1px solid ${c.border}`,
+          background:
+            visibility === v
+              ? c.primarySoft
+              : c.surface,
+          color:
+            visibility === v
+              ? c.primary
+              : c.textMuted,
+          cursor: "pointer",
+        }}
+      >
+        {v}
+      </button>
+    ))}
+  </div>
+</div>
+
 
         {/* Buttons */}
         <div
