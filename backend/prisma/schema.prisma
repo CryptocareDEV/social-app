@@ -93,25 +93,32 @@ model Post {
 }
 
 model Comment {
-  id            String            @id @default(uuid())
-  postId        String
-  userId        String
-  body          String?
-  mediaUrl      String?
-  mediaType     CommentMediaType?
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  isRemoved     Boolean           @default(false)
-  removedAt     DateTime?
-  removedBy     String?
-  removedReason String?
-  post          Post              @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String            @id @default(uuid())
+  postId          String
+  userId          String
+  parentCommentId String?
+  body            String?
+  mediaUrl        String?
+  mediaType       CommentMediaType?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  isRemoved       Boolean           @default(false)
+  removedAt       DateTime?
+  removedBy       String?
+  removedReason   String?
+
+  post            Post              @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  parent          Comment?          @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  replies         Comment[]         @relation("CommentReplies")
 
   @@index([postId])
   @@index([userId])
   @@index([createdAt])
+  @@index([parentCommentId])
 }
+
 
 model Like {
   id        String   @id @default(uuid())

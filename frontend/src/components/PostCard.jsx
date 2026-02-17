@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react"
 import { Link } from "react-router-dom"
 import { getThemeColors } from "../ui/theme"
 import { api } from "../api/client"
-import { fetchComments, createComment } from "../api/comments"
+import { fetchComments, createComment, fetchReplies } from "../api/comments"
+
 
 function formatTimeAgo(dateString) {
   const date = new Date(dateString)
@@ -28,6 +29,176 @@ function formatTimeAgo(dateString) {
   })
 }
 
+function CommentNode({
+  comment,
+  depth,
+  repliesMap,
+  setRepliesMap, 
+  activeReplyBox,
+  setActiveReplyBox,
+  replyBodies,
+  setReplyBodies,
+  handleReplySubmit,
+  loadReplies,
+  theme,
+  colors,
+})
+ {
+
+  const maxDepth = 3
+  const canReply = depth < maxDepth
+
+  const replies = repliesMap[comment.id] || []
+
+  return (
+    <div
+  style={{
+    marginTop: theme.spacing.sm,
+    paddingTop: theme.spacing.sm,
+    borderTop: `1px solid ${colors.border}`,
+    marginLeft: depth * 16,
+    maxWidth: "100%",
+    boxSizing: "border-box",
+  }}
+>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          fontSize: 12,
+          marginBottom: 2,
+        }}
+      >
+        <span style={{ fontWeight: 600, color: colors.text }}>
+          @{comment.user.username}
+        </span>
+
+        <span style={{ color: colors.textMuted, fontSize: 11 }}>
+          · {formatTimeAgo(comment.createdAt)}
+        </span>
+      </div>
+
+      <div
+        style={{
+          fontSize: 14,
+          lineHeight: 1.5,
+          color: colors.text,
+          marginTop: 2,
+        }}
+      >
+        {comment.body}
+      </div>
+
+      {comment._count?.replies > 0 && (
+  <button
+    type="button"
+    onClick={() => {
+      if (repliesMap[comment.id]) {
+        // Hide replies
+        setRepliesMap((prev) => {
+          const copy = { ...prev }
+          delete copy[comment.id]
+          return copy
+        })
+      } else {
+        // Load replies
+        loadReplies(comment.id)
+      }
+    }}
+    style={{
+      marginTop: 4,
+      fontSize: 12,
+      background: "none",
+      border: "none",
+      color: colors.textMuted,
+      cursor: "pointer",
+    }}
+  >
+    {repliesMap[comment.id]
+      ? "Hide replies"
+      : `View replies (${comment._count.replies})`}
+  </button>
+)}
+
+
+{canReply && (
+  <button
+    type="button"
+    onClick={() =>
+      setActiveReplyBox(
+        activeReplyBox === comment.id ? null : comment.id
+      )
+    }
+    style={{
+      marginTop: 4,
+      marginLeft: 8,
+      fontSize: 12,
+      background: "none",
+      border: "none",
+      color: colors.textMuted,
+      cursor: "pointer",
+    }}
+  >
+    Reply
+  </button>
+)}
+
+
+      {activeReplyBox === comment.id && (
+        <div style={{ marginTop: 6 }}>
+          <input
+  type="text"
+  value={replyBodies[comment.id] || ""}
+  onClick={(e) => e.stopPropagation()}
+  onChange={(e) =>
+    setReplyBodies((prev) => ({
+      ...prev,
+      [comment.id]: e.target.value,
+    }))
+  }
+  onKeyDown={(e) => {
+    e.stopPropagation()
+    if (e.key === "Enter") {
+      e.preventDefault()
+      handleReplySubmit(comment.id)
+    }
+  }}
+  placeholder="Write a reply…"
+  style={{
+  width: "100%",
+  padding: "6px 10px",
+  borderRadius: theme.radius.md,
+  border: `1px solid ${colors.border}`,
+  fontSize: 13,
+  boxSizing: "border-box",
+  maxWidth: "100%",
+}}
+/>
+
+        </div>
+      )}
+
+      {replies.map((reply) => (
+        <CommentNode
+  key={reply.id}
+  comment={reply}
+  depth={depth + 1}
+  repliesMap={repliesMap}
+  setRepliesMap={setRepliesMap}  
+  activeReplyBox={activeReplyBox}
+  setActiveReplyBox={setActiveReplyBox}
+  replyBodies={replyBodies}
+  setReplyBodies={setReplyBodies}
+  handleReplySubmit={handleReplySubmit}
+  loadReplies={loadReplies}
+  theme={theme}
+  colors={colors}
+/>
+      ))}
+    </div>
+  )
+}
 
 export default function PostCard({
   post,
@@ -39,11 +210,19 @@ export default function PostCard({
   reportCooldownUntil,
   refreshUserState,
 }) {
+  
   if (post.isRemoved) return null
 
   const [showReason, setShowReason] = useState(false)
   const [showComments, setShowComments] = useState(false)
 const [comments, setComments] = useState([])
+const [activeReplyBox, setActiveReplyBox] = useState(null)
+const [replyBodies, setReplyBodies] = useState({})
+const [replySubmitting, setReplySubmitting] = useState({})
+const [repliesMap, setRepliesMap] = useState({})
+const [replyCursors, setReplyCursors] = useState({})
+const [hasMoreReplies, setHasMoreReplies] = useState({})
+
 
 
 const [commentsLoading, setCommentsLoading] = useState(false)
@@ -233,7 +412,55 @@ const [optimisticCountDelta, setOptimisticCountDelta] = useState(0)
     transition: "background 0.15s ease, color 0.15s ease",
   }
 
+  const loadReplies = async (commentId) => {
+  if (repliesMap[commentId]) return
+
+  const res = await fetchReplies({ parentCommentId: commentId })
+
+  setRepliesMap((prev) => ({
+    ...prev,
+    [commentId]: res.items || [],
+  }))
+
+  setReplyCursors((prev) => ({
+    ...prev,
+    [commentId]: res.nextCursor,
+  }))
+
+  setHasMoreReplies((prev) => ({
+    ...prev,
+    [commentId]: !!res.nextCursor,
+  }))
+}
+
+const handleReplySubmit = async (parentId) => {
+  const body = replyBodies[parentId]?.trim()
+  if (!body || replySubmitting[parentId]) return
+
+  setReplySubmitting((prev) => ({ ...prev, [parentId]: true }))
+
+  try {
+    const newReply = await createComment({
+      postId: post.id,
+      body,
+      parentCommentId: parentId,
+    })
+
+    setRepliesMap((prev) => ({
+      ...prev,
+      [parentId]: [...(prev[parentId] || []), newReply],
+    }))
+
+    setReplyBodies((prev) => ({ ...prev, [parentId]: "" }))
+  } catch {
+    alert("Failed to reply")
+  } finally {
+    setReplySubmitting((prev) => ({ ...prev, [parentId]: false }))
+  }
+}
+
   return (
+
     <article
       style={{
         background: colors.surface,
@@ -649,60 +876,28 @@ onMouseLeave={(e) => {
         No responses yet.
       </div>
     )}
-
     {comments.map((comment) => (
-      <div
-        key={comment.id}
-        style={{
-          marginTop: theme.spacing.sm,
-          paddingTop: theme.spacing.sm,
-          borderTop: `1px solid ${colors.border}`,
-        }}
-      >
-        <div
-  style={{
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    fontSize: 12,
-    marginBottom: 2,
-  }}
->
-  <span
-    style={{
-      fontWeight: 600,
-      color: colors.text,
-    }}
-  >
-    @{comment.user.username}
-  </span>
+  <CommentNode
+  key={comment.id}
+  comment={comment}
+  depth={0}
+  repliesMap={repliesMap}
+  setRepliesMap={setRepliesMap} 
+  activeReplyBox={activeReplyBox}
+  setActiveReplyBox={setActiveReplyBox}
+  replyBodies={replyBodies}
+  setReplyBodies={setReplyBodies}
+  handleReplySubmit={handleReplySubmit}
+  loadReplies={loadReplies}
+  theme={theme}
+  colors={colors}
+/>
 
-  <span
-    style={{
-      color: colors.textMuted,
-      fontSize: 11,
-    }}
-  >
-    · {formatTimeAgo(comment.createdAt)}
-  </span>
-</div>
+))}
 
 
-        <div
-          style={{
-            fontSize: 14,
-            lineHeight: 1.5,
-            color: colors.text,
-            marginTop: 2,
-          }}
-        >
-          {comment.body}
-        </div>
-      </div>
-      
+    
 
-      
-    ))}
     
 
 
@@ -735,17 +930,18 @@ onMouseLeave={(e) => {
   <input
     ref={commentInputRef}
     value={commentBody}
+    onClick={(e) => e.stopPropagation()}
     onChange={(e) => {
-  setCommentBody(e.target.value)
-  if (commentSubmitError) setCommentSubmitError(null)
-}}
+      setCommentBody(e.target.value)
+      if (commentSubmitError) setCommentSubmitError(null)
+    }}
     onKeyDown={(e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSubmitComment()
-    }
-  }}
-  
+      e.stopPropagation()
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault()
+        handleSubmitComment()
+      }
+    }}
     placeholder="Add a thoughtful response…"
     style={{
       flex: 1,
@@ -775,8 +971,8 @@ onMouseLeave={(e) => {
   >
     {commentSubmitting ? "Posting…" : "Post"}
   </button>
-  
 </div>
+
 
 {commentSubmitError && (
   <div

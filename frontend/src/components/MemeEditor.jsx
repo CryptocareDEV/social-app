@@ -177,57 +177,71 @@ exportCanvas.toBlob((blob) => {
 })
   }
 
-  // 🧬 POST MEME (unchanged logic)
   const postMeme = async () => {
-    if (saving) return
-    setSaving(true)
+  if (saving) return
+  setSaving(true)
 
-    try {
-      const exportCanvas = document.createElement("canvas")
+  try {
+    const exportCanvas = document.createElement("canvas")
 
-await drawIntoCanvas(
-  exportCanvas,
-  topText,
-  bottomText
-)
+    await drawIntoCanvas(
+      exportCanvas,
+      topText,
+      bottomText
+    )
 
-const memeDataUrl =
-  exportCanvas.toDataURL("image/png")
+    // ✅ Convert canvas to Blob (NOT base64)
+    const blob = await new Promise((resolve) =>
+      exportCanvas.toBlob(resolve, "image/jpeg", 0.8)
+    )
 
-
-      const categories =
-        post.categories?.map((c) => c.category.key) || []
-
-      if (categories.length === 0) {
-        throw new Error("Cannot create meme without categories")
-      }
-
-      await api("/posts", {
-  method: "POST",
-  body: JSON.stringify({
-    type: "MEME",
-    caption: caption.trim(),
-    mediaUrl: memeDataUrl,   // 🔑 FINAL IMAGE WITH TEXT
-    scope: post.scope,
-    categories,
-    originPostId:
-      post.type === "MEME"
-        ? post.originPostId ?? post.id
-        : post.id,
-  }),
-})
-
-
-
-
-      onPosted()
-    } catch (err) {
-      console.error("POST MEME FAILED", err)
-      alert("Failed to create meme")
-    } finally {
-      setSaving(false)
+    if (!blob) {
+      throw new Error("Failed to generate image")
     }
+
+    // ✅ Upload image first
+    const formData = new FormData()
+    formData.append("file", blob, "meme.jpg")
+
+    const uploadRes = await api("/media/upload", {
+      method: "POST",
+      body: formData,
+    })
+
+    const imageUrl = uploadRes.url
+
+    const categories =
+      post.categories?.map((c) => c.category.key) || []
+
+    if (categories.length === 0) {
+      throw new Error("Cannot create meme without categories")
+    }
+
+    // ✅ Now create post with normal URL
+    await api("/posts", {
+      method: "POST",
+      body: JSON.stringify({
+        type: "MEME",
+        caption: caption.trim(),
+        mediaUrl: imageUrl,
+        scope: post.scope,
+        categories,
+        originPostId:
+          post.type === "MEME"
+            ? post.originPostId ?? post.id
+            : post.id,
+      }),
+    })
+
+    onPosted()
+  } catch (err) {
+    console.error("POST MEME FAILED", err)
+    alert("Failed to create meme")
+  } finally {
+    setSaving(false)
   }
+}
+
 
 const inputStyle = {
   

@@ -1,7 +1,7 @@
 import { api } from "./client"
 
 /**
- * Fetch comments for a post
+ * Fetch top-level comments for a post
  */
 export function fetchComments({ postId, cursor }) {
   const params = new URLSearchParams({ postId })
@@ -11,9 +11,25 @@ export function fetchComments({ postId, cursor }) {
 }
 
 /**
- * Create a new comment
+ * Fetch replies for a comment
  */
-export function createComment({ postId, body, mediaUrl, mediaType }) {
+export function fetchReplies({ parentCommentId, cursor }) {
+  const params = new URLSearchParams({ parentCommentId })
+  if (cursor) params.set("cursor", cursor)
+
+  return api(`/comments/replies?${params.toString()}`)
+}
+
+/**
+ * Create a new comment or reply
+ */
+export function createComment({
+  postId,
+  body,
+  mediaUrl,
+  mediaType,
+  parentCommentId = null,
+}) {
   return api("/comments", {
     method: "POST",
     body: JSON.stringify({
@@ -21,7 +37,7 @@ export function createComment({ postId, body, mediaUrl, mediaType }) {
       body,
       mediaUrl,
       mediaType,
+      parentCommentId,
     }),
   })
 }
-

@@ -5,13 +5,21 @@ const API_URL = "http://localhost:4000/api/v1"
 export const api = async (path, options = {}) => {
   const token = localStorage.getItem("token")
 
+  const isFormData = options.body instanceof FormData
+
+  const headers = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options.headers || {}),
+  }
+
+  // Only set JSON header if NOT FormData
+  if (!isFormData) {
+    headers["Content-Type"] = "application/json"
+  }
+
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers || {}),
-    },
+    headers,
   })
 
   // 🔐 Central auth handling

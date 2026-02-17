@@ -2,6 +2,8 @@ import likeRoutes from "./routes/like.routes.js"
 import express from "express"
 import cors from "cors"
 import dotenv from "dotenv"
+import path from "path"
+import { fileURLToPath } from "url"
 import authRoutes from "./routes/auth.routes.js"
 import postRoutes from "./routes/post.routes.js"
 import userRoutes from "./routes/user.routes.js"
@@ -56,7 +58,12 @@ app.use(
 /* ================================
    🛡 Security Headers
 ================================ */
-app.use(helmet())
+app.use(
+  helmet({
+    crossOriginResourcePolicy: false,
+  })
+)
+
 /* ================================
    🚦 Global Rate Limiter
 ================================ */
@@ -82,12 +89,21 @@ const loginLimiter = rateLimit({
 
 app.use(globalLimiter)
 
+app.use("/api/v1/media", mediaRoutes)
 app.use(express.json({ limit: "10mb" }))
 app.use(express.urlencoded({ limit: "10mb", extended: true }))
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+// Serve uploaded files statically
+app.use(
+  "/uploads",
+  express.static(path.join(__dirname, "../uploads"))
+)
+
 app.use("/api/v1/communities", communityRoutes)
 app.use("/api/v1", feedProfileRoutes)
 app.use("/api/v1", profileRoutes)
-app.use("/api/v1/media", mediaRoutes)
 app.use("/api/v1/comments", commentRoutes)
 app.use("/api/v1/superusers", superuserRoutes)
 

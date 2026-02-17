@@ -1,7 +1,7 @@
 import express from "express"
-import { getCommentsForPost } from "../services/comment.service.js"
+import prisma from "../lib/prisma.js"
+import { getCommentsForPost, createComment, getRepliesForComment } from "../services/comment.service.js"
 import { requireAuth } from "../middleware/auth.middleware.js"
-import { createComment } from "../services/comment.service.js"
 
 
 const router = express.Router()
@@ -26,9 +26,31 @@ router.get("/", async (req, res) => {
   }
 })
 
+router.get("/replies", async (req, res) => {
+  const { parentCommentId, cursor } = req.query
+
+  if (!parentCommentId) {
+    return res.status(400).json({ error: "parentCommentId is required" })
+  }
+
+  try {
+    const data = await getRepliesForComment({
+      parentCommentId,
+      cursor,
+    })
+
+    res.json(data)
+  } catch (err) {
+    console.error("Failed to load replies", err)
+    res.status(500).json({ error: "Failed to load replies" })
+  }
+})
+
+
+
 router.post("/", requireAuth, async (req, res) => {
   try {
-    const { postId, body, mediaUrl, mediaType } = req.body
+    const { postId, body, mediaUrl, mediaType, parentCommentId } = req.body
 
     if (!postId) {
       return res.status(400).json({ error: "postId is required" })
@@ -40,12 +62,29 @@ router.post("/", requireAuth, async (req, res) => {
       })
     }
 
+    // 🔐 If replying, validate parent comment
+    if (parentCommentId) {
+      const parent = await prisma.comment.findUnique({
+        where: { id: parentCommentId },
+        select: { postId: true },
+      })
+
+      if (!parent) {
+        return res.status(400).json({ error: "Parent comment not found" })
+      }
+
+      if (parent.postId !== postId) {
+        return res.status(400).json({ error: "Invalid parent comment" })
+      }
+    }
+
     const comment = await createComment({
       postId,
       userId: req.user.userId,
       body,
       mediaUrl,
       mediaType,
+      parentCommentId: parentCommentId || null,
     })
 
     res.json(comment)
@@ -54,6 +93,7 @@ router.post("/", requireAuth, async (req, res) => {
     res.status(500).json({ error: "Failed to create comment" })
   }
 })
+
 
 
 export default router
