@@ -1,16 +1,17 @@
+import React from "react"
 import PostCard from "./PostCard"
 import { getThemeColors } from "../ui/theme"
 
-export default function Feed({
+function Feed({
   posts,
   onLike,
   onMeme,
-  likingIds,
   onLabelClick,
   theme,
   reportCooldownUntil,
   refreshUserState,
 }) {
+
   const colors = getThemeColors(theme)
 
   // ⏳ Loading state
@@ -62,13 +63,14 @@ export default function Feed({
   post={post}
   onLike={onLike}
   onMeme={onMeme}
-  isLiking={likingIds?.has?.(post.id) ?? false}
   onLabelClick={onLabelClick}
   theme={theme}
   reportCooldownUntil={reportCooldownUntil}
   refreshUserState={refreshUserState}
 />
+
       ))}
     </div>
   )
 }
+export default React.memo(Feed)

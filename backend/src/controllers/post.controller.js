@@ -429,91 +429,113 @@ const nsfwFilter = buildNsfwFilter({
 })
 
 
-    const posts = await prisma.post.findMany({
-      where: {
-        scope,
-        communityId: null,
-        isRemoved: false,
-        ...nsfwFilter,
-        ...(scope === "COUNTRY" && userCountry
+    const { cursor, limit } = req.query
+
+const take = Math.min(parseInt(limit) || 10, 20) // max 20 per page
+
+const posts = await prisma.post.findMany({
+  where: {
+    scope,
+    communityId: null,
+    isRemoved: false,
+    ...nsfwFilter,
+    ...(scope === "COUNTRY" && userCountry
       ? { countryCode: userCountry }
       : {}),
     ...(scope === "LOCAL" && userRegion && userCountry
-  ? {
-      regionCode: userRegion,
-      countryCode: userCountry,
-    }
-  : {}),
-        ...(labelPrefs.length > 0 && {
-          categories: {
-            some: {
-              category: {
-                key: { in: labelPrefs },
-              },
-            },
+      ? {
+          regionCode: userRegion,
+          countryCode: userCountry,
+        }
+      : {}),
+    ...(labelPrefs.length > 0 && {
+      categories: {
+        some: {
+          category: {
+            key: { in: labelPrefs },
           },
-        }),
+        },
       },
-      orderBy: { createdAt: "desc" },
+    }),
+  },
+
+  orderBy: { createdAt: "desc" },
+
+  take: take + 1, // fetch 1 extra to detect next page
+
+  ...(cursor && {
+    skip: 1,
+    cursor: { id: cursor },
+  }),
+
+  include: {
+    user: {
+      select: {
+        id: true,
+        username: true,
+        avatarUrl: true,
+      },
+    },
+    categories: {
       include: {
-        user: {
+        category: { select: { key: true } },
+      },
+    },
+    likes: {
+      where: { userId },
+      select: { id: true },
+    },
+    _count: {
+      select: {
+        likes: true,
+        comments: true,
+      },
+    },
+    originPost: {
+      select: {
+        id: true,
+        type: true,
+        mediaUrl: true,
+        originPostId: true,
+        originPost: {
           select: {
             id: true,
-            username: true,
-            avatarUrl: true,
+            mediaUrl: true,
           },
-        },
-        categories: {
-          include: {
-            category: { select: { key: true } },
-          },
-        },
-        likes: {
-          where: { userId },
-          select: { id: true },
-        },
-        _count: {
-  select: {
-    likes: true,
-    comments: true,
-  }
-},
-        originPost: {
-    select: {
-      id: true,
-      type: true,
-      mediaUrl: true,
-      originPostId: true,
-      originPost: {
-        select: {
-          id: true,
-          mediaUrl: true,
         },
       },
     },
   },
-      },
-    })
+})
 
-    return res.json(
-  posts.map((p) => ({
+
+    let nextCursor = null
+
+if (posts.length > take) {
+  const nextItem = posts.pop()
+  nextCursor = nextItem.id
+}
+
+return res.json({
+  items: posts.map((p) => ({
     id: p.id,
     type: p.type,
     caption: p.caption,
-    mediaUrl: p.mediaUrl,            // 🔑 FORCE PASS
+    mediaUrl: p.mediaUrl,
     scope: p.scope,
     rating: p.rating,
     createdAt: p.createdAt,
     isRemoved: p.isRemoved,
-
     user: p.user,
     categories: p.categories,
     _count: p._count,
-
     originPost: p.originPost ?? null,
     likedByMe: p.likes.length > 0,
-  }))
-)
+  })),
+  nextCursor,
+})
+
+
 
   } catch (err) {
     console.error("GET SCOPED FEED ERROR:", err)

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { Routes, Route, Navigate } from "react-router-dom"
 import { Link, useNavigate } from "react-router-dom"
 import SuperuserDashboard from "./pages/SuperuserDashboard"
@@ -74,6 +74,9 @@ const toggleTheme = async () => {
 
 
   const [posts, setPosts] = useState([])
+  const [nextCursor, setNextCursor] = useState(null)
+const [loadingMoreFeed, setLoadingMoreFeed] = useState(false)
+const loadMoreRef = useRef(null)
   const [communities, setCommunities] = useState([])
 
   const [showCreateCommunity, setShowCreateCommunity] = useState(false)
@@ -104,7 +107,7 @@ const handleLogout = () => {
   localStorage.removeItem("token")
   setUser(null)
 }
-const refreshUserState = async () => {
+const refreshUserState = useCallback(async () => {
   try {
     const u = await api("/users/me")
 
@@ -126,7 +129,8 @@ const refreshUserState = async () => {
   } catch (err) {
     console.error("Failed to refresh user state")
   }
-}
+}, [])
+
 
 
   // ❤️ Likes
@@ -287,6 +291,7 @@ useEffect(() => {
 
 
 
+
   // 📰 Load feed
   // 📰 Load feed (single source of truth)
 const loadFeed = async () => {
@@ -312,11 +317,17 @@ const loadFeed = async () => {
     if (!user) return
 
 
-    const data = await api(endpoint, {
-  headers: activeFeedProfileId
-    ? { "X-Feed-Profile": activeFeedProfileId }
-    : {},
-})
+    const data = await api(
+  `${endpoint}${activeFeedProfileId ? "" : ""}${
+    nextCursor ? `?cursor=${nextCursor}` : ""
+  }`,
+  {
+    headers: activeFeedProfileId
+      ? { "X-Feed-Profile": activeFeedProfileId }
+      : {},
+  }
+)
+
 
     const items = Array.isArray(data)
       ? data
@@ -324,17 +335,54 @@ const loadFeed = async () => {
       ? data.items
       : []
 
-    setPosts(
-      items.map((p) => ({
-        ...p,
-        likedByMe: !!p.likedByMe,
-      }))
-    )
+    const formatted = items.map((p) => ({
+  ...p,
+  likedByMe: !!p.likedByMe,
+}))
+
+if (nextCursor) {
+  // append mode
+  setPosts((prev) => [...prev, ...formatted])
+} else {
+  // fresh load
+  setPosts(formatted)
+}
+
+setNextCursor(data?.nextCursor || null)
+
   } catch (err) {
     console.error("Failed to load feed", err)
     setPosts([]) // fail-safe: never leave stale feed
   }
 }
+const loadMoreFeed = useCallback(async () => {
+  if (!nextCursor || loadingMoreFeed) return
+
+  setLoadingMoreFeed(true)
+  await loadFeed()
+  setLoadingMoreFeed(false)
+}, [nextCursor, loadingMoreFeed, loadFeed])
+useEffect(() => {
+  if (!nextCursor) return
+  if (!loadMoreRef.current) return
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) {
+        loadMoreFeed()
+      }
+    },
+    {
+      rootMargin: "200px",
+    }
+  )
+
+  observer.observe(loadMoreRef.current)
+
+  return () => observer.disconnect()
+}, [nextCursor, loadMoreFeed])
+
+
 // 🔥 DELETE COMMUNITY (ADMIN + only member)
 const handleDeleteCommunity = async () => {
   if (!activeCommunity) return
@@ -404,6 +452,8 @@ useEffect(() => {
   // 🔁 Reload feed when feed inputs change
 useEffect(() => {
   if (!user) return
+
+  setNextCursor(null)
   loadFeed()
 }, [
   user,
@@ -413,9 +463,6 @@ useEffect(() => {
   activeLabel,
   activeFeedProfileId,
 ])
-
-
-
 
   // 🏷 Load labels for selected community
   // 🏷 Load labels for selected community
@@ -440,39 +487,57 @@ useEffect(() => {
 
 
   // ❤️ Like handler (backend is source of truth)
-  const handleLike = async (postId) => {
-    if (likingIds.has(postId)) return
+  const handleLike = useCallback(async (postId) => {
+  setLikingIds((prev) => {
+    if (prev.has(postId)) return prev
+    const next = new Set(prev)
+    next.add(postId)
+    return next
+  })
 
-    setLikingIds((prev) => new Set(prev).add(postId))
+  try {
+    const res = await api(`/likes/${postId}`, { method: "POST" })
 
-    try {
-      const res = await api(`/likes/${postId}`, { method: "POST" })
-
-      setPosts((prev) =>
-        prev.map((p) =>
-          p.id === postId
-            ? {
-                ...p,
-                likedByMe: res.liked,
-                _count: { likes: res.likeCount },
-              }
-            : p
-        )
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === postId
+          ? {
+              ...p,
+              likedByMe: res.liked,
+              _count: {
+                ...p._count,
+                likes: res.likeCount,
+              },
+            }
+          : p
       )
-    } catch (err) {
-      console.error("Like failed", err)
-    } finally {
-      setLikingIds((prev) => {
-        const next = new Set(prev)
-        next.delete(postId)
-        return next
-      })
-    }
+    )
+  } catch (err) {
+    console.error("Like failed", err)
+  } finally {
+    setLikingIds((prev) => {
+      const next = new Set(prev)
+      next.delete(postId)
+      return next
+    })
   }
+}, [])
+const handleLabelClick = useCallback((label) => {
+  setFeedMode("LABEL")
+  setActiveLabel(label)
+}, [])
+
+const handleMemeOpen = useCallback((p) => {
+  setMemePost(p)
+}, [])
+
+
 
   if (loading) {
     return <p style={{ textAlign: "center", marginTop: 40 }}>Loading…</p>
   }
+
+
 
   return (
   <div
@@ -746,7 +811,6 @@ padding: "24px 16px",
         borderRadius: 12,
         background: colors.surfaceMuted,
 border: `1px solid ${colors.border}`,
-color: colors.text,
 color: colors.textMuted
       }}
     >
@@ -1302,12 +1366,10 @@ backdropFilter: "blur(8px)",
                 <Feed
   posts={posts}
   onLike={handleLike}
-  onMeme={(p) => setMemePost(p)}
+  onMeme={handleMemeOpen}
   likingIds={likingIds}
-  onLabelClick={(label) => {
-    setFeedMode("LABEL")
-    setActiveLabel(label)
-  }}
+  onLabelClick={handleLabelClick}
+
   theme={theme}
   reportCooldownUntil={
     cooldownInfo?.type === "REPORT"
@@ -1316,6 +1378,9 @@ backdropFilter: "blur(8px)",
   }
   refreshUserState={refreshUserState}
 />
+<div ref={loadMoreRef} style={{ height: 1 }} />
+
+
                 </div>
                 {feedMode === "COMMUNITY" &&
   selectedCommunity !== "GLOBAL" && (
