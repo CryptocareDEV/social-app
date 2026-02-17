@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { Link } from "react-router-dom"
 import { getThemeColors } from "../ui/theme"
 import { api } from "../api/client"
@@ -200,11 +200,10 @@ function CommentNode({
   )
 }
 
-export default function PostCard({
+function PostCard({
   post,
   onLike,
   onMeme,
-  isLiking,
   onLabelClick,
   theme,
   reportCooldownUntil,
@@ -598,18 +597,34 @@ onMouseLeave={(e) => {
       position: "relative",
     }}
   >
-    <img
-      src={imageSrc}
-      alt={post.type === "MEME" ? "Meme image" : "Post media"}
-      loading="lazy"
-      style={{
-        width: "100%",
-        display: "block",
-        maxHeight: 520,
-        objectFit: "contain",
-        background: colors.bg,
-      }}
-    />
+    {post.type === "VIDEO" ? (
+  <video
+    src={imageSrc}
+    controls
+    preload="metadata"
+    style={{
+      width: "100%",
+      display: "block",
+      maxHeight: 520,
+      background: colors.bg,
+      borderRadius: theme.radius.md,
+    }}
+  />
+) : (
+  <img
+    src={imageSrc}
+    alt={post.type === "MEME" ? "Meme image" : "Post media"}
+    loading="lazy"
+    style={{
+      width: "100%",
+      display: "block",
+      maxHeight: 520,
+      objectFit: "contain",
+      background: colors.bg,
+    }}
+  />
+)}
+
     {/* 📝 MEME TEXT OVERLAY */}
     {post.type === "MEME" && post.memeMeta && (
   <>
@@ -788,7 +803,7 @@ onMouseLeave={(e) => {
         }}
       >
         <button
-  disabled={isLiking}
+  disabled={false}
   onClick={() => onLike(post.id)}
   style={{
     ...actionButtonStyle,
@@ -992,3 +1007,4 @@ onMouseLeave={(e) => {
     </article>
   )
 }
+export default React.memo(PostCard)

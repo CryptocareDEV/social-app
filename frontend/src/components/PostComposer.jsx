@@ -59,9 +59,11 @@ const selectStyle = {
 
 
   const [type, setType] = useState("TEXT")
-  const [caption, setCaption] = useState("")
-  const [mediaUrl, setMediaUrl] = useState("")
-  const [scope, setScope] = useState("GLOBAL")
+const [caption, setCaption] = useState("")
+const [file, setFile] = useState(null)
+const [uploadedUrl, setUploadedUrl] = useState("")
+const [scope, setScope] = useState("GLOBAL")
+
   
 
 
@@ -174,27 +176,59 @@ const effectiveCommunityId =
     ? activeCommunity.id
     : null
 
-      const post = await api("/posts", {
-        method: "POST",
-        body: JSON.stringify({
-          type,
-          caption,
-          mediaUrl: type === "TEXT" ? undefined : mediaUrl,
-          scope,
-          rating,
-          categories: labels,
-          communityId: postInCommunity
-  ? effectiveCommunityId
-  : null,
-        }),
-      })
+      let finalMediaUrl = undefined
+
+// 🔥 If IMAGE or VIDEO → upload first
+if (type !== "TEXT") {
+  if (!file) {
+    setError("Please select a file")
+    setLoading(false)
+    return
+  }
+
+  const formData = new FormData()
+  formData.append("file", file)
+
+  const uploadRes = await fetch(
+    "http://localhost:4000/api/v1/media/upload",
+    {
+      method: "POST",
+      body: formData,
+    }
+  )
+
+  if (!uploadRes.ok) {
+    throw new Error("Upload failed")
+  }
+
+  const uploadData = await uploadRes.json()
+  finalMediaUrl = uploadData.url
+}
+
+const post = await api("/posts", {
+  method: "POST",
+  body: JSON.stringify({
+    type,
+    caption,
+    mediaUrl: finalMediaUrl,
+    scope,
+    rating,
+    categories: labels,
+    communityId: postInCommunity
+      ? effectiveCommunityId
+      : null,
+  }),
+})
+
 
       setCaption("")
-      setMediaUrl("")
-      setSelectedLabels([])
-      setLabelInput("")
-      setType("TEXT")
-      setScope("GLOBAL")
+setFile(null)
+setUploadedUrl("")
+setSelectedLabels([])
+setLabelInput("")
+setType("TEXT")
+setScope("GLOBAL")
+
 
       onPostCreated?.(post)
     } catch (err) {
@@ -457,13 +491,31 @@ const effectiveCommunityId =
 
       {/* Media */}
       {type !== "TEXT" && (
-        <input
-          placeholder="Media URL"
-          value={mediaUrl}
-          onChange={(e) => setMediaUrl(e.target.value)}
-          style={inputStyle}
-        />
-      )}
+  <div style={{ marginTop: 8 }}>
+    <input
+      type="file"
+      accept={type === "IMAGE" ? "image/*" : "video/*"}
+      onChange={(e) => {
+        setFile(e.target.files[0] || null)
+        setUploadedUrl("")
+      }}
+      style={inputStyle}
+    />
+
+    {file && (
+      <div
+        style={{
+          fontSize: 12,
+          marginTop: 6,
+          color: colors.textMuted,
+        }}
+      >
+        Selected: {file.name}
+      </div>
+    )}
+  </div>
+)}
+
 
       {/* Actions */}
 <div style={{ marginTop: 12 }}>
@@ -504,9 +556,10 @@ border: `1px solid ${colors.border}`,
       type="submit"
       disabled={
   loading ||
-  !!cooldownInfo ||
+  (cooldownInfo?.type === "ACTION") ||
   caption.length > 420
 }
+
       style={{
         padding: "8px 18px",
         borderRadius: 999,
@@ -523,8 +576,8 @@ border: `1px solid ${colors.border}`,
     >
       {loading
   ? "Posting…"
-  : cooldownInfo
-  ? "On cooldown"
+  : cooldownInfo?.type === "ACTION"
+? "On cooldown"
   : caption.length > 420
   ? "Too long"
   : "Post"}

@@ -90,6 +90,7 @@ model Post {
   @@index([rating])
   @@index([countryCode])
   @@index([regionCode])
+  @@index([createdAt])
 }
 
 model Comment {
