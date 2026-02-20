@@ -14,8 +14,12 @@ export const getUserProfile = async (req, res) => {
         createdAt: true,
         _count: { select: { posts: true } },
         profile: {
-          select: { bio: true },
-        },
+  select: {
+    bio: true,
+    showCommunities: true,
+    showCommunityPosts: true,
+  },
+},
       },
     })
 
@@ -30,8 +34,12 @@ export const getUserProfile = async (req, res) => {
           createdAt: true,
           _count: { select: { posts: true } },
           profile: {
-            select: { bio: true },
-          },
+  select: {
+    bio: true,
+    showCommunities: true,
+    showCommunityPosts: true,
+  },
+},
         },
       })
     }
@@ -42,9 +50,11 @@ export const getUserProfile = async (req, res) => {
 
     // 3️⃣ Preserve exact response shape
     return res.json({
-      ...user,
-      bio: user.profile?.bio ?? "",
-    })
+  ...user,
+  bio: user.profile?.bio ?? "",
+  showCommunities: user.profile?.showCommunities ?? true,
+  showCommunityPosts: user.profile?.showCommunityPosts ?? true,
+})
   } catch (err) {
     console.error(err)
     return res.status(500).json({ error: "Failed to fetch profile" })
@@ -57,28 +67,82 @@ export const getUserPosts = async (req, res) => {
   try {
     const { id } = req.params
 
-    const posts = await prisma.post.findMany({
+    const viewerId = req.user?.userId || null
+    const isOwner = viewerId === id
+
+    // 🔎 Load profile visibility
+    const profile = await prisma.userProfile.findUnique({
       where: { userId: id },
-      orderBy: { createdAt: "desc" },
       select: {
-        id: true,
-        type: true,
-        caption: true,
-        mediaUrl: true,
-        communityId: true, // 🔑 THIS IS THE KEY LINE
-        createdAt: true,
-        _count: {
-          select: { likes: true },
-        },
+        showCommunityPosts: true,
       },
     })
 
-    return res.json(posts)
+    const hideCommunityPosts =
+      !isOwner && profile?.showCommunityPosts === false
+
+    const { cursor } = req.query
+const take = 20
+
+const posts = await prisma.post.findMany({
+  where: {
+    userId: id,
+    ...(hideCommunityPosts && {
+      communityId: null,
+    }),
+  },
+  orderBy: [
+    { createdAt: "desc" },
+    { id: "desc" },
+  ],
+  take,
+  ...(cursor && {
+    skip: 1,
+    cursor: {
+      id: cursor,
+    },
+  }),
+  select: {
+    id: true,
+    type: true,
+    caption: true,
+    mediaUrl: true,
+    communityId: true,
+    createdAt: true,
+    scope: true,
+    community: {
+      select: {
+        id: true,
+        name: true,
+        scope: true,
+      },
+    },
+    _count: {
+      select: { likes: true },
+    },
+  },
+})
+
+
+
+    const nextCursor =
+  posts.length === take
+    ? posts[posts.length - 1].id
+    : null
+
+return res.json({
+  posts,
+  nextCursor,
+})
+
   } catch (err) {
     console.error(err)
-    return res.status(500).json({ error: "Failed to fetch user posts" })
+    return res.status(500).json({
+      error: "Failed to fetch user posts",
+    })
   }
 }
+
 
 
 /**
@@ -187,7 +251,15 @@ export const getMyInvitations = async (req, res) => {
 export const updateMe = async (req, res) => {
   try {
     const userId = req.user.userId
-    const { bio, nsfwEnabled, themeMode, accentTheme } = req.body
+    const {
+  bio,
+  nsfwEnabled,
+  themeMode,
+  accentTheme,
+  showCommunities,
+  showCommunityPosts,
+} = req.body
+
 
     const updateData = {}
     let profileUpdate = null
@@ -203,6 +275,43 @@ export const updateMe = async (req, res) => {
         },
       }
     }
+
+    /* ================================
+   👁 COMMUNITY VISIBILITY
+================================ */
+
+if (typeof showCommunities === "boolean") {
+  profileUpdate = {
+    ...(profileUpdate || {}),
+    upsert: {
+      create: {
+        ...(profileUpdate?.upsert?.create || {}),
+        showCommunities,
+      },
+      update: {
+        ...(profileUpdate?.upsert?.update || {}),
+        showCommunities,
+      },
+    },
+  }
+}
+
+if (typeof showCommunityPosts === "boolean") {
+  profileUpdate = {
+    ...(profileUpdate || {}),
+    upsert: {
+      create: {
+        ...(profileUpdate?.upsert?.create || {}),
+        showCommunityPosts,
+      },
+      update: {
+        ...(profileUpdate?.upsert?.update || {}),
+        showCommunityPosts,
+      },
+    },
+  }
+}
+
 
     /* ================================
    🔞 NSFW TOGGLE (hard ceiling, DB enforced)
@@ -287,18 +396,25 @@ if (typeof nsfwEnabled === "boolean") {
         themeMode: true,
         accentTheme: true,
         profile: {
-          select: { bio: true },
-        },
+  select: {
+    bio: true,
+    showCommunities: true,
+    showCommunityPosts: true,
+  },
+},
       },
     })
 
     return res.json({
-      id: updatedUser.id,
-      bio: updatedUser.profile?.bio ?? "",
-      nsfwEnabled: updatedUser.nsfwEnabled,
-      themeMode: updatedUser.themeMode,
-      accentTheme: updatedUser.accentTheme,
-    })
+  id: updatedUser.id,
+  bio: updatedUser.profile?.bio ?? "",
+  nsfwEnabled: updatedUser.nsfwEnabled,
+  themeMode: updatedUser.themeMode,
+  accentTheme: updatedUser.accentTheme,
+  showCommunities: updatedUser.profile?.showCommunities ?? true,
+  showCommunityPosts:
+    updatedUser.profile?.showCommunityPosts ?? true,
+})
   } catch (err) {
     console.error("UPDATE ME ERROR:", err)
     return res.status(500).json({
@@ -312,6 +428,20 @@ if (typeof nsfwEnabled === "boolean") {
 export const getUserCommunities = async (req, res) => {
   try {
     const { id } = req.params
+    const viewerId = req.user.userId
+    const isOwner = viewerId === id
+
+    // 🔎 Check visibility
+    const profile = await prisma.userProfile.findUnique({
+      where: { userId: id },
+      select: {
+        showCommunities: true,
+      },
+    })
+
+    if (!isOwner && profile?.showCommunities === false) {
+      return res.json([])
+    }
 
     const memberships = await prisma.communityMember.findMany({
       where: { userId: id },
@@ -338,8 +468,9 @@ export const getUserCommunities = async (req, res) => {
     )
   } catch (err) {
     console.error("GET USER COMMUNITIES ERROR", err)
-    return res
-      .status(500)
-      .json({ error: "Failed to fetch user communities" })
+    return res.status(500).json({
+      error: "Failed to fetch user communities",
+    })
   }
 }
+

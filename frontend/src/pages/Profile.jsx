@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { api } from "../api/client"
 import { getThemeColors } from "../ui/theme"
@@ -13,6 +13,7 @@ export default function Profile({
   setTheme,
   currentUser,
   onFeedProfileChange,
+  refreshUserState,
 }) {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -33,6 +34,11 @@ export default function Profile({
   const [editingBio, setEditingBio] = useState(false)
   const [bioDraft, setBioDraft] = useState("")
   const [communities, setCommunities] = useState([])
+  const [nextCursor, setNextCursor] = useState(null)
+const [loadingMore, setLoadingMore] = useState(false)
+const loadMoreRef = useRef(null)
+  const [showCommunities, setShowCommunities] = useState(true)
+const [showCommunityPosts, setShowCommunityPosts] = useState(true)
   const [postView, setPostView] = useState("PUBLIC")
   const [isOwnProfile, setIsOwnProfile] = useState(false)
   const [showCreateCommunity, setShowCreateCommunity] = useState(false)
@@ -121,7 +127,7 @@ const viewingOwnProfile = u.id === currentUser?.id
 
 
 // 4️⃣ Load posts for profile owner
-const userPosts = await api(`/users/${u.id}/posts`)
+const postRes = await api(`/users/${u.id}/posts`)
 
 // 5️⃣ Load my feed profiles (ONLY mine)
 const fps = viewingOwnProfile
@@ -132,9 +138,22 @@ const fps = viewingOwnProfile
       if (!mounted) return
 
       setUser(u)
-      setPosts(userPosts || [])
+      setPosts(postRes?.posts || [])
+setNextCursor(postRes?.nextCursor || null)
       setProfiles(fps || [])
       setBio(u.bio || "")
+      setShowCommunities(
+  typeof u.showCommunities === "boolean"
+    ? u.showCommunities
+    : true
+)
+
+setShowCommunityPosts(
+  typeof u.showCommunityPosts === "boolean"
+    ? u.showCommunityPosts
+    : true
+)
+
 
       setIsOwnProfile(viewingOwnProfile)
 
@@ -170,6 +189,37 @@ const fps = viewingOwnProfile
   }
 }, [id, currentUser])
 
+useEffect(() => {
+  if (!loadMoreRef.current) return
+  if (!nextCursor) return
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      const first = entries[0]
+      if (first.isIntersecting) {
+        loadMorePosts()
+      }
+    },
+    {
+      rootMargin: "200px",
+    }
+  )
+
+  observer.observe(loadMoreRef.current)
+
+  return () => {
+    if (loadMoreRef.current) {
+      observer.unobserve(loadMoreRef.current)
+    }
+  }
+}, [nextCursor, loadingMore, user])
+
+
+useEffect(() => {
+  if (!isOwnProfile && !showCommunityPosts && postView === "COMMUNITY") {
+    setPostView("PUBLIC")
+  }
+}, [isOwnProfile, showCommunityPosts])
 
 
   const activateProfile = async (profile) => {
@@ -187,6 +237,24 @@ const fps = viewingOwnProfile
     id: profile.id,
     name: profile.name,
   })
+}
+const loadMorePosts = async () => {
+  if (!nextCursor || loadingMore || !user?.id) return
+
+  setLoadingMore(true)
+
+  try {
+    const res = await api(
+      `/users/${user.id}/posts?cursor=${nextCursor}`
+    )
+
+    setPosts((prev) => [...prev, ...(res.posts || [])])
+    setNextCursor(res.nextCursor || null)
+  } catch (err) {
+    console.error("Failed loading more posts")
+  } finally {
+    setLoadingMore(false)
+  }
 }
 
 
@@ -385,10 +453,18 @@ const fps = viewingOwnProfile
   }}
 >
 
-  {["POSTS", "COMMUNITIES", "FEED", "SETTINGS", "MODERATION"].map((tab) => {
+  {["POSTS", "COMMUNITIES", "FEED", "SETTINGS", "MODERATION", "PHILOSOPHY"].map((tab) => {
     if (tab === "FEED" && !isOwnProfile) return null
-    if (tab === "MODERATION" && !isOwnProfile) return null
-    if (tab === "SETTINGS" && !isOwnProfile) return null
+if (tab === "MODERATION" && !isOwnProfile) return null
+if (tab === "SETTINGS" && !isOwnProfile) return null
+
+// 👁 Hide communities tab for public viewers
+if (
+  tab === "COMMUNITIES" &&
+  !isOwnProfile &&
+  showCommunities === false
+)
+  return null
 
 
     return (
@@ -430,58 +506,80 @@ const fps = viewingOwnProfile
 {activeTab === "FEED" && isOwnProfile && (
 <div style={sectionStyle}>
 
-<p
+<div
   style={{
-    fontSize: 14,
-    color: colors.textMuted,
-    marginBottom: 16,
-    lineHeight: 1.6,
-    maxWidth: 560,
+    marginBottom: 28,
+    padding: 20,
+    borderRadius: 18,
+    background: colors.surfaceMuted,
+    border: `1px solid ${colors.border}`,
   }}
 >
-  Your feed is shaped by <strong>profiles</strong>, intentional lenses that
-  decide what content appears and why.  
-  <br />
-  <br />
-  <strong>Default</strong> is a safe baseline profile that always exists, so
-  your feed never becomes empty or unpredictable. You can create, switch,
-  and customize other profiles freely.
-</p>
+  <div
+    style={{
+      fontSize: 18,
+      fontWeight: 600,
+      marginBottom: 8,
+    }}
+  >
+    Your Feed Control Center
+  </div>
+
+  <div
+    style={{
+      fontSize: 14,
+      lineHeight: 1.7,
+      color: colors.textMuted,
+      maxWidth: 640,
+    }}
+  >
+    There is no algorithm deciding what you see.
+    <br /><br />
+    A <strong>Feed Profile</strong> is an intentional lens.
+    It defines which labels matter to you and how content flows
+    across global, country, and local scopes.
+    <br /><br />
+    You are not following people.
+    You are structuring information.
+  </div>
+</div>
+
 
       {/* 🧠 Feed profiles */}
       <div
   style={{
     marginBottom: 32,
-    padding: 20,
-    borderRadius: theme.radius.lg,
+    padding: 24,
+    borderRadius: 20,
     background: colors.surface,
     border: `1px solid ${colors.border}`,
+    boxShadow: theme.shadow.sm,
   }}
 >
-
-
-
         <div style={{ marginTop: 12 }}>
           <button
-            onClick={() => setShowCreateProfile(true)}
-            style={{
-              fontSize: 13,
-              padding: "6px 12px",
-              borderRadius: 10,
-              border: `1px solid ${colors.border}`,
-              background: colors.surface,
-              color: colors.text,
-              cursor: "pointer",
-            }}
-          >
-            + Create new profile
-          </button>
+  onClick={() => setShowCreateProfile(true)}
+  style={{
+    padding: "10px 18px",
+    borderRadius: 999,
+    fontSize: 14,
+    fontWeight: 500,
+    border: "none",
+    background: colors.primary,
+    color: "#fff",
+    cursor: "pointer",
+    marginBottom: 20,
+  }}
+>
+  + Create Feed Profile
+</button>
         </div>
 
         <FeedProfilesCard
   theme={theme}
   profiles={profiles}
   activeProfileId={activeProfileId}
+
   onChange={async (id) => {
     const profile = profiles.find((p) => p.id === id)
     if (!profile) return
@@ -497,34 +595,64 @@ const fps = viewingOwnProfile
       name: profile.name,
     })
   }}
+
   onEdit={(profile) => {
+    // TRUE edit mode
     setEditingProfile(profile)
     setShowCreateProfile(true)
   }}
-  onDelete={async (profile) => {
-    const ok = window.confirm(
-      `Delete feed profile "${profile.name}"?`
-    )
-    if (!ok) return
 
-    await api(`/me/feed-profiles/${profile.id}`, {
-      method: "DELETE",
+  onDuplicate={(profile) => {
+    // TRUE create mode
+    setEditingProfile({
+      ...profile,
+      id: null,
+      name: `${profile.name} Copy`,
     })
+    setShowCreateProfile(true)
+  }}
 
-    setProfiles((prev) =>
-      prev.filter((p) => p.id !== profile.id)
+  onDelete={async (profile) => {
+  const ok = window.confirm(
+    `Delete feed profile "${profile.name}"?`
+  )
+  if (!ok) return
+
+  await api(`/me/feed-profiles/${profile.id}`, {
+    method: "DELETE",
+  })
+
+  // Remove from state
+  const updatedProfiles = profiles.filter(
+    (p) => p.id !== profile.id
+  )
+
+  setProfiles(updatedProfiles)
+
+  // If deleted profile was active → switch to Default
+  if (profile.id === activeProfileId) {
+    const defaultProfile = updatedProfiles.find(
+      (p) => p.name === "Default"
     )
 
-    // if deleted profile was active → reset feed
-    if (profile.id === activeProfileId) {
-      setActiveProfileId(null)
+    if (defaultProfile) {
+      await api(
+        `/me/feed-profiles/${defaultProfile.id}/activate`,
+        { method: "POST" }
+      )
+
+      setActiveProfileId(defaultProfile.id)
+
       onFeedProfileChange?.({
-        id: null,
-        name: null,
+        id: defaultProfile.id,
+        name: defaultProfile.name,
       })
     }
-  }}
+  }
+}}
+
 />
+
 </div>
 
       </div>
@@ -533,6 +661,46 @@ const fps = viewingOwnProfile
 
 {activeTab === "COMMUNITIES" && (
 <div style={sectionStyle}>
+{/* 🏘 Communities Explainer */}
+<div
+  style={{
+    marginBottom: 28,
+    padding: 20,
+    borderRadius: 18,
+    background: colors.surfaceMuted,
+    border: `1px solid ${colors.border}`,
+  }}
+>
+  <div
+    style={{
+      fontSize: 18,
+      fontWeight: 600,
+      marginBottom: 8,
+    }}
+  >
+    Structured Spaces
+  </div>
+
+  <div
+    style={{
+      fontSize: 14,
+      lineHeight: 1.7,
+      color: colors.textMuted,
+      maxWidth: 640,
+    }}
+  >
+    Communities are intentional containers.
+    <br /><br />
+    You gather around shared labels.
+    <br /><br />
+    Import topics.
+    Organize thinking.
+    Build local clarity.
+    <br /><br />
+    Whether there are 3 members or 3 million,
+    information flows equally to all.
+  </div>
+</div>
 
 
 
@@ -824,21 +992,23 @@ const fps = viewingOwnProfile
       type="checkbox"
       checked={currentUser?.nsfwEnabled || false}
       onChange={async (e) => {
-        const value = e.target.checked
+  const value = e.target.checked
 
-        try {
-          const updated = await api("/users/me", {
-            method: "PATCH",
-            body: JSON.stringify({
-              nsfwEnabled: value,
-            }),
-          })
+  try {
+    await api("/users/me", {
+      method: "PATCH",
+      body: JSON.stringify({
+        nsfwEnabled: value,
+      }),
+    })
 
-          
-        } catch (err) {
-          alert(err?.error || "Update failed")
-        }
-      }}
+    await refreshUserState?.()
+
+  } catch (err) {
+    alert(err?.error || "Update failed")
+  }
+}}
+
     />
     Allow NSFW content
   </label>
@@ -970,7 +1140,344 @@ const fps = viewingOwnProfile
             ))}
           </div>
         </div>
+        </div>
+
+
+{/* Profile Visibility */}
+<div
+  style={{
+    padding: 20,
+    borderRadius: 16,
+    background: colors.surface,
+    border: `1px solid ${colors.border}`,
+    display: "flex",
+    flexDirection: "column",
+    gap: 20,
+    marginTop: 8,
+  }}
+>
+  <div
+    style={{
+      fontSize: 16,
+      fontWeight: 600,
+      marginBottom: 4,
+    }}
+  >
+    Profile Visibility
+  </div>
+
+  <div
+    style={{
+      fontSize: 13,
+      color: colors.textMuted,
+      marginBottom: 8,
+    }}
+  >
+    Control what visitors can see on your profile.
+  </div>
+
+  {/* Communities Toggle */}
+  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <div>
+      <div style={{ fontSize: 14, fontWeight: 500 }}>
+        Communities
       </div>
+      <div style={{ fontSize: 12, color: colors.textMuted }}>
+        Show communities you belong to
+      </div>
+    </div>
+
+    <div style={{ display: "flex", gap: 6 }}>
+      <button
+        onClick={async () => {
+          setShowCommunities(true)
+          await api("/users/me", {
+            method: "PATCH",
+            body: JSON.stringify({ showCommunities: true }),
+          })
+        }}
+        style={{
+          padding: "6px 12px",
+          borderRadius: 999,
+          fontSize: 12,
+          border: `1px solid ${colors.border}`,
+          background: showCommunities ? colors.primarySoft : colors.surface,
+          color: showCommunities ? colors.primary : colors.textMuted,
+          cursor: "pointer",
+        }}
+      >
+        Public
+      </button>
+
+      <button
+        onClick={async () => {
+          setShowCommunities(false)
+          await api("/users/me", {
+            method: "PATCH",
+            body: JSON.stringify({ showCommunities: false }),
+          })
+        }}
+        style={{
+          padding: "6px 12px",
+          borderRadius: 999,
+          fontSize: 12,
+          border: `1px solid ${colors.border}`,
+          background: !showCommunities ? colors.primarySoft : colors.surface,
+          color: !showCommunities ? colors.primary : colors.textMuted,
+          cursor: "pointer",
+        }}
+      >
+        Private
+      </button>
+    </div>
+  </div>
+
+  {/* Community Posts Toggle */}
+  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <div>
+      <div style={{ fontSize: 14, fontWeight: 500 }}>
+        Community Posts
+      </div>
+      <div style={{ fontSize: 12, color: colors.textMuted }}>
+        Show posts made inside communities
+      </div>
+    </div>
+
+    <div style={{ display: "flex", gap: 6 }}>
+      <button
+        onClick={async () => {
+          setShowCommunityPosts(true)
+          await api("/users/me", {
+            method: "PATCH",
+            body: JSON.stringify({ showCommunityPosts: true }),
+          })
+        }}
+        style={{
+          padding: "6px 12px",
+          borderRadius: 999,
+          fontSize: 12,
+          border: `1px solid ${colors.border}`,
+          background: showCommunityPosts ? colors.primarySoft : colors.surface,
+          color: showCommunityPosts ? colors.primary : colors.textMuted,
+          cursor: "pointer",
+        }}
+      >
+        Public
+      </button>
+
+      <button
+        onClick={async () => {
+          setShowCommunityPosts(false)
+          await api("/users/me", {
+            method: "PATCH",
+            body: JSON.stringify({ showCommunityPosts: false }),
+          })
+        }}
+        style={{
+          padding: "6px 12px",
+          borderRadius: 999,
+          fontSize: 12,
+          border: `1px solid ${colors.border}`,
+          background: !showCommunityPosts ? colors.primarySoft : colors.surface,
+          color: !showCommunityPosts ? colors.primary : colors.textMuted,
+          cursor: "pointer",
+        }}
+      >
+        Private
+      </button>
+    </div>
+  </div>
+</div>
+
+
+      </div>
+    </div>
+)}
+
+
+
+
+{activeTab === "PHILOSOPHY" && (
+  <div
+    style={{
+      maxWidth: 820,
+      margin: "0 auto",
+      padding: "40px 28px",
+      borderRadius: 20,
+      border: "1px solid rgba(212, 175, 55, 0.6)", // subtle gold
+      boxShadow: "0 0 0 1px rgba(255,255,255,0.05)",
+      background: colors.surface,
+      display: "flex",
+      flexDirection: "column",
+      gap: 40,
+      lineHeight: 1.9,
+      color: colors.text,
+    }}
+  >
+    {/* Header */}
+    <div style={{ textAlign: "center" }}>
+      <div
+        style={{
+          fontSize: 12,
+          letterSpacing: 3,
+          textTransform: "uppercase",
+          color: colors.textMuted,
+          marginBottom: 18,
+        }}
+      >
+        Declaration
+      </div>
+
+      <div
+        style={{
+          fontSize: 24,
+          fontWeight: 600,
+        }}
+      >
+        A Different Kind of Social Space
+      </div>
+    </div>
+
+    {/* Section 1 */}
+    <div style={{ fontSize: 17 }}>
+      <p>
+        We removed following.
+      </p>
+
+      <p>
+        Not because connection is unimportant,
+        but because influence should never decide truth.
+      </p>
+
+      <p>
+        Here, no one rises because they are amplified.
+        Nothing spreads because it performs.
+      </p>
+    </div>
+
+    {/* Divider */}
+    <div
+      style={{
+        height: 1,
+        background: "rgba(212, 175, 55, 0.4)",
+      }}
+    />
+
+    {/* Section 2 */}
+    <div style={{ fontSize: 17 }}>
+      <p>
+        You choose what you see.
+      </p>
+
+      <p>
+        Through labels.
+        Through profiles.
+        Through communities built intentionally.
+      </p>
+
+      <p>
+        The structure defines the flow.
+        Not popularity.
+        Not outrage.
+      </p>
+    </div>
+
+    {/* Divider */}
+    <div
+      style={{
+        height: 1,
+        background: "rgba(212, 175, 55, 0.4)",
+      }}
+    />
+
+    {/* Section 3 */}
+    <div style={{ fontSize: 17 }}>
+      <p>
+        This is not influencer culture.
+      </p>
+
+      <p>
+        There are no hidden agendas.
+        No engagement traps.
+        No advertisements shaping perception.
+      </p>
+
+      <p>
+        We will keep it that way.
+      </p>
+    </div>
+
+    {/* Divider */}
+    <div
+      style={{
+        height: 1,
+        background: "rgba(212, 175, 55, 0.4)",
+      }}
+    />
+
+    {/* Section 4 */}
+    <div style={{ fontSize: 17 }}>
+      <p>
+        Use labels to follow subjects instead of people.
+      </p>
+
+      <p>
+        Import a topic into a community.
+        Create a local space.
+        Join globally.
+      </p>
+
+      <p>
+        Whether one member or one million,
+        the information remains the same for everyone.
+      </p>
+    </div>
+
+    {/* Divider */}
+    <div
+      style={{
+        height: 1,
+        background: "rgba(212, 175, 55, 0.4)",
+      }}
+    />
+
+    {/* Section 5 */}
+    <div style={{ fontSize: 17 }}>
+      <p>
+        You can find work here.
+        Friendship.
+        Love.
+        Humor.
+        Shared curiosity.
+      </p>
+
+      <p>
+        Build communities that matter.
+        Stay aligned without fighting algorithms.
+      </p>
+    </div>
+
+    {/* Final Statement */}
+    <div
+      style={{
+        textAlign: "center",
+        marginTop: 20,
+        fontSize: 18,
+        fontWeight: 500,
+      }}
+    >
+      <p>
+        Hello world.
+      </p>
+
+      <p>
+        Let us unite with clarity.
+      </p>
+
+      <p>
+        Let us move humanity forward
+        together.
+      </p>
     </div>
   </div>
 )}
@@ -980,6 +1487,46 @@ const fps = viewingOwnProfile
 
       {activeTab === "POSTS" && (
 <div>
+  {/* 📝 Posts Explainer */}
+<div
+  style={{
+    marginBottom: 28,
+    padding: 20,
+    borderRadius: 18,
+    background: colors.surfaceMuted,
+    border: `1px solid ${colors.border}`,
+  }}
+>
+  <div
+    style={{
+      fontSize: 18,
+      fontWeight: 600,
+      marginBottom: 8,
+    }}
+  >
+    Your Public Voice
+  </div>
+
+  <div
+    style={{
+      fontSize: 14,
+      lineHeight: 1.7,
+      color: colors.textMuted,
+      maxWidth: 640,
+    }}
+  >
+    This is where your thinking lives.
+    <br /><br />
+    Public posts appear across global, country, and local scopes
+    based on their labels.
+    <br /><br />
+    Community posts stay inside the spaces you intentionally join.
+    <br /><br />
+    Nothing spreads because of followers.
+    It spreads because it is categorized clearly.
+  </div>
+</div>
+
         <div style={sectionStyle}>
         
 
@@ -1011,6 +1558,9 @@ const fps = viewingOwnProfile
     Public
   </button>
 
+
+
+  {(isOwnProfile || showCommunityPosts) && (
   <button
     onClick={() => setPostView("COMMUNITY")}
     style={{
@@ -1031,6 +1581,8 @@ const fps = viewingOwnProfile
   >
     Community
   </button>
+)}
+
 </div>
 
 
@@ -1045,8 +1597,8 @@ const fps = viewingOwnProfile
   <div
     key={post.id}
     style={{
-      marginBottom: 12,
-      padding: 14,
+      marginBottom: 20,
+      padding: 20,
       borderRadius: 12,
       background:
         postView === "COMMUNITY"
@@ -1058,28 +1610,65 @@ const fps = viewingOwnProfile
           : `1px solid ${colors.border}`,
     }}
   >
-    {post.caption && <p>{post.caption}</p>}
+    {post.caption && (
+  <p style={{ marginBottom: 8, lineHeight: 1.6 }}>
+    {post.caption}
+  </p>
+)}
 
     {renderPostMedia(post)}
 
-    {/* Footer row */}
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginTop: 10,
-      }}
-    >
-      <div
-        style={{
-          fontSize: 12,
-          color: colors.textMuted,
-        }}
-      >
-        ❤️ {post._count?.likes ?? 0} likes
-      </div>
-{isOwnProfile && (
+    {/* Meta Section */}
+<div
+  style={{
+    marginTop: 16,
+    paddingTop: 12,
+    borderTop: `1px solid ${colors.border}`,
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+  }}
+>
+  {/* Scope or Community */}
+  <div
+    style={{
+      fontSize: 12,
+      color: colors.textMuted,
+    }}
+  >
+    {!post.communityId && (
+      <>
+        {post.scope === "GLOBAL" && "🌍 Global"}
+        {post.scope === "COUNTRY" && "🏳️ Country"}
+        {post.scope === "LOCAL" && "📍 Local"}
+      </>
+    )}
+
+    {post.communityId && post.community && (
+      <>
+        🏘 {post.community.name}
+        {post.community.scope && (
+          <> • {post.community.scope.toLowerCase()}</>
+        )}
+      </>
+    )}
+  </div>
+
+  {/* Engagement Row */}
+  <div
+    style={{
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      fontSize: 12,
+      color: colors.textMuted,
+    }}
+  >
+    <div>
+      ❤️ {post._count?.likes ?? 0} likes
+    </div>
+
+    {isOwnProfile && (
       <button
         onClick={async () => {
           const ok = window.confirm(
@@ -1105,19 +1694,33 @@ const fps = viewingOwnProfile
       >
         Delete
       </button>
-)}
-      
-    </div>
+    )}
+  </div>
+</div>
+
   </div>
 ))}
-
-
-
-{communityPosts.length === 0 && (
-  <p style={{ opacity: 0.6 }}>
-    No community posts yet.
-  </p>
+{nextCursor && (
+  <div
+    ref={loadMoreRef}
+    style={{
+      height: 1,
+    }}
+  />
 )}
+
+
+
+{(isOwnProfile || showCommunityPosts) && postView === "COMMUNITY" && (
+  <>
+    {communityPosts.length === 0 && (
+      <p style={{ opacity: 0.6 }}>
+        No community posts yet.
+      </p>
+    )}
+  </>
+)}
+
 
 
 

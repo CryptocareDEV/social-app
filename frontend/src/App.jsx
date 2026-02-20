@@ -74,6 +74,7 @@ const toggleTheme = async () => {
 
 
   const [posts, setPosts] = useState([])
+  const [isSwitchingFeed, setIsSwitchingFeed] = useState(false)
   const [nextCursor, setNextCursor] = useState(null)
 const [loadingMoreFeed, setLoadingMoreFeed] = useState(false)
 const loadMoreRef = useRef(null)
@@ -317,16 +318,17 @@ const loadFeed = async () => {
     if (!user) return
 
 
-    const data = await api(
-  `${endpoint}${activeFeedProfileId ? "" : ""}${
-    nextCursor ? `?cursor=${nextCursor}` : ""
-  }`,
+    const query = nextCursor ? `?cursor=${nextCursor}` : ""
+
+const data = await api(
+  `${endpoint}${query}`,
   {
     headers: activeFeedProfileId
       ? { "X-Feed-Profile": activeFeedProfileId }
       : {},
   }
 )
+
 
 
     const items = Array.isArray(data)
@@ -454,7 +456,56 @@ useEffect(() => {
   if (!user) return
 
   setNextCursor(null)
-  loadFeed()
+  setIsSwitchingFeed(true)
+
+  const loadFresh = async () => {
+    try {
+      let endpoint = null
+
+      if (feedMode === "LABEL" && activeLabel) {
+        endpoint = `/posts/label/${activeLabel}`
+      } 
+      else if (
+        feedMode === "COMMUNITY" &&
+        selectedCommunity &&
+        selectedCommunity !== "GLOBAL"
+      ) {
+        endpoint = `/communities/${selectedCommunity}/feed`
+      } 
+      else {
+        endpoint = `/posts/feed/${feedScope}`
+      }
+
+      if (!endpoint) return
+
+      const data = await api(endpoint, {
+        headers: activeFeedProfileId
+          ? { "X-Feed-Profile": activeFeedProfileId }
+          : {},
+      })
+
+      const items = Array.isArray(data?.items)
+        ? data.items
+        : Array.isArray(data)
+        ? data
+        : []
+
+      const formatted = items.map((p) => ({
+        ...p,
+        likedByMe: !!p.likedByMe,
+      }))
+
+      setPosts(formatted)
+      setNextCursor(data?.nextCursor || null)
+    } catch (err) {
+      console.error("Failed to load feed", err)
+    } finally {
+      setIsSwitchingFeed(false)
+    }
+  }
+
+  loadFresh()
+
 }, [
   user,
   feedMode,
@@ -463,6 +514,8 @@ useEffect(() => {
   activeLabel,
   activeFeedProfileId,
 ])
+
+
 
   // 🏷 Load labels for selected community
   // 🏷 Load labels for selected community
@@ -1361,6 +1414,8 @@ backdropFilter: "blur(8px)",
     borderRadius: 16,
     padding: 16,
     boxShadow: theme.shadow.sm,
+    opacity: isSwitchingFeed ? 0.5 : 1,
+    transition: "opacity 0.2s ease",
   }}
 >
                 <Feed
@@ -1415,14 +1470,18 @@ backdropFilter: "blur(8px)",
         theme={theme}
         setTheme={setTheme}
         currentUser={user}
+        refreshUserState={refreshUserState}
         onFeedProfileChange={async ({ id, name }) => {
   setActiveFeedProfileId(id)
   setActiveFeedProfileName(name)
   setFeedMode("GLOBAL")
   setActiveLabel(null)
+  setFeedScope("GLOBAL") // 🔥 force scope reset
+  setNextCursor(null)    // 🔥 prevent stale pagination
 
-  await loadFeed()   // 🔥 FORCE fresh reload AFTER activation
+
 }}
+
 
       />
     ) : (

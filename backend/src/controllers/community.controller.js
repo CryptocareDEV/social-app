@@ -37,7 +37,13 @@ if (!community) {
 export const addCommunityLabelImport = async (req, res) => {
   try {
     const communityId = req.params.id
-    const { categoryKey, importMode } = req.body
+    const {
+  categoryKey,
+  importMode,
+  global = true,
+  country = true,
+  local = true,
+} = req.body
     const userId = req.user.userId
 
     if (!categoryKey || !importMode) {
@@ -106,23 +112,29 @@ export const addCommunityLabelImport = async (req, res) => {
       })
     }
 
-    // ✅ Upsert import rule
     const rule = await prisma.communityLabelImport.upsert({
-      where: {
-        communityId_categoryKey: {
-          communityId,
-          categoryKey,
-        },
-      },
-      update: {
-        importMode,
-      },
-      create: {
-        communityId,
-        categoryKey,
-        importMode,
-      },
-    })
+  where: {
+    communityId_categoryKey: {
+      communityId,
+      categoryKey,
+    },
+  },
+  update: {
+    importMode,
+    global,
+    country,
+    local,
+  },
+  create: {
+    communityId,
+    categoryKey,
+    importMode,
+    global,
+    country,
+    local,
+  },
+})
+
 await materializeCommunityFeed(communityId, new Date())
 
     res.status(201).json(rule)
@@ -165,11 +177,14 @@ export const getCommunityById = async (req, res) => {
     select: { categoryKey: true },
   },
   labelImports: {
-    select: {
-      categoryKey: true,
-      importMode: true,
-    },
+  select: {
+    categoryKey: true,
+    importMode: true,
+    global: true,
+    country: true,
+    local: true,
   },
+},
 },
     })
 
@@ -261,7 +276,6 @@ export const createCommunity = async (req, res) => {
   scope,
   categories = [],
   rating = "SAFE",
-  visibility = "PUBLIC",
 } = req.body
 
     /* =========================
@@ -284,19 +298,6 @@ if (allowedRatings.includes(rating)) {
 if (req.user.isMinor) {
   finalRating = "SAFE"
 }
-
-/* ================================
-   🔐 Visibility Validation
-================================ */
-
-const allowedVisibility = ["PUBLIC", "PRIVATE"]
-
-let finalVisibility = "PUBLIC"
-
-if (allowedVisibility.includes(visibility)) {
-  finalVisibility = visibility
-}
-
 
     const userId = req.user.userId
 
@@ -347,7 +348,6 @@ try {
       intention: intention.trim(),
       scope,
       rating: finalRating,
-visibility: finalVisibility,
       createdBy: userId,
       categories: {
         create: categoryRecords,
@@ -990,6 +990,9 @@ if (!username) {
         error: "User not found",
       })
     }
+
+    const invitedUserId = invitedUser.id
+
 
 
     // 4. 🔞 Minor safety: block NSFW invitations entirely

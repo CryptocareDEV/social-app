@@ -115,63 +115,207 @@ export default function Signup() {
         }}
       >
         {/* LEFT */}
-        <div>
+<div
+  style={{
+    background: colors.surface,
+    padding: 36,
+    borderRadius: theme.radius.lg,
+    border: `1px solid ${colors.border}`,
+    boxShadow: theme.shadow.md,
+    minHeight: 500,
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+  }}
+>
+  {/* Small Label */}
+  <div
+    style={{
+      fontSize: 11,
+      letterSpacing: 3,
+      textTransform: "uppercase",
+      color: colors.textMuted,
+      marginBottom: 20,
+    }}
+  >
+    Platform Philosophy
+  </div>
+
+  {/* Headline Block with subtle gold accent */}
+  <div
+    style={{
+      borderLeft: "3px solid #C6A75E",
+      paddingLeft: 16,
+      marginBottom: 30,
+    }}
+  >
+    <div
+      style={{
+        fontSize: 26,
+        fontWeight: 600,
+        fontFamily: "Georgia, serif",
+        color: colors.text,
+      }}
+    >
+      This platform
+    </div>
+
+    <div
+      style={{
+        marginTop: 6,
+        fontSize: 14,
+        color: colors.textMuted,
+      }}
+    >
+      is structured by intention, not influence.
+    </div>
+  </div>
+
+  {/* Sections */}
+  <div
+    style={{
+      display: "flex",
+      flexDirection: "column",
+      gap: 28,
+      fontSize: 15,
+      lineHeight: 1.6,
+    }}
+  >
+    {/* WHAT YOU CAN DO */}
+    <div>
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 600,
+          letterSpacing: 1.5,
+          textTransform: "uppercase",
+          marginBottom: 12,
+          color: colors.primary,
+        }}
+      >
+        What you can do
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {[
+          "Choose what you see through labels",
+          "Build real communities with shared intention",
+          "Stay aligned with topics that matter",
+          "Experience equal information flow",
+        ].map((text, i) => (
           <div
+            key={i}
             style={{
-              fontSize: theme.typography.h1.size,
-              fontWeight: 600,
-              lineHeight: theme.typography.h1.lineHeight,
-              marginBottom: 16,
-              color: colors.text,
+              display: "flex",
+              gap: 10,
+              alignItems: "flex-start",
+              transition: "transform 0.15s ease",
+              cursor: "default",
             }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.transform = "translateX(4px)")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.transform = "translateX(0px)")
+            }
           >
-            🌱 A calmer way to see the world
+            <div
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 999,
+                marginTop: 6,
+                background: colors.primary,
+                flexShrink: 0,
+              }}
+            />
+            <div>{text}</div>
           </div>
+        ))}
+      </div>
+    </div>
 
-          <p
+    {/* Divider */}
+    <div
+      style={{
+        height: 1,
+        background: colors.border,
+        opacity: 0.6,
+      }}
+    />
+
+    {/* WHAT YOU WON'T FIND */}
+    <div>
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 600,
+          letterSpacing: 1.5,
+          textTransform: "uppercase",
+          marginBottom: 12,
+          color: colors.textMuted,
+        }}
+      >
+        What you won’t find
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {[
+          "Follower counts or influence hierarchies",
+          "Engagement manipulation",
+          "Hidden ranking systems",
+          "Advertisements shaping perception",
+        ].map((text, i) => (
+          <div
+            key={i}
             style={{
-              fontSize: theme.typography.body.size,
-              lineHeight: theme.typography.body.lineHeight,
-              color: colors.textMuted,
-              marginBottom: 32,
+              display: "flex",
+              gap: 10,
+              alignItems: "flex-start",
+              transition: "transform 0.15s ease",
+              cursor: "default",
             }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.transform = "translateX(4px)")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.transform = "translateX(0px)")
+            }
           >
-            This is a place for intentional communities and thoughtful
-            conversations, not engagement farming.
-          </p>
-
-          <div style={{ display: "grid", gap: 20 }}>
-            <div>
-              <div style={featureTitleStyle}>
-                Multiple perspectives
-              </div>
-              <div style={featureBodyStyle}>
-                Create different feed profiles and experience the same
-                world through different lenses.
-              </div>
-            </div>
-
-            <div>
-              <div style={featureTitleStyle}>
-                Labels over algorithms
-              </div>
-              <div style={featureBodyStyle}>
-                Choose topics and communities deliberately, no opaque
-                ranking tricks.
-              </div>
-            </div>
-
-            <div>
-              <div style={featureTitleStyle}>
-                Governed, not chaotic
-              </div>
-              <div style={featureBodyStyle}>
-                Communities have rules, roles, and accountability built
-                in.
-              </div>
-            </div>
+            <div
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 999,
+                marginTop: 6,
+                background: colors.textMuted,
+                flexShrink: 0,
+              }}
+            />
+            <div>{text}</div>
           </div>
-        </div>
+        ))}
+      </div>
+    </div>
+
+    {/* Closing line */}
+    <div
+      style={{
+        marginTop: 10,
+        fontSize: 14,
+        fontStyle: "italic",
+        color: colors.textMuted,
+      }}
+    >
+      Information is structured & unrestricted.
+    </div>
+  </div>
+</div>
+
+
+
+
+
 
         {/* RIGHT: FORM */}
         <div

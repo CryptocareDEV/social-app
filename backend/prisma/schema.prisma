@@ -224,12 +224,18 @@ model CommunityLabelImport {
   communityId String
   categoryKey String
   importMode  LabelImportMode
+
+  global      Boolean         @default(true)
+  country     Boolean         @default(true)
+  local       Boolean         @default(true)
+
   category    Category        @relation(fields: [categoryKey], references: [key])
   community   Community       @relation(fields: [communityId], references: [id], onDelete: Cascade)
 
   @@unique([communityId, categoryKey])
   @@index([communityId])
 }
+
 
 model PostCategory {
   id          String   @id @default(uuid())
@@ -258,6 +264,8 @@ model UserProfile {
   userId   String   @id
   bio      String?  @db.VarChar(160)
   joinedAt DateTime @default(now())
+  showCommunities   Boolean  @default(true)
+  showCommunityPosts Boolean @default(true)
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 

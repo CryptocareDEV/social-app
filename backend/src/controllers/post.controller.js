@@ -402,6 +402,14 @@ if (scope === "LOCAL" && (!userCountry || !userRegion)) {
     /* 🔑 Load active feed profile */
     const feedProfile = await getActiveFeedProfile(userId)
 
+const profileName = feedProfile?.name ?? "Default"
+
+const activeLabelsForScope =
+  feedProfile?.preferences?.labels?.[scope] ?? []
+
+const isDefaultProfile =
+  !activeLabelsForScope || activeLabelsForScope.length === 0
+
     if (!feedProfile) {
       console.warn("⚠️ No active feed profile for user", userId)
     }
@@ -531,6 +539,19 @@ return res.json({
     _count: p._count,
     originPost: p.originPost ?? null,
     likedByMe: p.likes.length > 0,
+    reason: {
+  matchedCategories: p.categories.map(
+    (c) => c.category.key
+  ),
+  scopeCeiling: scope,
+  likes: p._count?.likes ?? 0,
+
+
+  scope,
+  profileName,
+  isDefaultProfile,
+},
+
   })),
   nextCursor,
 })

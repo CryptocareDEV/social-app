@@ -682,65 +682,6 @@ onMouseLeave={(e) => {
   </div>
 )}
 
-
-
-
-
-      {/* WHY AM I SEEING THIS */}
-      {post.reason && (
-        <div style={{ marginTop: 6 }}>
-          <button
-            type="button"
-            onClick={() => setShowReason((s) => !s)}
-            style={{
-              fontSize: 12,
-              color: colors.textMuted,
-              background: "none",
-              border: "none",
-              padding: 0,
-              cursor: "pointer",
-            }}
-          >
-            {showReason ? "Hide why" : "Why am I seeing this?"}
-          </button>
-
-          {showReason && (
-            <div
-              style={{
-                marginTop: 6,
-                padding: "8px 10px",
-                background: colors.surfaceMuted,
-                borderRadius: theme.radius.sm,
-                fontSize: 12,
-                color: colors.textMuted,
-                border: `1px solid ${colors.border}`,
-              }}
-            >
-              {post.reason.matchedCategories?.length > 0 && (
-                <div>
-                  <strong>Matched labels:</strong>{" "}
-                  {post.reason.matchedCategories.join(", ")}
-                </div>
-              )}
-
-              {post.reason.scopeCeiling && (
-                <div>
-                  <strong>Community scope:</strong>{" "}
-                  {post.reason.scopeCeiling}
-                </div>
-              )}
-
-              {"likes" in post.reason && (
-                <div>
-                  <strong>Engagement:</strong>{" "}
-                  {post.reason.likes} likes
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* LABELS */}
       {post.categories?.length > 0 && (
         <div
@@ -861,9 +802,103 @@ onMouseLeave={(e) => {
   </button>
 )}
 
+{post.reason && (
+  <div
+    style={{
+      marginLeft: "auto",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "flex-end",
+    }}
+  >
+    <button
+      type="button"
+      onClick={() => setShowReason((s) => !s)}
+      style={{
+        fontSize: 12,
+        color: colors.textMuted,
+        background: "none",
+        border: "none",
+        padding: 0,
+        cursor: "pointer",
+      }}
+    >
+      {showReason ? "Hide why" : "Why am I seeing this?"}
+    </button>
 
-        
-      </footer>
+    {showReason && (
+  <div
+    style={{
+      marginTop: 8,
+      padding: "8px 10px",
+      fontSize: 12,
+      color: colors.textMuted,
+      maxWidth: 280,
+      lineHeight: 1.5,
+      textAlign: "right",
+      borderTop: `1px solid ${colors.border}`,
+paddingTop: 6,
+    }}
+  >
+        {/* 🔎 Feed profile explanation */}
+{post.reason?.scope && (
+  <div style={{ marginBottom: 6 }}>
+    {post.reason.isDefaultProfile ? (
+      <div>
+        Viewing <strong>{post.reason.scope.toLowerCase()}</strong> feed ·
+<strong>Default</strong> profile.
+      </div>
+    ) : (
+      <div>
+        Matched your <strong>{post.reason.profileName}</strong> profile ·
+<strong>{post.reason.scope.toLowerCase()}</strong> scope.
+      </div>
+    )}
+  </div>
+)}
+
+        {post.reason.type === "INTERNAL" && (
+          <div>This post was created inside this community.</div>
+        )}
+
+        {post.reason.type === "EXTERNAL" && (
+          <>
+            <div>
+              Imported via label: <strong>#{post.reason.label}</strong>
+            </div>
+            <div>Mode: {post.reason.importMode}</div>
+          </>
+        )}
+
+        {post.reason.matchedCategories?.length > 0 && (
+          <div>
+            <span style={{ opacity: 0.8 }}>
+  Labels: {post.reason.matchedCategories.join(", ")}
+</span>
+          </div>
+        )}
+
+        {post.reason.scopeCeiling && (
+          <div>
+            <strong>Community scope:</strong>{" "}
+            {post.reason.scopeCeiling}
+          </div>
+        )}
+
+        {"likes" in post.reason && (
+          <div>
+            <span style={{ opacity: 0.7 }}>
+  {post.reason.likes} likes
+</span>
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+)}
+
+
+ </footer>
       {showComments && (
   <div
     style={{

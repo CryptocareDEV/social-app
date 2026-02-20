@@ -124,7 +124,6 @@ router.delete(
 )
 
 
-
 router.post(
   "/invitations/:id/accept",
   requireAuth,

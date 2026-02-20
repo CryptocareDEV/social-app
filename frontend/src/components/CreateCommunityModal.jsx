@@ -23,7 +23,6 @@ export default function CreateCommunityModal({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [rating, setRating] = useState("SAFE")
-  const [visibility, setVisibility] = useState("PUBLIC")
   const [isMinor, setIsMinor] = useState(false)
 useEffect(() => {
   api("/users/me")
@@ -50,6 +49,8 @@ useEffect(() => {
   const submit = async () => {
     if (loading) return
     if (!name.trim()) return setError("Community name is required")
+    if (!intention.trim())
+  return setError("Community intention is required")
     if (labels.length === 0)
       return setError("Add at least one label")
 
@@ -65,7 +66,6 @@ useEffect(() => {
           scope,
           categories: labels,
           rating: isMinor ? "SAFE" : rating,
-  visibility,
         }),
       })
 
@@ -307,49 +307,6 @@ useEffect(() => {
   </div>
 </div>
 
-
-{/* Visibility */}
-<div>
-  <div
-    style={{
-      fontSize: theme.typography.small.size,
-      color: c.textMuted,
-      marginBottom: 6,
-    }}
-  >
-    Privacy
-  </div>
-
-  <div style={{ display: "flex", gap: 8 }}>
-    {["PUBLIC", "PRIVATE"].map((v) => (
-      <button
-        key={v}
-        type="button"
-        onClick={() => setVisibility(v)}
-        style={{
-          padding: "6px 14px",
-          borderRadius: theme.radius.pill,
-          fontSize: 13,
-          border:
-            visibility === v
-              ? `1px solid ${c.primary}`
-              : `1px solid ${c.border}`,
-          background:
-            visibility === v
-              ? c.primarySoft
-              : c.surface,
-          color:
-            visibility === v
-              ? c.primary
-              : c.textMuted,
-          cursor: "pointer",
-        }}
-      >
-        {v}
-      </button>
-    ))}
-  </div>
-</div>
 
 
         {/* Buttons */}

@@ -21,17 +21,12 @@ import commentRoutes from "./routes/comment.routes.js"
 import helmet from "helmet"
 import rateLimit from "express-rate-limit"
 import superuserRoutes from "./routes/superuser.routes.js"
-
-
-
-
-
-
-
+import { rateLimit as userRateLimit } from "./middleware/rateLimit.middleware.js"
 
 dotenv.config()
 
 const app = express()
+app.set("trust proxy", 1)
 app.disable("etag")
 /* ================================
    🌐 CORS Configuration
@@ -63,6 +58,15 @@ app.use(
     crossOriginResourcePolicy: false,
   })
 )
+const signupLimiter = rateLimit({
+  windowMs: 30 * 60 * 1000, // 30 minutes
+  max: 5, // max 5 signups per IP
+  message: {
+    error: "Too many signup attempts. Try again later.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
 
 /* ================================
    🚦 Global Rate Limiter
@@ -101,6 +105,16 @@ app.use(
   express.static(path.join(__dirname, "../uploads"))
 )
 
+app.use(
+  "/api/v1/posts",
+  userRateLimit({ windowMs: 60 * 1000, max: 10 })
+)
+
+app.use(
+  "/api/v1/likes",
+  userRateLimit({ windowMs: 60 * 1000, max: 40 })
+)
+
 app.use("/api/v1/communities", communityRoutes)
 app.use("/api/v1", feedProfileRoutes)
 app.use("/api/v1", profileRoutes)
@@ -111,8 +125,9 @@ app.use("/api/v1/superusers", superuserRoutes)
 
 
 
-
+app.use("/api/v1/auth/signup", signupLimiter)
 app.use("/api/v1/auth/login", loginLimiter)
+
 app.use("/api/v1/auth", authRoutes)
 app.use("/api/v1/reports", reportRoutes)
 app.use("/api/v1/moderation", moderationRoutes)

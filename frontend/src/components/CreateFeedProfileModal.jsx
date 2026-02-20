@@ -93,11 +93,14 @@ const labelPreferences = Object.entries(labels)
 
 
 
-    const endpoint = editingProfile
+    const isEditMode = Boolean(editingProfile?.id)
+
+const endpoint = isEditMode
   ? `/me/feed-profiles/${editingProfile.id}`
   : "/me/feed-profiles"
 
-const method = editingProfile ? "PATCH" : "POST"
+const method = isEditMode ? "PATCH" : "POST"
+
 
 const profile = await api(endpoint, {
   method,
@@ -108,11 +111,6 @@ const profile = await api(endpoint, {
 }),
 })
 
-
-    // 2️⃣ ACTIVATE IT (THIS WAS MISSING)
-    await api(`/me/feed-profiles/${profile.id}/activate`, {
-      method: "POST",
-    })
 
     onCreated?.(profile)
     onClose()
@@ -146,33 +144,39 @@ const profile = await api(endpoint, {
     width: "100%",
     maxWidth: 520,
     background: colors.surface,
-    borderRadius: theme.radius.lg,
-    padding: 28,
+    borderRadius: 22,
+    padding: 32,
     border: `1px solid ${colors.border}`,
-    boxShadow: theme.shadow.md,
+    boxShadow: theme.shadow.lg,
     display: "flex",
     flexDirection: "column",
-    gap: 18,
+    gap: 24,
   }}
 >
 
-        <div
-  style={{
-    fontSize: theme.typography.h3.size,
-    fontWeight: theme.typography.h3.weight,
-  }}
->
-  {editingProfile ? "Edit feed profile" : "Create feed profile"}
+        <div>
+  <div
+    style={{
+      fontSize: 20,
+      fontWeight: 600,
+      marginBottom: 6,
+    }}
+  >
+    {editingProfile ? "Edit Feed Profile" : "Create Feed Profile"}
+  </div>
+
+  <div
+    style={{
+      fontSize: 13,
+      color: colors.textMuted,
+      lineHeight: 1.6,
+    }}
+  >
+    Define what subjects shape your feed across global,
+    country, and local scopes.
+  </div>
 </div>
 
-<div
-  style={{
-    fontSize: theme.typography.small.size,
-    color: colors.textMuted,
-  }}
->
-  Shape how your feed prioritizes content.
-</div>
 
 
         {/* Name */}
@@ -214,12 +218,37 @@ const profile = await api(endpoint, {
 
         {/* Scope selector */}
         <div style={{ marginTop: 16 }}>
-          <strong style={{ fontSize: 13 }}>
-            Label preferences
-          </strong>
+  <div
+    style={{
+      fontSize: 14,
+      fontWeight: 600,
+      marginBottom: 4,
+    }}
+  >
+    Labels per scope
+  </div>
+
+  <div
+    style={{
+      fontSize: 12,
+      color: colors.textMuted,
+      marginBottom: 12,
+      lineHeight: 1.5,
+    }}
+  >
+    Choose which topics appear in each geographic layer of your feed.
+  </div>
+
 
           <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-  {["GLOBAL", "COUNTRY", "LOCAL"].map((s) => (
+  {["GLOBAL", "COUNTRY", "LOCAL"].map((s) => {
+  const descriptions = {
+    GLOBAL: "🌍 Worldwide posts",
+    COUNTRY: "🏳️ Your country",
+    LOCAL: "📍 Your region",
+  }
+
+  return (
     <button
       key={s}
       onClick={() => setScope(s)}
@@ -241,9 +270,11 @@ const profile = await api(endpoint, {
             : colors.textMuted,
       }}
     >
-      {s}
+      {descriptions[s]}
     </button>
-  ))}
+  )
+})}
+
 </div>
 
 {/* Label search */}
@@ -336,6 +367,27 @@ transition: "background 0.2s ease",
       {labels[scope].map((l) => `#${l}`).join(", ")}
     </strong>
   </div>
+)}
+{labels[scope].length > 0 && (
+  <button
+    onClick={() => {
+      setLabels({
+        GLOBAL: labels[scope],
+        COUNTRY: labels[scope],
+        LOCAL: labels[scope],
+      })
+    }}
+    style={{
+      marginTop: 8,
+      fontSize: 12,
+      background: "transparent",
+      border: "none",
+      color: colors.primary,
+      cursor: "pointer",
+    }}
+  >
+    Apply these labels to all scopes
+  </button>
 )}
 
 
