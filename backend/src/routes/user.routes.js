@@ -56,7 +56,7 @@ router.get(
   }
 )
 
-router.get("/:id/posts", getUserPosts)
+router.get("/:id/posts", requireAuth, getUserPosts)
 router.get("/:id", getUserProfile)
 router.get("/:id/communities", requireAuth, getUserCommunities)
 

@@ -4,7 +4,6 @@ import {
   getModerationReports,
 } from "../controllers/moderation.controller.js"
 import { applyModerationAction } from "../controllers/moderation.controller.js"
-import { enforceCooldown } from "../middleware/enforceCooldown.middleware.js"
 import { requireSuperuserRole } from "../middleware/requireSuperuserRole.middleware.js"
 
 

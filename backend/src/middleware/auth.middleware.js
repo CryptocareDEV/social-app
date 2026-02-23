@@ -3,6 +3,10 @@ import prisma from "../lib/prisma.js"
 import { applyStrikeDecayIfEligible } from "../lib/strikeDecay.js"
 import { applyReportAccuracyDecayIfEligible } from "../lib/reportAccuracyDecay.js"
 
+if (!process.env.JWT_SECRET) {
+  throw new Error("JWT_SECRET is not defined")
+}
+
 export const requireAuth = async (req, res, next) => {
   try {
     const header = req.headers.authorization

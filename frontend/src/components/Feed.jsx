@@ -10,6 +10,7 @@ function Feed({
   theme,
   reportCooldownUntil,
   refreshUserState,
+  isMobile,
 }) {
 
   const colors = getThemeColors(theme)
@@ -51,12 +52,12 @@ function Feed({
   // 📰 Feed
   return (
     <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: theme.spacing.lg,
-      }}
-    >
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    gap: isMobile ? 12 : theme.spacing.lg,
+  }}
+>
       {posts.map((post) => (
         <PostCard
   key={post.id}

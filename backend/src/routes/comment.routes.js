@@ -2,7 +2,7 @@ import express from "express"
 import prisma from "../lib/prisma.js"
 import { getCommentsForPost, createComment, getRepliesForComment } from "../services/comment.service.js"
 import { requireAuth } from "../middleware/auth.middleware.js"
-
+import { rateLimit } from "../middleware/rateLimit.middleware.js"
 
 const router = express.Router()
 
@@ -48,7 +48,11 @@ router.get("/replies", async (req, res) => {
 
 
 
-router.post("/", requireAuth, async (req, res) => {
+router.post(
+  "/",
+  requireAuth,
+  rateLimit({ action: "COMMENT_CREATE" }),
+  async (req, res) => {
   try {
     const { postId, body, mediaUrl, mediaType, parentCommentId } = req.body
 

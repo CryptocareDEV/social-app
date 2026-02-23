@@ -57,20 +57,18 @@ export async function createComment({
   mediaType,
   parentCommentId = null,
 }) {
-  return prisma.comment.create({
+  // 1️⃣ Create comment
+  const comment = await prisma.comment.create({
     data: {
       body,
       mediaUrl,
       mediaType,
-
       post: {
         connect: { id: postId },
       },
-
       user: {
         connect: { id: userId },
       },
-
       ...(parentCommentId && {
         parent: {
           connect: { id: parentCommentId },
@@ -87,9 +85,51 @@ export async function createComment({
       },
     },
   })
+
+
+
+// A) Top-level comment → notify post owner
+if (!parentCommentId) {
+  const post = await prisma.post.findUnique({
+    where: { id: postId },
+    select: { userId: true },
+  })
+
+  if (post && post.userId !== userId) {
+    await prisma.notification.create({
+      data: {
+        recipientId: post.userId,
+        actorId: userId,
+        postId: postId,
+        commentId: comment.id,
+        type: "COMMENT_POST",
+      },
+    })
+  }
 }
 
+// B) Reply → notify parent comment owner
+if (parentCommentId) {
+  const parentComment = await prisma.comment.findUnique({
+    where: { id: parentCommentId },
+    select: { userId: true, postId: true },
+  })
 
+  if (parentComment && parentComment.userId !== userId) {
+    await prisma.notification.create({
+      data: {
+        recipientId: parentComment.userId,
+        actorId: userId,
+        postId: parentComment.postId,
+        commentId: parentCommentId,
+        type: "REPLY_COMMENT",
+      },
+    })
+  }
+}
+
+  return comment
+} 
 
 export async function getRepliesForComment({
   parentCommentId,

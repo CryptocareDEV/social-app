@@ -12,10 +12,6 @@ export default function MemeEditor({ post, theme, onClose, onPosted }) {
   const [baseImageUrl, setBaseImageUrl] = useState(null)
   const colors = getThemeColors(theme)
 
-  
-
-
-  const canvasRef = useRef(null)
 
 useEffect(() => {
   let mounted = true
@@ -36,9 +32,19 @@ useEffect(() => {
         setBaseImageUrl(res.mediaUrl)
       }
     } catch (err) {
-      console.error("Failed to load base image", err)
-      alert("Could not load meme base image")
-    }
+  console.error("Failed to load base image", err)
+
+  if (err?.error?.includes?.("NSFW") || err?.status === 403) {
+    alert("This image is not available.")
+  } else {
+    alert("Could not load meme base image")
+  }
+
+  // Prevent further canvas operations
+  if (mounted) {
+    setBaseImageUrl(null)
+  }
+}
   }
 
   loadBaseImage()
@@ -89,7 +95,14 @@ const wrapText = (ctx, text, maxWidth) => {
 }
 
 const drawIntoCanvas = async (canvas, top, bottom) => {
-  const ctx = canvas.getContext("2d")
+  if (!canvas) {
+  throw new Error("Canvas not available")
+}
+
+const ctx = canvas.getContext("2d")
+if (!ctx) {
+  throw new Error("Failed to get canvas context")
+}
   const img = await loadImageDirect()
 
   canvas.width = img.naturalWidth
@@ -149,15 +162,6 @@ const drawIntoCanvas = async (canvas, top, bottom) => {
 }
 
 
-
-  const drawMemeToCanvas = async (top, bottom) => {
-  const canvas = canvasRef.current
-  await drawIntoCanvas(canvas, top, bottom)
-  return canvas
-}
-
-
-
   // ⬇️ DOWNLOAD (WORKS RELIABLY)
   const downloadMeme = async () => {
     const exportCanvas = document.createElement("canvas")
@@ -179,6 +183,10 @@ exportCanvas.toBlob((blob) => {
 
   const postMeme = async () => {
   if (saving) return
+  if (!baseImageUrl) {
+  alert("Base image unavailable")
+  return
+}
   setSaving(true)
 
   try {
@@ -210,8 +218,9 @@ exportCanvas.toBlob((blob) => {
 
     const imageUrl = uploadRes.url
 
-    const categories =
-      post.categories?.map((c) => c.category.key) || []
+    const categories = Array.isArray(post.categories)
+  ? post.categories
+  : []
 
     if (categories.length === 0) {
       throw new Error("Cannot create meme without categories")
@@ -226,20 +235,18 @@ exportCanvas.toBlob((blob) => {
         mediaUrl: imageUrl,
         scope: post.scope,
         categories,
-        originPostId:
-          post.type === "MEME"
-            ? post.originPostId ?? post.id
-            : post.id,
+        originPostId: post.id,
       }),
     })
 
     onPosted()
   } catch (err) {
-    console.error("POST MEME FAILED", err)
-    alert("Failed to create meme")
-  } finally {
-    setSaving(false)
+  if (err?.cooldownUntil) {
+    await refreshUserState?.()
   }
+
+  alert(err?.error || "Action failed")
+}
 }
 
 

@@ -7,8 +7,22 @@ import { loadCommunityWithCategories } from "../services/community.loader.js"
 export const materializeCommunityNow = async (req, res) => {
   try {
     const { id } = req.params
+    const userId = req.user.userId
+    const membership = await prisma.communityMember.findFirst({
+  where: {
+    communityId: id,
+    userId,
+    role: "ADMIN",
+  },
+})
+
+if (!membership) {
+  return res.status(403).json({
+    error: "Only ADMIN can materialize community feed",
+  })
+}
     const community = await prisma.community.findUnique({
-  where: { id: communityId },
+  where: { id },
 })
 
 if (!community) {
@@ -193,6 +207,12 @@ export const getCommunityById = async (req, res) => {
         error: "Community not found",
       })
     }
+
+    if (req.user.isMinor && community.rating === "NSFW") {
+  return res.status(403).json({
+    error: "Minors cannot access NSFW communities",
+  })
+}
 
     return res.json({
   ...community,
@@ -552,8 +572,11 @@ let feedItems = await prisma.communityFeedItem.findMany({
     communityId: id,
     feedDate: feedDate,
     post: {
-    isRemoved: false,
-  },
+  isRemoved: false,
+  ...(req.user.isMinor && {
+    rating: "SAFE",
+  }),
+},
     ...(cursor && {
       rank: {
         gt: (
@@ -625,9 +648,14 @@ if (feedItems.length === 0) {
 
   feedItems = await prisma.communityFeedItem.findMany({
     where: {
-      communityId: id,
-      feedDate: feedDate,
-    },
+  communityId: id,
+  feedDate: feedDate,
+  post: {
+    ...(req.user.isMinor && {
+      rating: "SAFE",
+    }),
+  },
+},
     orderBy: { rank: "asc" },
     include: {
   post: {
@@ -688,7 +716,7 @@ return res.json(
       isRemoved: post.isRemoved,
 
       user: post.user,
-      categories: post.categories,
+      categories: post.categories.map(c => c.category.key),
       _count: post._count,
 
       originPost: post.originPost ?? null, // 🔑 KEEP LINEAGE
@@ -1076,6 +1104,15 @@ if (!username) {
         },
       })
 
+    await prisma.notification.create({
+  data: {
+    recipientId: invitedUserId,
+    actorId: invitedById,
+    communityId: communityId,
+    type: "COMMUNITY_INVITE",
+  },
+})
+
     return res.status(201).json(invitation)
   } catch (err) {
     console.error("CREATE INVITATION ERROR:", err)
@@ -1363,12 +1400,16 @@ export const getMyCommunities = async (req, res) => {
 
     const communities = await prisma.community.findMany({
       where: {
-        members: {
-          some: {
-            userId,
-          },
-        },
+    members: {
+      some: {
+        userId,
       },
+    },
+
+    ...(req.user.isMinor && {
+      rating: "SAFE",
+    }),
+  },
       select: {
   id: true,
   name: true,
@@ -1433,8 +1474,31 @@ export const leaveCommunity = async (req, res) => {
       }
 
       // Last member → delete community
-      await prisma.community.delete({ where: { id: communityId } })
-      return res.json({ deleted: true })
+      await prisma.$transaction([
+  prisma.communityCategory.deleteMany({
+    where: { communityId },
+  }),
+  prisma.communityMember.deleteMany({
+    where: { communityId },
+  }),
+  prisma.communityInvitation.deleteMany({
+    where: { communityId },
+  }),
+  prisma.communityFeedItem.deleteMany({
+    where: { communityId },
+  }),
+  prisma.communityChat.deleteMany({
+    where: { communityId },
+  }),
+  prisma.communityLabelImport.deleteMany({
+    where: { communityId },
+  }),
+  prisma.community.delete({
+    where: { id: communityId },
+  }),
+])
+
+return res.json({ deleted: true })
     }
   }
 
@@ -1526,6 +1590,11 @@ export const getCommunityPublicView = async (req, res) => {
     if (!community) {
       return res.status(404).json({ error: "Community not found" })
     }
+    if (req.user?.isMinor && community.rating === "NSFW") {
+  return res.status(403).json({
+    error: "Minors cannot access NSFW communities",
+  })
+}
 
     // 2️⃣ Load PUBLIC posts only
     const posts = await prisma.communityFeedItem.findMany({
@@ -1570,7 +1639,10 @@ if (req.user?.userId) {
 
 return res.json({
   community,
-  posts: posts.map(i => i.post),
+  posts: posts.map(i => ({
+  ...i.post,
+  categories: i.post.categories?.map(c => c.category.key) || [],
+})),
   canRequestJoin: true,
   myInvitationStatus,
 })

@@ -84,24 +84,41 @@ export const getUserPosts = async (req, res) => {
     const { cursor } = req.query
 const take = 20
 
+const isMinor = req.user?.isMinor === true
+
 const posts = await prisma.post.findMany({
   where: {
     userId: id,
+
     ...(hideCommunityPosts && {
       communityId: null,
     }),
+
+    ...(isMinor && {
+      rating: "SAFE",
+      OR: [
+        { communityId: null },
+        {
+          community: {
+            rating: "SAFE",
+          },
+        },
+      ],
+    }),
   },
+
   orderBy: [
     { createdAt: "desc" },
     { id: "desc" },
   ],
+
   take,
+
   ...(cursor && {
     skip: 1,
-    cursor: {
-      id: cursor,
-    },
+    cursor: { id: cursor },
   }),
+
   select: {
     id: true,
     type: true,
@@ -215,31 +232,41 @@ export const getMyInvitations = async (req, res) => {
   try {
     const userId = req.user.userId
 
-    const invitations = await prisma.communityInvitation.findMany({
-      where: {
-        invitedUserId: userId,
-        status: "PENDING",
+    const isMinor = req.user?.isMinor === true
+
+const invitations = await prisma.communityInvitation.findMany({
+  where: {
+    invitedUserId: userId,
+    status: "PENDING",
+
+    ...(isMinor && {
+      community: {
+        rating: "SAFE",
       },
-      include: {
-        community: {
-          select: {
-            id: true,
-            name: true,
-            intention: true,
-            scope: true,
-          },
-        },
-        invitedBy: {
-          select: {
-            id: true,
-            username: true,
-          },
-        },
+    }),
+  },
+
+  include: {
+    community: {
+      select: {
+        id: true,
+        name: true,
+        intention: true,
+        scope: true,
       },
-      orderBy: {
-        createdAt: "desc",
+    },
+    invitedBy: {
+      select: {
+        id: true,
+        username: true,
       },
-    })
+    },
+  },
+
+  orderBy: {
+    createdAt: "desc",
+  },
+})
 
     return res.json(invitations)
   } catch (err) {
@@ -443,20 +470,32 @@ export const getUserCommunities = async (req, res) => {
       return res.json([])
     }
 
-    const memberships = await prisma.communityMember.findMany({
-      where: { userId: id },
-      include: {
-        community: {
-          select: {
-            id: true,
-            name: true,
-            intention: true,
-            scope: true,
-          },
-        },
+    const isMinor = req.user?.isMinor === true
+
+const memberships = await prisma.communityMember.findMany({
+  where: {
+    userId: id,
+
+    ...(isMinor && {
+      community: {
+        rating: "SAFE",
       },
-      orderBy: { joinedAt: "desc" },
-    })
+    }),
+  },
+
+  include: {
+    community: {
+      select: {
+        id: true,
+        name: true,
+        intention: true,
+        scope: true,
+      },
+    },
+  },
+
+  orderBy: { joinedAt: "desc" },
+})
 
     return res.json(
       memberships.map((m) => ({

@@ -21,11 +21,13 @@ import commentRoutes from "./routes/comment.routes.js"
 import helmet from "helmet"
 import rateLimit from "express-rate-limit"
 import superuserRoutes from "./routes/superuser.routes.js"
-import { rateLimit as userRateLimit } from "./middleware/rateLimit.middleware.js"
+import notificationRoutes from "./routes/notification.routes.js"
+import rootAnalyticsRoutes from "./routes/rootAnalytics.routes.js"
 
 dotenv.config()
 
 const app = express()
+app.disable("x-powered-by")
 app.set("trust proxy", 1)
 app.disable("etag")
 /* ================================
@@ -33,7 +35,7 @@ app.disable("etag")
 ================================ */
 const allowedOrigins = process.env.FRONTEND_URL
   ? [process.env.FRONTEND_URL]
-  : ["http://localhost:5173", "http://localhost:4000"]
+  : ["http://localhost:5173"]
 
 app.use(
   cors({
@@ -93,27 +95,11 @@ const loginLimiter = rateLimit({
 
 app.use(globalLimiter)
 
-app.use("/api/v1/media", mediaRoutes)
 app.use(express.json({ limit: "10mb" }))
 app.use(express.urlencoded({ limit: "10mb", extended: true }))
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+app.use("/api/v1/media", mediaRoutes)
+app.use("/api/v1/root", rootAnalyticsRoutes)
 
-// Serve uploaded files statically
-app.use(
-  "/uploads",
-  express.static(path.join(__dirname, "../uploads"))
-)
-
-app.use(
-  "/api/v1/posts",
-  userRateLimit({ windowMs: 60 * 1000, max: 10 })
-)
-
-app.use(
-  "/api/v1/likes",
-  userRateLimit({ windowMs: 60 * 1000, max: 40 })
-)
 
 app.use("/api/v1/communities", communityRoutes)
 app.use("/api/v1", feedProfileRoutes)
@@ -137,7 +123,7 @@ app.use("/api/v1/likes", likeRoutes)
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/invitations", invitationRoutes)
 app.use("/api/v1/communities", communityChatRoutes)
-
+app.use("/api/v1/notifications", notificationRoutes)
 
 
 startCommunityFeedCron()
@@ -149,6 +135,33 @@ app.get("/", (req, res) => {
 })
 
 const PORT = process.env.PORT || 4000
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Backend running on http://localhost:${PORT}`)
+})
+
+import prisma from "./lib/prisma.js"
+
+const shutdown = async (signal) => {
+  console.log(`\nReceived ${signal}. Shutting down gracefully...`)
+  try {
+    await prisma.$disconnect()
+    server.close(() => {
+      console.log("Server closed.")
+      process.exit(0)
+    })
+  } catch (err) {
+    console.error("Shutdown error:", err)
+    process.exit(1)
+  }
+}
+
+process.on("SIGINT", () => shutdown("SIGINT"))
+process.on("SIGTERM", () => shutdown("SIGTERM"))
+
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled Rejection:", reason)
+})
+
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err)
 })

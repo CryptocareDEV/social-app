@@ -42,6 +42,7 @@ function CommentNode({
   loadReplies,
   theme,
   colors,
+  isMobile,
 })
  {
 
@@ -56,7 +57,7 @@ function CommentNode({
     marginTop: theme.spacing.sm,
     paddingTop: theme.spacing.sm,
     borderTop: `1px solid ${colors.border}`,
-    marginLeft: depth * 16,
+    marginLeft: isMobile ? depth * 10 : depth * 16,
     maxWidth: "100%",
     boxSizing: "border-box",
   }}
@@ -194,6 +195,7 @@ function CommentNode({
   loadReplies={loadReplies}
   theme={theme}
   colors={colors}
+  isMobile={isMobile}
 />
       ))}
     </div>
@@ -208,6 +210,7 @@ function PostCard({
   theme,
   reportCooldownUntil,
   refreshUserState,
+  isMobile,
 }) {
   
   if (post.isRemoved) return null
@@ -221,7 +224,7 @@ const [replySubmitting, setReplySubmitting] = useState({})
 const [repliesMap, setRepliesMap] = useState({})
 const [replyCursors, setReplyCursors] = useState({})
 const [hasMoreReplies, setHasMoreReplies] = useState({})
-
+const reason = post.reason || null
 
 
 const [commentsLoading, setCommentsLoading] = useState(false)
@@ -253,8 +256,8 @@ const [optimisticCountDelta, setOptimisticCountDelta] = useState(0)
   const severity = (() => {
     if (!post?.rating) return null
     if (post.rating === "NSFW") return "CRITICAL"
-    if (post.reason?.autoLimited) return "MEDIUM"
-    if (post.reason?.moderationOutcome === "REMOVED") return "HIGH"
+    if (reason?.autoLimited) return "MEDIUM"
+    if (reason?.moderationOutcome === "REMOVED") return "HIGH"
     return null
   })()
 
@@ -373,8 +376,15 @@ const [optimisticCountDelta, setOptimisticCountDelta] = useState(0)
 })
 
   } catch (err) {
+  if (err?.cooldownUntil) {
+    await refreshUserState?.()
+    setCommentSubmitError("You’ve reached your comment limit. Please slow down.")
+  } else if (err?.error) {
+    setCommentSubmitError(err.error)
+  } else {
     setCommentSubmitError("Failed to post comment")
-  } finally {
+  }
+} finally {
     setCommentSubmitting(false)
   }
 }
@@ -401,15 +411,16 @@ const [optimisticCountDelta, setOptimisticCountDelta] = useState(0)
 
 
   const actionButtonStyle = {
-    fontSize: 13,
-    padding: "6px 12px",
-    borderRadius: theme.radius.pill,
-    border: `1px solid ${colors.border}`,
-    background: "transparent",
-    color: colors.textMuted,
-    cursor: "pointer",
-    transition: "background 0.15s ease, color 0.15s ease",
-  }
+  fontSize: 12,
+  padding: isMobile ? "2px 0" : "6px 12px",
+  minHeight: isMobile ? 24 : "auto",
+  borderRadius: theme.radius.pill,
+  border: isMobile ? "none" : `1px solid ${colors.border}`,
+  background: "transparent",
+  color: colors.textMuted,
+  cursor: "pointer",
+  transition: "opacity 0.15s ease",
+}
 
   const loadReplies = async (commentId) => {
   if (repliesMap[commentId]) return
@@ -451,9 +462,14 @@ const handleReplySubmit = async (parentId) => {
     }))
 
     setReplyBodies((prev) => ({ ...prev, [parentId]: "" }))
-  } catch {
-    alert("Failed to reply")
-  } finally {
+  } catch (err) {
+  if (err?.cooldownUntil) {
+    await refreshUserState?.()
+    alert("You’ve reached your reply limit. Please slow down.")
+  } else {
+    alert(err?.error || "Failed to reply")
+  }
+} finally {
     setReplySubmitting((prev) => ({ ...prev, [parentId]: false }))
   }
 }
@@ -461,41 +477,50 @@ const handleReplySubmit = async (parentId) => {
   return (
 
     <article
+      id={`post-${post.id}`}
       style={{
-        background: colors.surface,
-        borderRadius: theme.radius.lg,
-        padding: theme.spacing.xl + 4,
-        border: `1px solid ${colors.border}`,
-        boxShadow: theme.shadow.sm,
-        transition: "box-shadow 0.15s ease",
-      }}
-  onMouseEnter={(e) => {
-    e.currentTarget.style.boxShadow = theme.shadow.md
-    e.currentTarget.style.transform = "translateY(-1px)"
-  }}
-  onMouseLeave={(e) => {
-    e.currentTarget.style.boxShadow = theme.shadow.sm
-    e.currentTarget.style.transform = "translateY(0)"
-  }}
+  background: colors.surface,
+  borderRadius: isMobile ? 0 : theme.radius.lg,
+  padding: isMobile ? "12px 0" : theme.spacing.xl + 4,
+  boxShadow: isMobile ? "none" : theme.shadow.sm,
+
+  borderTop: isMobile ? "none" : `1px solid ${colors.border}`,
+  borderLeft: isMobile ? "none" : `1px solid ${colors.border}`,
+  borderRight: isMobile ? "none" : `1px solid ${colors.border}`,
+  borderBottom: `1px solid ${colors.border}`,
+}}
 >
       {/* HEADER */}
       <header
   style={{
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: isMobile ? 6 : 12,
+  fontSize: 13,
+}}
+>
+        <div
+  style={{
     display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 12,
-    fontSize: 13,
+    gap: 8,
+    alignItems: "center",
+    minWidth: 0,
+    flex: 1,
   }}
 >
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
     <Link
       to={`/profile/${post.user.id}`}
       style={{
   color: colors.text,
   fontWeight: 600,
-  fontSize: 14,
-  textDecoration: "none",
+fontSize: 14,
+textDecoration: "none",
+whiteSpace: "nowrap",
+overflow: "hidden",
+textOverflow: "ellipsis",
+maxWidth: isMobile ? "60vw" : 220,
+display: "block",
 }}
     >
       @{post.user.username}
@@ -517,12 +542,12 @@ const handleReplySubmit = async (parentId) => {
   onClick={() => setCollapsed((c) => !c)}
   style={{
     ...actionButtonStyle,
-    fontSize: 12,
-    padding: "4px 8px",
+    fontSize: isMobile ? 13 : 12,
+padding: isMobile ? "6px 10px" : "4px 8px",
     opacity: 0.6,
   }}
 >
-  {collapsed ? "▸ Expand" : "▾ Collapse"}
+  {collapsed ? "▸" : "▾"}
 </button>
 
 
@@ -589,12 +614,12 @@ onMouseLeave={(e) => {
 {!collapsed && imageSrc && (
   <div
     style={{
-      marginTop: theme.spacing.md,
-      borderRadius: theme.radius.md,
-      overflow: "hidden",
-      border: `1px solid ${colors.border}`,
-      background: colors.surfaceMuted,
-      position: "relative",
+      marginTop: isMobile ? 8 : theme.spacing.md,
+borderRadius: isMobile ? 0 : theme.radius.md,
+overflow: "hidden",
+border: isMobile ? "none" : `1px solid ${colors.border}`,
+background: colors.surfaceMuted,
+position: "relative",
     }}
   >
     {post.type === "VIDEO" ? (
@@ -605,9 +630,11 @@ onMouseLeave={(e) => {
     style={{
       width: "100%",
       display: "block",
-      maxHeight: 520,
+      minHeight: isMobile ? "60vh" : undefined,
+      maxHeight: isMobile ? "none" : 520,
       background: colors.bg,
-      borderRadius: theme.radius.md,
+      borderRadius: isMobile ? 0 : theme.radius.md,
+      objectFit: isMobile ? "cover" : "contain",
     }}
   />
 ) : (
@@ -618,9 +645,11 @@ onMouseLeave={(e) => {
     style={{
       width: "100%",
       display: "block",
-      maxHeight: 520,
-      objectFit: "contain",
+      minHeight: isMobile ? "60vh" : undefined,
+      maxHeight: isMobile ? "none" : 520,
+      objectFit: isMobile ? "cover" : "contain",
       background: colors.bg,
+      borderRadius: isMobile ? 0 : theme.radius.md,
     }}
   />
 )}
@@ -684,40 +713,40 @@ onMouseLeave={(e) => {
 
       {/* LABELS */}
       {post.categories?.length > 0 && (
-        <div
-          style={{
-            display: "flex",
-            gap: 6,
-            flexWrap: "wrap",
-            marginTop: 8,
-          }}
-        >
-          {post.categories.map((c) => (
-            <span
-              key={c.category.key}
-              onClick={() => onLabelClick(c.category.key)}
-              style={{
-    fontSize: 12,
-    padding: "4px 10px",
-    borderRadius: theme.radius.pill,
-    background:
-      theme.mode === "dark"
-        ? "rgba(59,130,246,0.15)"
-        : "rgba(37,99,235,0.08)",
-    color:
-      theme.mode === "dark"
-        ? "#bfdbfe"
-        : "#1e3a8a",
-    border: `1px solid ${colors.border}`,
-    cursor: "pointer",
-    fontWeight: 500,
-  }}
-            >
-              #{c.category.key}
-            </span>
-          ))}
-        </div>
-      )}
+  <div
+    style={{
+      display: "flex",
+      gap: 6,
+      flexWrap: "wrap",
+      marginTop: 8,
+    }}
+  >
+    {post.categories.map((key) => (
+      <span
+        key={key}
+        onClick={() => onLabelClick(key)}
+        style={{
+          fontSize: 12,
+          padding: "4px 10px",
+          borderRadius: theme.radius.pill,
+          background:
+            theme.mode === "dark"
+              ? "rgba(59,130,246,0.15)"
+              : "rgba(37,99,235,0.08)",
+          color:
+            theme.mode === "dark"
+              ? "#bfdbfe"
+              : "#1e3a8a",
+          border: `1px solid ${colors.border}`,
+          cursor: "pointer",
+          fontWeight: 500,
+        }}
+      >
+        #{key}
+      </span>
+    ))}
+  </div>
+)}
 {severity && severityCopy[severity] && (
   <div
     style={{
@@ -737,12 +766,21 @@ onMouseLeave={(e) => {
   {/* FOOTER */}
       <footer
         style={{
-          marginTop: theme.spacing.lg,
-          display: "flex",
-          gap: 12,
-          alignItems: "center",
-        }}
+  marginTop: 10,
+  display: "flex",
+  flexDirection: isMobile ? "column" : "row",
+  alignItems: isMobile ? "flex-start" : "center",
+  gap: isMobile ? 6 : 0,
+  justifyContent: "space-between",
+}}
       >
+        <div
+  style={{
+    display: "flex",
+    gap: isMobile ? 18 : 12,
+    alignItems: "center",
+  }}
+>
         <button
   disabled={false}
   onClick={() => onLike(post.id)}
@@ -751,6 +789,9 @@ onMouseLeave={(e) => {
     fontWeight: 500,
     color: post.likedByMe ? colors.primary : colors.textMuted,
     borderColor: post.likedByMe ? colors.primarySoft : colors.border,
+    border: isMobile ? "none" : `1px solid ${colors.border}`,
+  background: isMobile ? "transparent" : "transparent",
+  padding: isMobile ? "6px 4px" : actionButtonStyle.padding,
   }}
 >
   {post.likedByMe ? "💙" : "🤍"} {post._count.likes}
@@ -762,32 +803,27 @@ onMouseLeave={(e) => {
   style={{
     ...actionButtonStyle,
     fontWeight: 500,
+    border: isMobile ? "none" : `1px solid ${colors.border}`,
+  background: isMobile ? "transparent" : "transparent",
+  padding: isMobile ? "6px 4px" : actionButtonStyle.padding,
   }}
 >
-  💬{" "}
-{showComments
-  ? "Hide"
-  : displayCommentCount > 0
-  ? `${displayCommentCount} ${
-      displayCommentCount === 1 ? "Comment" : "Comments"
-    }`
-  : "Comments"}
+  💬 {displayCommentCount}
 
 </button>
-
 
 {/* MEME (image-only) */}
   {["IMAGE", "MEME"].includes(post.type) && imageSrc && (
   <button
     onClick={() => onMeme(post)}
     style={{
-      fontSize: 12,
-      padding: "6px 10px",
+      fontSize: isMobile ? 12 : 12,
+padding: isMobile ? "4px 2px" : "6px 10px",
       borderRadius: theme.radius.pill,
-      border: `1px solid ${colors.border}`,
+      border: isMobile ? "none" : `1px solid ${colors.border}`,
       background: "transparent",
       color: colors.textMuted,
-      opacity: 0.75,
+      opacity: isMobile ? 0.7 : 0.75,
       cursor: "pointer",
       transition: "opacity 0.15s ease",
     }}
@@ -798,14 +834,15 @@ onMouseLeave={(e) => {
       e.currentTarget.style.opacity = 0.75
     }}
   >
-    🖼️ Meme this post
+    🖼️ Meme It
   </button>
 )}
+</div>
 
-{post.reason && (
+
+{reason && (
   <div
     style={{
-      marginLeft: "auto",
       display: "flex",
       flexDirection: "column",
       alignItems: "flex-end",
@@ -823,7 +860,7 @@ onMouseLeave={(e) => {
         cursor: "pointer",
       }}
     >
-      {showReason ? "Hide why" : "Why am I seeing this?"}
+      {showReason ? "Hide Why" : "Why?"}
     </button>
 
     {showReason && (
@@ -841,54 +878,54 @@ paddingTop: 6,
     }}
   >
         {/* 🔎 Feed profile explanation */}
-{post.reason?.scope && (
+{reason?.scope && (
   <div style={{ marginBottom: 6 }}>
-    {post.reason.isDefaultProfile ? (
+    {reason.isDefaultProfile ? (
       <div>
-        Viewing <strong>{post.reason.scope.toLowerCase()}</strong> feed ·
+        Viewing <strong>{reason.scope.toLowerCase()}</strong> feed ·
 <strong>Default</strong> profile.
       </div>
     ) : (
       <div>
-        Matched your <strong>{post.reason.profileName}</strong> profile ·
-<strong>{post.reason.scope.toLowerCase()}</strong> scope.
+        Matched your <strong>{reason.profileName}</strong> profile ·
+<strong>{reason.scope.toLowerCase()}</strong> scope.
       </div>
     )}
   </div>
 )}
 
-        {post.reason.type === "INTERNAL" && (
+        {reason.type === "INTERNAL" && (
           <div>This post was created inside this community.</div>
         )}
 
-        {post.reason.type === "EXTERNAL" && (
+        {reason.type === "EXTERNAL" && (
           <>
             <div>
-              Imported via label: <strong>#{post.reason.label}</strong>
+              Imported via label: <strong>#{reason.label}</strong>
             </div>
-            <div>Mode: {post.reason.importMode}</div>
+            <div>Mode: {reason.importMode}</div>
           </>
         )}
 
-        {post.reason.matchedCategories?.length > 0 && (
+        {reason.matchedCategories?.length > 0 && (
           <div>
             <span style={{ opacity: 0.8 }}>
-  Labels: {post.reason.matchedCategories.join(", ")}
+  Labels: {reason.matchedCategories.join(", ")}
 </span>
           </div>
         )}
 
-        {post.reason.scopeCeiling && (
+        {reason.scopeCeiling && (
           <div>
             <strong>Community scope:</strong>{" "}
-            {post.reason.scopeCeiling}
+            {reason.scopeCeiling}
           </div>
         )}
 
-        {"likes" in post.reason && (
+        {"likes" in reason && (
           <div>
             <span style={{ opacity: 0.7 }}>
-  {post.reason.likes} likes
+  {reason.likes} likes
 </span>
           </div>
         )}
@@ -905,8 +942,9 @@ paddingTop: 6,
       marginTop: theme.spacing.md,
       padding: theme.spacing.md,
       borderRadius: theme.radius.md,
-      background: colors.surfaceMuted,
-      border: `1px solid ${colors.border}`,
+      background: "transparent",
+border: "none",
+padding: isMobile ? 12 : theme.spacing.md,
     }}
   >
     {commentsLoading && (
@@ -941,6 +979,7 @@ paddingTop: 6,
   loadReplies={loadReplies}
   theme={theme}
   colors={colors}
+  isMobile={isMobile}
 />
 
 ))}
@@ -974,7 +1013,7 @@ paddingTop: 6,
   style={{
     marginTop: theme.spacing.md,
     display: "flex",
-    gap: 8,
+    gap: isMobile ? 10 : 8,
   }}
 >
   <input
@@ -995,7 +1034,7 @@ paddingTop: 6,
     placeholder="Add a thoughtful response…"
     style={{
       flex: 1,
-      padding: "10px 12px",
+      padding: isMobile ? "12px 14px" : "10px 12px",
       borderRadius: theme.radius.md,
       border: `1px solid ${colors.border}`,
       background: colors.surface,

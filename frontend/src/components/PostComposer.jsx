@@ -188,21 +188,14 @@ if (type !== "TEXT") {
 
   const formData = new FormData()
   formData.append("file", file)
+  
+  const uploadData = await api("/media/upload", {
+  method: "POST",
+  body: formData,
+  })
 
-  const uploadRes = await fetch(
-    "http://localhost:4000/api/v1/media/upload",
-    {
-      method: "POST",
-      body: formData,
-    }
-  )
-
-  if (!uploadRes.ok) {
-    throw new Error("Upload failed")
-  }
-
-  const uploadData = await uploadRes.json()
   finalMediaUrl = uploadData.url
+  
 }
 
 const post = await api("/posts", {
@@ -233,10 +226,10 @@ setScope("GLOBAL")
       onPostCreated?.(post)
     } catch (err) {
   if (err?.cooldownUntil) {
-    refreshUserState?.() // 🔥 important
+    await refreshUserState?.()
   }
 
-  setError(err?.error || "Failed to create post")
+  alert(err?.error || "Action failed")
 }
  finally {
       setLoading(false)

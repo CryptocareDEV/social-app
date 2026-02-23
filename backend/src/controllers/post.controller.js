@@ -338,14 +338,29 @@ regionCode:
       },
     })
 
-    
-
-
-
-
     if (communityId) {
-      await materializeCommunityFeed(communityId)
-    }
+  await materializeCommunityFeed(communityId)
+
+  const members = await prisma.communityMember.findMany({
+    where: {
+      communityId,
+      userId: { not: userId }, // exclude author
+    },
+    select: { userId: true },
+  })
+
+  if (members.length > 0) {
+    await prisma.notification.createMany({
+      data: members.map((member) => ({
+        recipientId: member.userId,
+        actorId: userId,
+        communityId: communityId,
+        postId: post.id,
+        type: "COMMUNITY_POST",
+      })),
+    })
+  }
+}
 
     return res.status(201).json(post)
   } catch (err) {
@@ -378,7 +393,8 @@ export const getScopedFeed = async (req, res) => {
     }
 
     const userId = req.user.userId
-        // 🌍 Get user's stored location
+
+    // 🌍 Get user's stored location
     const userLocation = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -391,71 +407,150 @@ export const getScopedFeed = async (req, res) => {
     const userRegion = userLocation?.regionCode || null
 
     if (scope === "COUNTRY" && !userCountry) {
-  return res.json([])
-}
+      return res.json({ items: [], nextCursor: null })
+    }
 
-if (scope === "LOCAL" && (!userCountry || !userRegion)) {
-  return res.json([])
-}
-
+    if (scope === "LOCAL" && (!userCountry || !userRegion)) {
+      return res.json({ items: [], nextCursor: null })
+    }
 
     /* 🔑 Load active feed profile */
     const feedProfile = await getActiveFeedProfile(userId)
 
-const profileName = feedProfile?.name ?? "Default"
-
-const activeLabelsForScope =
-  feedProfile?.preferences?.labels?.[scope] ?? []
-
-const isDefaultProfile =
-  !activeLabelsForScope || activeLabelsForScope.length === 0
-
-    if (!feedProfile) {
-      console.warn("⚠️ No active feed profile for user", userId)
-    }
-
-    console.log("🧠 ACTIVE FEED PROFILE:", feedProfile)
-
     const labelPrefs =
       feedProfile?.preferences?.labels?.[scope] ?? []
 
-    console.log(
-      "🧠 FEED LABELS FOR SCOPE",
-      scope,
-      labelPrefs
-    )
-
     const user = await prisma.user.findUnique({
-  where: { id: userId },
-  select: { nsfwEnabled: true },
-})
+      where: { id: userId },
+      select: { nsfwEnabled: true },
+    })
 
-const nsfwFilter = buildNsfwFilter({
-  isMinor: req.user.isMinor,
-  nsfwEnabled: user?.nsfwEnabled,
-  feedProfile,
-})
-
+    const nsfwFilter = buildNsfwFilter({
+      isMinor: req.user.isMinor,
+      nsfwEnabled: user?.nsfwEnabled,
+      feedProfile,
+    })
 
     const { cursor, limit } = req.query
+    const take = Math.min(parseInt(limit) || 10, 20)
 
-const take = Math.min(parseInt(limit) || 10, 20) // max 20 per page
+    const posts = await prisma.post.findMany({
+      where: {
+        scope,
+        communityId: null,
+        isRemoved: false,
+        ...nsfwFilter,
 
-const posts = await prisma.post.findMany({
+        ...(scope === "COUNTRY" && userCountry
+          ? { countryCode: userCountry }
+          : {}),
+
+        ...(scope === "LOCAL" && userRegion && userCountry
+          ? {
+              regionCode: userRegion,
+              countryCode: userCountry,
+            }
+          : {}),
+
+        ...(labelPrefs.length > 0 && {
+          categories: {
+            some: {
+              category: {
+                key: { in: labelPrefs },
+              },
+            },
+          },
+        }),
+      },
+
+      orderBy: [
+  { createdAt: "desc" },
+  { id: "desc" },
+],
+
+      take: take + 1,
+
+      ...(cursor && {
+        skip: 1,
+        cursor: { id: cursor },
+      }),
+
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            avatarUrl: true,
+          },
+        },
+
+        categories: {
+          select: {
+            category: {
+              select: { key: true },
+            },
+          },
+        },
+
+        likes: {
+          where: { userId },
+          select: { id: true },
+        },
+
+        _count: {
+          select: {
+            likes: true,
+            comments: true,
+          },
+        },
+
+        originPost: req.user.isMinor
+  ? {
+      where: {
+        rating: "SAFE",
+        isRemoved: false,
+      },
+      select: {
+        id: true,
+        type: true,
+        mediaUrl: true,
+      },
+    }
+  : {
+      select: {
+        id: true,
+        type: true,
+        mediaUrl: true,
+      },
+    },
+      },
+    })
+
+    let nextCursor = null
+
+    if (posts.length > take) {
+      const nextItem = posts.pop()
+      nextCursor = nextItem.id
+    }
+
+const totalCount = await prisma.post.count({
   where: {
     scope,
     communityId: null,
     isRemoved: false,
     ...nsfwFilter,
+
     ...(scope === "COUNTRY" && userCountry
       ? { countryCode: userCountry }
       : {}),
+
     ...(scope === "LOCAL" && userRegion && userCountry
       ? {
           regionCode: userRegion,
           countryCode: userCountry,
         }
       : {}),
+
     ...(labelPrefs.length > 0 && {
       categories: {
         some: {
@@ -466,66 +561,18 @@ const posts = await prisma.post.findMany({
       },
     }),
   },
-
-  orderBy: { createdAt: "desc" },
-
-  take: take + 1, // fetch 1 extra to detect next page
-
-  ...(cursor && {
-    skip: 1,
-    cursor: { id: cursor },
-  }),
-
-  include: {
-    user: {
-      select: {
-        id: true,
-        username: true,
-        avatarUrl: true,
-      },
-    },
-    categories: {
-      include: {
-        category: { select: { key: true } },
-      },
-    },
-    likes: {
-      where: { userId },
-      select: { id: true },
-    },
-    _count: {
-      select: {
-        likes: true,
-        comments: true,
-      },
-    },
-    originPost: {
-      select: {
-        id: true,
-        type: true,
-        mediaUrl: true,
-        originPostId: true,
-        originPost: {
-          select: {
-            id: true,
-            mediaUrl: true,
-          },
-        },
-      },
-    },
-  },
 })
 
+    const payload = {
+      items: posts.map((p) => {
+  const categoryKeys = p.categories.map(
+    (c) => c.category.key
+  )
 
-    let nextCursor = null
+  const isDefaultProfile =
+    !labelPrefs || labelPrefs.length === 0
 
-if (posts.length > take) {
-  const nextItem = posts.pop()
-  nextCursor = nextItem.id
-}
-
-return res.json({
-  items: posts.map((p) => ({
+  return {
     id: p.id,
     type: p.type,
     caption: p.caption,
@@ -535,29 +582,27 @@ return res.json({
     createdAt: p.createdAt,
     isRemoved: p.isRemoved,
     user: p.user,
-    categories: p.categories,
+    categories: categoryKeys,
     _count: p._count,
     originPost: p.originPost ?? null,
     likedByMe: p.likes.length > 0,
     reason: {
-  matchedCategories: p.categories.map(
-    (c) => c.category.key
-  ),
-  scopeCeiling: scope,
-  likes: p._count?.likes ?? 0,
+      scope,
+      profileName: feedProfile?.name ?? "Default",
+      isDefaultProfile,
+      matchedCategories: categoryKeys,
+      scopeCeiling: scope,
+      likes: p._count?.likes ?? 0,
+    },
+    
+  }
+  
+}),
+nextCursor,
+totalCount,      
+    }
 
-
-  scope,
-  profileName,
-  isDefaultProfile,
-},
-
-  })),
-  nextCursor,
-})
-
-
-
+    return res.json(payload)
   } catch (err) {
     console.error("GET SCOPED FEED ERROR:", err)
     return res.status(500).json({
@@ -600,7 +645,10 @@ const nsfwFilter = buildNsfwFilter({
           },
         },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: [
+  { createdAt: "desc" },
+  { id: "desc" },
+],
       include: {
         user: {
           select: {
@@ -646,31 +694,53 @@ export const getPostOrigin = async (req, res) => {
     const { id } = req.params
 
     let current = await prisma.post.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        mediaUrl: true,
-        originPostId: true,
-      },
-    })
+  where: { id },
+  select: {
+    id: true,
+    mediaUrl: true,
+    originPostId: true,
+    rating: true,      
+    isRemoved: true,  
+  },
+})
 
     if (!current) {
       return res.status(404).json({ error: "Post not found" })
     }
 
+    
+if (req.user?.isMinor && current.rating === "NSFW") {
+  return res.status(403).json({
+    error: "Minors cannot access NSFW content",
+  })
+}
+
+if (current.isRemoved) {
+  return res.status(404).json({
+    error: "Post not found",
+  })
+}
+
     // 🔁 Walk up dynamically until true root
     while (current.originPostId) {
       current = await prisma.post.findUnique({
-        where: { id: current.originPostId },
-        select: {
-          id: true,
-          mediaUrl: true,
-          originPostId: true,
-        },
-      })
+  where: { id: current.originPostId },
+  select: {
+    id: true,
+    mediaUrl: true,
+    originPostId: true,
+    rating: true,       
+    isRemoved: true, 
+  },
+})
 
       if (!current) break
     }
+    if (req.user?.isMinor && current.rating === "NSFW") {
+  return res.status(403).json({
+    error: "Minors cannot access NSFW content",
+  })
+}
 
     return res.json({
       id: current.id,

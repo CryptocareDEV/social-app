@@ -13,7 +13,7 @@ import PostComposer from "../components/PostComposer"
 import CommunityChat from "../components/CommunityChat"
 
 
-export default function CommunityPage({ theme }) {
+export default function CommunityPage({ theme, isMobile }) {
   const { id } = useParams()
   const colors = getThemeColors(theme)
   const t = theme.typography
@@ -83,8 +83,9 @@ const [inviting, setInviting] = useState(false)
       borderRadius: theme.radius.lg,
       background: colors.surfaceMuted,
       border: `1px solid ${colors.border}`,
-      fontSize: t.h4.size,
-      fontWeight: t.h4.weight,
+      fontSize: 14,
+      fontWeight: 600,
+      letterSpacing: 0.2,
       transition: "all 0.15s ease",
     }}
   >
@@ -183,9 +184,15 @@ console.log("Community role resolved →", role)
     setLoadingFeed(true)
 
     api(`/communities/${id}/feed`)
-      .then((data) => {
-        if (mounted) setPosts(Array.isArray(data) ? data : [])
-      })
+  .then((data) => {
+    if (!mounted) return
+
+    const items = Array.isArray(data)
+      ? data
+      : data?.items || []
+
+    setPosts(items)
+  })
       .catch(() => {
         if (mounted) setPosts([])
       })
@@ -221,6 +228,23 @@ useEffect(() => {
     })
 }, [community])
 
+useEffect(() => {
+  const targetId = sessionStorage.getItem("highlightPostId")
+  if (!targetId) return
+
+  const el = document.getElementById(`post-${targetId}`)
+  if (!el) return
+
+  el.scrollIntoView({ behavior: "smooth", block: "center" })
+  el.style.transition = "background 0.6s ease"
+  el.style.background = "#fff7ed"
+
+  setTimeout(() => {
+    el.style.background = ""
+  }, 2000)
+
+  sessionStorage.removeItem("highlightPostId")
+}, [posts])
 
 useEffect(() => {
   if (showAddLabel) {
@@ -291,16 +315,18 @@ useEffect(() => {
   if (!community) return <p style={{ padding: 24 }}>Community not found</p>
 
   return (
-    <div
-      style={{
-  maxWidth: 820,
-  margin: "0 auto",
-  padding: s.xl,
-  fontFamily: t.fontFamily,
-  background: colors.bg,
-  boxSizing: "border-box",
-}}
-    >
+  <div
+    style={{
+      minHeight: "100vh",
+      display: "flex",
+      flexDirection: "column",
+
+      maxWidth: isMobile ? "100%" : 820,
+      margin: isMobile ? 0 : "0 auto",
+      padding: isMobile ? "16px 12px" : "24px 16px",
+      boxSizing: "border-box",
+    }}
+  >
       {/* Top navigation */}
 <div
   style={{
@@ -335,7 +361,7 @@ useEffect(() => {
       {/* COMMUNITY HEADER */}
       <div
         style={{
-  padding: s.lg,
+  padding: isMobile ? s.md : s.lg,
   borderRadius: theme.radius.lg,
   background: colors.surface,
   border: `1px solid ${colors.border}`,
@@ -456,12 +482,16 @@ useEffect(() => {
 
       {/* TABS */}
       <div
+      className="hide-scrollbar"
         style={{
   display: "flex",
-  gap: s.sm,
-  marginBottom: s.lg,
-  borderBottom: `1px solid ${colors.border}`,
-  paddingBottom: s.sm,
+gap: s.sm,
+marginBottom: s.lg,
+borderBottom: `1px solid ${colors.border}`,
+paddingBottom: s.sm,
+overflowX: "auto",
+whiteSpace: "nowrap",
+scrollbarWidth: "none",
 }}
       >
         {[
@@ -498,20 +528,39 @@ useEffect(() => {
       </div>
 
       {/* TAB CONTENT */}
-      <div
+<div
   style={{
-    padding: s.lg,
-    borderRadius: theme.radius.lg,
-    background: colors.surface,
-    border: `1px solid ${colors.border}`,
-    boxShadow: theme.shadow.sm,
-    minHeight: 260,
-  }}
+  flex: activeTab === "chat" ? 1 : "initial",
+
+  padding:
+    activeTab === "feed" || activeTab === "chat"
+      ? 0
+      : s.lg,
+  borderRadius:
+    activeTab === "feed" || activeTab === "chat"
+      ? 0
+      : theme.radius.lg,
+  background:
+    activeTab === "feed" || activeTab === "chat"
+      ? "transparent"
+      : colors.surface,
+  border:
+    activeTab === "feed" || activeTab === "chat"
+      ? "none"
+      : `1px solid ${colors.border}`,
+  boxShadow:
+    activeTab === "feed" || activeTab === "chat"
+      ? "none"
+      : theme.shadow.sm,
+
+  display: activeTab === "chat" ? "flex" : "block",
+  flexDirection: activeTab === "chat" ? "column" : "initial",
+}}
 >
         {activeTab === "settings" && myRole === "ADMIN" && (
   <div
   style={{
-    maxWidth: 640,
+    maxWidth: isMobile ? "100%" : 640,
     margin: "0 auto",
     display: "flex",
     flexDirection: "column",
@@ -521,7 +570,7 @@ useEffect(() => {
 
     <div
   style={{
-    fontSize: 22,
+    fontSize: isMobile ? 18 : 20,
     fontWeight: 600,
     marginBottom: 6,
   }}
@@ -559,8 +608,9 @@ useEffect(() => {
     style={{
       marginTop: 16,
       display: "flex",
+      flexDirection: isMobile ? "column" : "row",
       gap: 12,
-      alignItems: "center",
+      alignItems: isMobile ? "stretch" : "center",
     }}
   >
       <input
@@ -568,7 +618,6 @@ useEffect(() => {
         value={inviteUsername}
         onChange={(e) => setInviteUsername(e.target.value)}
         style={{
-          flex: 1,
           padding: "10px 14px",
           borderRadius: theme.radius.md,
           border: `1px solid ${colors.border}`,
@@ -646,8 +695,10 @@ useEffect(() => {
             key={req.id}
             style={{
               display: "flex",
+              flexDirection: isMobile ? "column" : "row",
               justifyContent: "space-between",
-              alignItems: "center",
+              alignItems: isMobile ? "stretch" : "center",
+              gap: isMobile ? 12 : 0,
               padding: s.md,
               borderRadius: theme.radius.lg,
               border: `1px solid ${colors.border}`,
@@ -666,7 +717,7 @@ useEffect(() => {
               @{req.invitedUser.username}
             </span>
 
-            <div style={{ display: "flex", gap: s.sm }}>
+            <div style={{ display: "flex", gap: s.sm, flexDirection: isMobile ? "column" : "row" }}>
               <button
                 onClick={async () => {
                   await api(
@@ -1210,9 +1261,9 @@ fontWeight: 500,
     {/* Composer */}
     <div
   style={{
-    paddingBottom: s.lg,
     marginBottom: s.lg,
-    borderBottom: `1px solid ${colors.border}`,
+    padding:
+      isMobile ? "0 0 16px 0" : "0 0 20px 0",
   }}
 >
       {isMember && (
@@ -1228,7 +1279,12 @@ fontWeight: 500,
         setLoadingFeed(true)
         try {
           const data = await api(`/communities/${id}/feed`)
-          setPosts(Array.isArray(data) ? data : [])
+
+const items = Array.isArray(data)
+  ? data
+  : data?.items || []
+
+setPosts(items)
         } finally {
           setLoadingFeed(false)
         }
@@ -1249,58 +1305,62 @@ fontWeight: 500,
         Nothing here yet. Be the first to post.
       </p>
     ) : (
-      <Feed posts={posts} theme={theme} />
+      <div
+  style={{
+    padding: isMobile ? "0 0 40px 0" : "0 0 60px 0",
+  }}
+>
+  <Feed posts={posts} theme={theme} />
+</div>
     )}
   </div>
 )}
 
         {activeTab === "chat" && (
   <div
-  style={{
-    display: "flex",
-    flexDirection: "column",
-    height: "65vh",
-    minHeight: 420,
-    borderRadius: theme.radius.lg,
-    border: `1px solid ${colors.border}`,
-    background: colors.surface,
-    boxShadow: theme.shadow.sm,
-    overflow: "hidden",
-  }}
->
-
-    {/* Header */}
+    style={{
+      flex: 1,
+      display: "flex",
+      flexDirection: "column",
+      marginTop: 8,
+    }}
+  >
     <div
       style={{
-        padding: "14px 18px",
-        fontSize: t.h4.size,
-fontWeight: t.h4.weight,
-        borderBottom: `1px solid ${colors.border}`,
-        color: colors.text,
-        background: colors.surfaceMuted,
-        flexShrink: 0,
+        fontSize: 14,
+        fontWeight: 600,
+        color: colors.textMuted,
+        marginBottom: 12,
       }}
     >
-      Community chat
+      Chat
     </div>
 
-    {/* Chat body */}
     <div
       style={{
         flex: 1,
-        overflowY: "auto",
-        padding: s.md,
-background: colors.bg,
-        boxSizing: "border-box",
+        overflow: "hidden",
+        borderRadius: theme.radius.lg,
+        border: `1px solid ${colors.border}`,
+        background: colors.surface,
       }}
     >
       {isMember ? (
-  <CommunityChat communityId={id} isMember={isMember} />
-) : (
-  <p style={{ opacity: 0.6, fontSize: 13 }}>
-    Join this community to participate in chat.
-  </p>
-)}
+        <CommunityChat
+          communityId={id}
+          isMember={isMember}
+        />
+      ) : (
+        <div
+          style={{
+            padding: 20,
+            fontSize: 13,
+            color: colors.textMuted,
+          }}
+        >
+          Join this community to participate in chat.
+        </div>
+      )}
     </div>
   </div>
 )}
@@ -1357,164 +1417,246 @@ background: colors.bg,
     style={{
       maxWidth: 760,
       margin: "0 auto",
-      padding: "20px 10px",
+      padding: isMobile ? "16px 6px" : "24px 10px",
       display: "flex",
       flexDirection: "column",
-      gap: 36,
+      gap: isMobile ? 28 : 36,
       color: colors.text,
     }}
   >
-    {/* Title */}
-    <div
-      style={{
-        textAlign: "center",
-        marginBottom: 10,
-      }}
-    >
+    {/* Header */}
+    <div style={{ textAlign: "center" }}>
       <div
         style={{
           fontSize: 12,
-          letterSpacing: 2,
+          letterSpacing: 1.5,
           textTransform: "uppercase",
           color: colors.textMuted,
-          marginBottom: 12,
+          marginBottom: 10,
         }}
       >
-        Community Manifesto
+        Community Guide
       </div>
 
       <div
         style={{
           fontSize: t.h2.size,
           fontWeight: 600,
-          lineHeight: 1.2,
+          lineHeight: 1.25,
         }}
       >
-        Structured belonging in a chaotic world
+        How this community works
       </div>
     </div>
 
-    {/* Divider */}
     <div
       style={{
         height: 1,
         background: colors.border,
         opacity: 0.6,
-        margin: "10px 0 0 0",
       }}
     />
 
-    {/* Section 1 */}
-    <div style={{ lineHeight: 1.8, fontSize: 16 }}>
-      <p>
-        Communities exist so that people can gather with intention.
-        Not around outrage. Not around algorithms.
-        Around shared meaning.
-      </p>
-
-      <p>
-        Every community is defined by labels chosen deliberately.
-        What flows inside is not what performs,
-        it is what belongs.
-      </p>
-    </div>
-
-    {/* Section 2 */}
+    {/* What Members Can Do */}
     <div
       style={{
-        borderLeft: `3px solid ${colors.primary}`,
-        paddingLeft: 18,
-        lineHeight: 1.9,
-        fontSize: 16,
-      }}
-    >
-      <p>
-        Traditional platforms push content into individuals
-        using prediction systems.
-      </p>
-
-      <p>
-        Communities reverse that direction.
-        You choose the space.
-        You choose the structure.
-        The structure defines the flow.
-      </p>
-
-      <p>
-        Whether there is one member or one million,
-        information is never throttled by popularity.
-        If it aligns with the shared labels,
-        it moves.
-      </p>
-    </div>
-
-    {/* Section 3 */}
-    <div style={{ lineHeight: 1.8, fontSize: 16 }}>
-      <p>
-        A community can be a circle of family.
-        A group of close friends.
-        A local neighborhood.
-        Or a global knowledge network.
-      </p>
-
-      <p>
-        Add the people you trust.
-        Follow the topics that matter.
-        Stay updated within shared context
-        instead of chaotic streams.
-      </p>
-    </div>
-
-    {/* Section 4 */}
-    <div
-      style={{
-        background: colors.surfaceMuted,
-        padding: "20px 24px",
         borderRadius: theme.radius.lg,
-        lineHeight: 1.9,
-        fontSize: 16,
+        border: `1px solid ${colors.border}`,
+        background: colors.surface,
+        padding: isMobile ? 16 : 24,
+        boxShadow: theme.shadow.sm,
+        display: "flex",
+        flexDirection: "column",
+        gap: 20,
       }}
     >
-      <p>
-        Because communities are label-based and not engagement-based,
-        they reduce the spread of misinformation,
-        emotional manipulation,
-        and AI-generated noise.
-      </p>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 999,
+            background: colors.primarySoft,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 16,
+          }}
+        >
+          ✍️
+        </div>
 
-      <p>
-        Information moves through intention,
-        not outrage.
-      </p>
+        <div style={{ fontSize: 16, fontWeight: 600 }}>
+          What members can do
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+          fontSize: isMobile ? 14 : 15,
+          lineHeight: 1.8,
+        }}
+      >
+        {[
+          "Create posts aligned with the community intention",
+          "Participate in real-time chat discussions",
+          "Discover structured content through selected labels",
+          "Connect with people sharing the same scope and focus",
+        ].map((text, i) => (
+          <div key={i} style={{ display: "flex", gap: 10 }}>
+            <div style={{ color: colors.primary }}>•</div>
+            <div>{text}</div>
+          </div>
+        ))}
+      </div>
     </div>
 
-    {/* Final Section */}
+    {/* Content Flow */}
+    <div
+      style={{
+        borderRadius: theme.radius.lg,
+        border: `1px solid ${colors.border}`,
+        background: colors.surface,
+        padding: isMobile ? 16 : 24,
+        boxShadow: theme.shadow.sm,
+        display: "flex",
+        flexDirection: "column",
+        gap: 18,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 999,
+            background: colors.primarySoft,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 16,
+          }}
+        >
+          🔄
+        </div>
+
+        <div style={{ fontSize: 16, fontWeight: 600 }}>
+          How content flows
+        </div>
+      </div>
+
+      <div style={{ fontSize: isMobile ? 14 : 15, lineHeight: 1.8 }}>
+        This community is label-based rather than engagement-driven.
+        <br /><br />
+        External posts enter only if they match imported labels.
+        Internal posts from members always remain visible.
+        <br /><br />
+        Scope determines whether content appears globally, nationally, or locally.
+      </div>
+    </div>
+
+    {/* Structure Over Algorithms */}
+    <div
+      style={{
+        borderRadius: theme.radius.lg,
+        border: `1px solid ${colors.border}`,
+        background: colors.surfaceMuted,
+        padding: isMobile ? 16 : 24,
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 999,
+            background: colors.primarySoft,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 16,
+          }}
+        >
+          🧭
+        </div>
+
+        <div style={{ fontSize: 16, fontWeight: 600 }}>
+          Structure over algorithms
+        </div>
+      </div>
+
+      <div style={{ fontSize: isMobile ? 14 : 15, lineHeight: 1.8 }}>
+        Traditional platforms optimize for engagement.
+        This platform optimizes for alignment.
+        <br /><br />
+        If content matches the defined labels and scope,
+        it appears. Popularity does not determine visibility.
+      </div>
+    </div>
+
+    {/* Roles */}
+    <div
+      style={{
+        borderRadius: theme.radius.lg,
+        border: `1px solid ${colors.border}`,
+        background: colors.surface,
+        padding: isMobile ? 16 : 24,
+        boxShadow: theme.shadow.sm,
+        display: "flex",
+        flexDirection: "column",
+        gap: 18,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 999,
+            background: colors.primarySoft,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 16,
+          }}
+        >
+          👥
+        </div>
+
+        <div style={{ fontSize: 16, fontWeight: 600 }}>
+          Roles in this community
+        </div>
+      </div>
+
+      <div style={{ fontSize: isMobile ? 14 : 15, lineHeight: 1.8 }}>
+        Members can post and participate in chat.
+        <br /><br />
+        Administrators manage invitations, edit intention, and control label imports.
+        <br /><br />
+        Governance is transparent and intentional.
+      </div>
+    </div>
+
+    {/* Closing */}
     <div
       style={{
         textAlign: "center",
-        marginTop: 20,
-        lineHeight: 1.9,
-        fontSize: 17,
+        marginTop: 10,
+        fontSize: isMobile ? 14 : 16,
         fontWeight: 500,
+        lineHeight: 1.8,
+        color: colors.textMuted,
       }}
     >
-      <p>
-        Have fun.
-        Create.
-        Explore.
-        Support one another.
-      </p>
-
-      <p>
-        Join local communities where people are genuinely
-        trying to make a difference.
-      </p>
-
-      <p>
-        Small groups shape neighborhoods.
-        Neighborhoods shape nations.
-        And nations shape the future of humanity.
-      </p>
+      Join thoughtfully.  
+      Contribute meaningfully.  
+      Build spaces that reflect shared intention.
     </div>
   </div>
 )}
@@ -1536,9 +1678,11 @@ backdropFilter: "blur(2px)",
   >
     <div
       style={{
-  width: 520,
-  padding: 28,
-  borderRadius: 24,
+  width: isMobile ? "92%" : 520,
+  maxHeight: isMobile ? "85vh" : "auto",
+  overflowY: isMobile ? "auto" : "visible",
+  padding: isMobile ? 18 : 28,
+  borderRadius: isMobile ? 16 : 24,
   boxShadow: theme.shadow.lg,
   background: colors.surface,
   border: `1px solid ${colors.border}`,
@@ -1594,7 +1738,7 @@ backdropFilter: "blur(2px)",
 />
 <div
   style={{
-    maxHeight: 220,
+    maxHeight: isMobile ? 180 : 220,
     overflowY: "auto",
     borderRadius: 10,
     border: `1px solid ${colors.border}`,

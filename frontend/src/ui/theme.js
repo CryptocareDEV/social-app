@@ -108,12 +108,21 @@ export const getThemeColors = (theme) => {
   const base = theme.colors[theme.mode]
 
   const accents = {
-    REDDIT: "#ff4500",        // classic reddit orange
-    SUN_ORANGE: "#e07a3f",    // softer warm orange
-    SKY_BLUE: "#4ea8de",      // uplifting sky tone
-    TURQUOISE: "#2a9d8f",     // calm water
-    SOFT_GREEN: "#6a994e",    // peaceful earth green
-  }
+  REDDIT: theme.mode === "light" ? "#ff4500" : "#ff6a2a",
+
+  SUN_ORANGE:
+    theme.mode === "light" ? "#d97745" : "#f4a261",
+
+  SKY_BLUE:
+    theme.mode === "light" ? "#4ea8de" : "#72c3f0",
+
+  TURQUOISE:
+    theme.mode === "light" ? "#2a9d8f" : "#52bdb1",
+
+  SOFT_GREEN:
+    theme.mode === "light" ? "#6a994e" : "#8ecf6c",
+}
+
 
   const primary = accents[theme.accent] || accents.REDDIT
 

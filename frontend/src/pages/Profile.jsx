@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react"
-import { useParams, useNavigate } from "react-router-dom"
+import { useParams, useNavigate, useLocation } from "react-router-dom"
 import { api } from "../api/client"
 import { getThemeColors } from "../ui/theme"
 import { secondaryButton } from "../ui/buttonStyles"
@@ -14,11 +14,18 @@ export default function Profile({
   currentUser,
   onFeedProfileChange,
   refreshUserState,
+  isMobile,
 }) {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const colors = getThemeColors(theme)
   const [activeTab, setActiveTab] = useState("POSTS")
+  useEffect(() => {
+  if (location.state?.openTab) {
+    setActiveTab(location.state.openTab)
+  }
+}, [location.state])
 
 
 
@@ -266,7 +273,14 @@ const loadMorePosts = async () => {
 
 
   return (
-    <div style={{ maxWidth: 720, margin: "0 auto", padding: 24 }}>
+  <div
+  style={{
+    maxWidth: isMobile ? "100%" : 820,
+    margin: isMobile ? 0 : "0 auto",
+    padding: isMobile ? "16px 12px" : "24px 16px",
+    boxSizing: "border-box",
+  }}
+>
       <button
   onClick={() => navigate("/")}
   style={{
@@ -295,14 +309,14 @@ const loadMorePosts = async () => {
       {/* 🧍 Identity card */}
       <div
         style={{
-          padding: 20,
+          padding: isMobile ? 16 : 20,
           borderRadius: 16,
           background: colors.surface,
           border: `1px solid ${colors.border}`,
           marginBottom: 24,
         }}
       >
-        <div style={{ fontSize: 20, fontWeight: 700 }}>
+        <div style={{ fontSize: isMobile ? 18 : 20, fontWeight: 700 }}>
           @{user.username}
         </div>
 
@@ -443,6 +457,7 @@ const loadMorePosts = async () => {
 
 {/* 🔹 Profile Tabs */}
 <div
+className="hide-scrollbar"
   style={{
     display: "flex",
     gap: 8,
@@ -450,6 +465,9 @@ const loadMorePosts = async () => {
     marginBottom: 24,
     borderBottom: `1px solid ${colors.border}`,
     paddingBottom: 8,
+    overflowX: "auto",
+    whiteSpace: "nowrap",
+    scrollbarWidth: "none",
   }}
 >
 
@@ -499,7 +517,7 @@ if (
     background: colors.surface,
     borderRadius: 16,
     border: `1px solid ${colors.border}`,
-    padding: 20,
+    padding: isMobile ? 16 : 20,
   }}
 >
 
@@ -509,7 +527,7 @@ if (
 <div
   style={{
     marginBottom: 28,
-    padding: 20,
+    padding: isMobile ? 16 : 20,
     borderRadius: 18,
     background: colors.surfaceMuted,
     border: `1px solid ${colors.border}`,
@@ -549,7 +567,7 @@ if (
       <div
   style={{
     marginBottom: 32,
-    padding: 24,
+    padding: isMobile ? 16 : 24,
     borderRadius: 20,
     background: colors.surface,
     border: `1px solid ${colors.border}`,
@@ -665,7 +683,7 @@ if (
 <div
   style={{
     marginBottom: 28,
-    padding: 20,
+    padding: isMobile ? 16 : 20,
     borderRadius: 18,
     background: colors.surfaceMuted,
     border: `1px solid ${colors.border}`,
@@ -795,7 +813,7 @@ if (
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
-              maxWidth: 420,
+              maxWidth: isMobile ? 180 : 420,
             }}
           >
             {c.name}
@@ -809,7 +827,7 @@ if (
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
-              maxWidth: 420,
+              maxWidth: isMobile ? 180 : 420
             }}
           >
             {c.intention}
@@ -952,7 +970,7 @@ if (
       {/* Section Card */}
       <div
         style={{
-          padding: 20,
+          padding: isMobile ? 16 : 20,
           borderRadius: 16,
           background: colors.surface,
           border: `1px solid ${colors.border}`,
@@ -1020,7 +1038,7 @@ if (
       {/* Appearance Card */}
       <div
         style={{
-          padding: 20,
+          padding: isMobile ? 16 : 20,
           borderRadius: 16,
           background: colors.surface,
           border: `1px solid ${colors.border}`,
@@ -1146,7 +1164,7 @@ if (
 {/* Profile Visibility */}
 <div
   style={{
-    padding: 20,
+    padding: isMobile ? 16 : 20,
     borderRadius: 16,
     background: colors.surface,
     border: `1px solid ${colors.border}`,
@@ -1300,16 +1318,16 @@ if (
 {activeTab === "PHILOSOPHY" && (
   <div
     style={{
-      maxWidth: 820,
+      maxWidth: "100%",
       margin: "0 auto",
-      padding: "40px 28px",
+      padding: isMobile ? "24px 16px" : "40px 28px",
       borderRadius: 20,
-      border: "1px solid rgba(212, 175, 55, 0.6)", // subtle gold
+      border: "1px solid rgba(212, 175, 55, 0.6)",
       boxShadow: "0 0 0 1px rgba(255,255,255,0.05)",
       background: colors.surface,
       display: "flex",
       flexDirection: "column",
-      gap: 40,
+      gap: isMobile ? 28 : 40,
       lineHeight: 1.9,
       color: colors.text,
     }}
@@ -1325,7 +1343,7 @@ if (
           marginBottom: 18,
         }}
       >
-        Declaration
+        Platform Philosophy
       </div>
 
       <div
@@ -1334,24 +1352,25 @@ if (
           fontWeight: 600,
         }}
       >
-        A Different Kind of Social Space
+        Design Your Information Environment
       </div>
     </div>
 
     {/* Section 1 */}
-    <div style={{ fontSize: 17 }}>
+    <div style={{ fontSize: isMobile ? 15 : 17 }}>
       <p>
-        We removed following.
+        You are not following people here.
       </p>
 
       <p>
-        Not because connection is unimportant,
-        but because influence should never decide truth.
+        You are following subjects.
+        Topics.
+        Ideas.
       </p>
 
       <p>
-        Here, no one rises because they are amplified.
-        Nothing spreads because it performs.
+        Your feed is shaped by labels,
+        not by influence.
       </p>
     </div>
 
@@ -1364,21 +1383,20 @@ if (
     />
 
     {/* Section 2 */}
-    <div style={{ fontSize: 17 }}>
+    <div style={{ fontSize: isMobile ? 15 : 17 }}>
       <p>
-        You choose what you see.
+        You choose what enters your feed.
       </p>
 
       <p>
-        Through labels.
-        Through profiles.
-        Through communities built intentionally.
+        Feed Profiles act as lenses.
+        They define scope.
+        They define flow.
       </p>
 
       <p>
-        The structure defines the flow.
+        Structure determines visibility.
         Not popularity.
-        Not outrage.
       </p>
     </div>
 
@@ -1391,19 +1409,19 @@ if (
     />
 
     {/* Section 3 */}
-    <div style={{ fontSize: 17 }}>
+    <div style={{ fontSize: isMobile ? 15 : 17 }}>
       <p>
-        This is not influencer culture.
+        Communities are intentional containers.
       </p>
 
       <p>
-        There are no hidden agendas.
-        No engagement traps.
-        No advertisements shaping perception.
+        You can create one.
+        Define its intention.
+        Import the labels that matter.
       </p>
 
       <p>
-        We will keep it that way.
+        Information flows equally to every member.
       </p>
     </div>
 
@@ -1416,20 +1434,21 @@ if (
     />
 
     {/* Section 4 */}
-    <div style={{ fontSize: 17 }}>
+    <div style={{ fontSize: isMobile ? 15 : 17 }}>
       <p>
-        Use labels to follow subjects instead of people.
+        Public posts move across scopes:
+        global,
+        country,
+        local.
       </p>
 
       <p>
-        Import a topic into a community.
-        Create a local space.
-        Join globally.
+        Community posts stay within shared spaces.
       </p>
 
       <p>
-        Whether one member or one million,
-        the information remains the same for everyone.
+        Nothing spreads because it performs.
+        It appears because it is categorized clearly.
       </p>
     </div>
 
@@ -1442,18 +1461,17 @@ if (
     />
 
     {/* Section 5 */}
-    <div style={{ fontSize: 17 }}>
+    <div style={{ fontSize: isMobile ? 15 : 17 }}>
       <p>
-        You can find work here.
+        You can discover work.
+        Collaboration.
         Friendship.
-        Love.
-        Humor.
         Shared curiosity.
       </p>
 
       <p>
-        Build communities that matter.
-        Stay aligned without fighting algorithms.
+        You can build spaces that reflect
+        clarity instead of chaos.
       </p>
     </div>
 
@@ -1467,16 +1485,15 @@ if (
       }}
     >
       <p>
-        Hello world.
+        Participate intentionally.
       </p>
 
       <p>
-        Let us unite with clarity.
+        Organize information clearly.
       </p>
 
       <p>
-        Let us move humanity forward
-        together.
+        Move forward together.
       </p>
     </div>
   </div>
@@ -1491,7 +1508,7 @@ if (
 <div
   style={{
     marginBottom: 28,
-    padding: 20,
+    padding: isMobile ? 16 : 20,
     borderRadius: 18,
     background: colors.surfaceMuted,
     border: `1px solid ${colors.border}`,
@@ -1534,6 +1551,7 @@ if (
   style={{
     display: "flex",
     gap: 8,
+    flexWrap: "wrap",
     marginBottom: 16,
   }}
 >
@@ -1598,7 +1616,7 @@ if (
     key={post.id}
     style={{
       marginBottom: 20,
-      padding: 20,
+      padding: isMobile ? 16 : 20,
       borderRadius: 12,
       background:
         postView === "COMMUNITY"
@@ -1660,6 +1678,8 @@ if (
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
+      flexWrap: "wrap",
+      rowGap: 6,
       fontSize: 12,
       color: colors.textMuted,
     }}

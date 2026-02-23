@@ -30,14 +30,19 @@ export const api = async (path, options = {}) => {
 
   // ⛔ Other errors
   if (!res.ok) {
-    let error
-    try {
-      error = await res.json()
-    } catch {
-      error = { error: "Request failed" }
-    }
-    throw error
+  let error
+  try {
+    error = await res.json()
+  } catch {
+    error = { error: "Request failed" }
   }
+
+  if (res.status === 429 && error.cooldownUntil) {
+    error.isRateLimited = true
+  }
+
+  throw error
+}
 
   // ✅ Safe JSON handling
   if (res.status === 204) return null

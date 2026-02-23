@@ -1,11 +1,13 @@
 import React from "react"
 import ReactDOM from "react-dom/client"
-import { BrowserRouter } from "react-router-dom"
 import App from "./App"
+import { BrowserRouter } from "react-router-dom"
+import ErrorBoundary from "./components/ErrorBoundary"
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <BrowserRouter>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </BrowserRouter>
 )
-

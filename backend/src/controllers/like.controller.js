@@ -43,7 +43,7 @@ export const toggleLike = async (req, res) => {
         where: { id: existing.id },
       })
       liked = false
-    } else {
+        } else {
       // LIKE
       await prisma.like.create({
         data: {
@@ -51,6 +51,17 @@ export const toggleLike = async (req, res) => {
           postId,
         },
       })
+
+      // 🔔 Create notification for post owner
+      await prisma.notification.create({
+        data: {
+          recipientId: post.userId,
+          actorId: userId,
+          postId: postId,
+          type: "LIKE_POST",
+        },
+      })
+
       liked = true
     }
 
@@ -67,7 +78,10 @@ export const toggleLike = async (req, res) => {
       likeCount,
     })
   } catch (err) {
-    console.error("LIKE ERROR:", err)
-    return res.status(500).json({ error: "Failed to toggle like" })
+  if (err?.cooldownUntil) {
+    await refreshUserState?.()
   }
+
+  alert(err?.error || "Action failed")
+}
 }

@@ -7,7 +7,9 @@ import prisma from "../lib/prisma.js"
 ========================= */
 export const signup = async (req, res) => {
   try {
-    const { email, username, password, dateOfBirth } = req.body
+    let { email, username, password, dateOfBirth } = req.body
+email = email?.toLowerCase().trim()
+username = username?.trim()
     // 🌍 Detect client IP
     const forwarded = req.headers["x-forwarded-for"]
     const ip = forwarded
@@ -40,7 +42,11 @@ export const signup = async (req, res) => {
     if (existingUser) {
       return res.status(409).json({ error: "User already exists" })
     }
-
+    if (password.length < 8) {
+  return res.status(400).json({
+    error: "Password must be at least 8 characters",
+  })
+}
     const passwordHash = await bcrypt.hash(password, 10)
     // 🌍 Geo detection (non-blocking fallback)
     // 🌍 Geo detection (with dev fallback)
@@ -216,13 +222,16 @@ try {
 
 
     const token = jwt.sign(
-      {
-        userId: user.id,
-        email: user.email,
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    )
+  {
+    userId: user.id,
+    email: user.email,
+  },
+  process.env.JWT_SECRET,
+  {
+    expiresIn: "7d",
+    algorithm: "HS256",
+  }
+)
 
     return res.json({
       token,

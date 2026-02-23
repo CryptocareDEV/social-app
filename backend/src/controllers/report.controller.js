@@ -36,9 +36,9 @@ export const createReport = async (req, res) => {
       new Date(reporter.reportCooldownUntil) > new Date()
     ) {
       return res.status(403).json({
-        error: "You are temporarily restricted from reporting",
-        cooldownUntil: reporter.reportCooldownUntil,
-      })
+  error: "You are temporarily restricted from reporting",
+  reportCooldownUntil: reporter.reportCooldownUntil,
+})
     }
 
     /* ================================
@@ -125,15 +125,22 @@ if (context && context.length > MAX_CONTEXT_LENGTH) {
        🔍 Ensure post exists
     ================================= */
     const post = await prisma.post.findUnique({
-      where: { id: postId },
-      select: { id: true },
-    })
+  where: { id: postId },
+  select: { id: true, userId: true },
+})
 
-    if (!post) {
-      return res.status(404).json({
-        error: "Post not found",
-      })
-    }
+if (!post) {
+  return res.status(404).json({
+    error: "Post not found",
+  })
+}
+
+// 🚫 Prevent self-reporting
+if (post.userId === userId) {
+  return res.status(400).json({
+    error: "You cannot report your own post",
+  })
+}
 
     /* ================================
        🚫 Prevent duplicate reports

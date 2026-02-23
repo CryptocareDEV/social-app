@@ -45,11 +45,14 @@ model User {
   communityJoinRequests CommunityJoinRequest[]
   communityMemberships  CommunityMember[]
   profiles              FeedProfile[]
+  notifications         Notification[] @relation("UserNotifications")
+  notificationsSent     Notification[] @relation("ActorNotifications")
   likes                 Like[]
   posts                 Post[]
   reportsMade           Report[]
   superuser             Superuser?
   profile               UserProfile?
+  actionLogs            UserActionLog[]
 }
 
 model Post {
@@ -76,6 +79,7 @@ model Post {
   communityFeedItems CommunityFeedItem[]
   likes              Like[]
   moderationActions  ModerationAction[]
+  notifications      Notification[]
   community          Community?          @relation(fields: [communityId], references: [id])
   originPost         Post?               @relation("PostOrigin", fields: [originPostId], references: [id])
   derivedPosts       Post[]              @relation("PostOrigin")
@@ -113,7 +117,7 @@ model Comment {
 
   parent          Comment?          @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
   replies         Comment[]         @relation("CommentReplies")
-
+  notifications   Notification[]
   @@index([postId])
   @@index([userId])
   @@index([createdAt])
@@ -132,6 +136,41 @@ model Like {
   @@unique([userId, postId])
 }
 
+model Notification {
+  id            String            @id @default(uuid())
+
+  recipientId   String
+  actorId       String?
+
+  postId        String?
+  commentId     String?
+  communityId   String?
+
+  type          NotificationType
+
+  mentionedUsername String?
+
+  readAt        DateTime?
+  createdAt     DateTime          @default(now())
+
+  recipient     User              @relation("UserNotifications", fields: [recipientId], references: [id], onDelete: Cascade)
+  actor         User?             @relation("ActorNotifications", fields: [actorId], references: [id], onDelete: SetNull)
+
+  post          Post?             @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment       Comment?          @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  community     Community?        @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  dedupeKey     String?
+  metadata      Json?
+
+  @@index([recipientId, createdAt])
+  @@index([recipientId, readAt])
+  @@index([postId])
+  @@index([commentId])
+  @@index([communityId])
+  @@index([dedupeKey])
+}
+
 model Community {
   id                    String                 @id @default(uuid())
   name                  String                 @unique
@@ -148,6 +187,7 @@ model Community {
   labelImports          CommunityLabelImport[]
   members               CommunityMember[]
   posts                 Post[]
+  notifications         Notification[]
 
   @@index([rating])
 }
@@ -295,8 +335,24 @@ model Report {
   post       Post               @relation(fields: [postId], references: [id], onDelete: Cascade)
   reporter   User               @relation(fields: [reporterId], references: [id], onDelete: Cascade)
 
+  @@unique([reporterId, postId])
   @@index([postId])
   @@index([reporterId])
+}
+
+model UserActionLog {
+  id          String      @id @default(uuid())
+  userId      String
+  action      ActionType
+  metadata    Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime    @default(now())
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, action, createdAt])
+  @@index([createdAt])
 }
 
 model ModerationAction {
@@ -470,4 +526,28 @@ SOFT_GREEN
 
 }
 
+enum NotificationType {
+  LIKE_POST
+  COMMENT_POST
+  REPLY_COMMENT
+  MENTION_POST
+  MENTION_COMMENT
+  COMMUNITY_INVITE
+  COMMUNITY_POST
+  SYSTEM
+}
 
+enum ActionType {
+  POST_CREATE
+  COMMENT_CREATE
+  LIKE_TOGGLE
+  REPORT_CREATE
+  MEDIA_UPLOAD
+  LOGIN_ATTEMPT
+  PASSWORD_RESET_ATTEMPT
+  PROFILE_UPDATE
+  COMMUNITY_CREATE
+  COMMUNITY_JOIN
+  COMMUNITY_INVITE
+  MODERATION_ACTION
+}
