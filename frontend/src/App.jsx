@@ -126,6 +126,8 @@ const refreshUserState = useCallback(async () => {
   try {
     const u = await api("/users/me")
 
+    if (!u) return
+
     setUser(u)
 
     if (u.reportCooldownUntil) {
@@ -165,10 +167,14 @@ useEffect(() => {
     try {
       const u = await api("/users/me")
 
-      // ✅ Auth confirmed
+      if (!u) {
+        setUser(null)
+        return
+      }
+
       setUser(u)
 
-      // ✅ Apply theme safely
+      // Apply theme safely
       setTheme((t) => ({
         ...t,
         mode: u.themeMode === "DARK" ? "dark" : "light",
@@ -190,9 +196,7 @@ useEffect(() => {
       }
 
     } catch (err) {
-      // Only logout if truly unauthorized
       if (err?.error === "Unauthorized") {
-        console.warn("Session invalid. Logging out.")
         setUser(null)
       } else {
         console.error("Auth boot unexpected error:", err)
