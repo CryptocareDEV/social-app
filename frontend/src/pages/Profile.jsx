@@ -4,7 +4,7 @@ import { api } from "../api/client"
 import { getThemeColors } from "../ui/theme"
 import { secondaryButton } from "../ui/buttonStyles"
 import CreateFeedProfileModal from "../components/CreateFeedProfileModal"
-import FeedProfilesCard from "../components/profile/feedprofilescard"
+import FeedProfilesCard from "../components/profile/FeedProfilesCard"
 import CreateCommunityModal from "../components/CreateCommunityModal"
 
 

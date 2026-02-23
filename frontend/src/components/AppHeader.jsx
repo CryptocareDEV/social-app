@@ -146,14 +146,42 @@ const handleNotificationClick = (n) => {
           }}
         >
           <div
-            style={{
-              fontSize: theme.typography.h3.size,
-              fontWeight: 600,
-              letterSpacing: "-0.01em",
-            }}
-          >
-            🌱 Social
-          </div>
+  onClick={() => navigate("/")}
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    cursor: "pointer",
+  }}
+>
+  <div
+    style={{
+      width: 28,
+      height: 28,
+      borderRadius: 8,
+      background: colors.primary,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#fff",
+    }}
+  >
+    C
+  </div>
+
+  <div
+    style={{
+      fontSize: theme.typography.h3.size,
+      fontWeight: 800,
+      letterSpacing: "-0.02em",
+      color: colors.text
+    }}
+  >
+    Civic
+  </div>
+</div>
 
           {activeFeedProfileName && (
             <div style={{ position: "relative" }}>

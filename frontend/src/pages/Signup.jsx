@@ -15,6 +15,7 @@ export default function Signup() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const isMobile = window.innerWidth < 768
 
   const navigate = useNavigate()
 
@@ -69,7 +70,7 @@ export default function Signup() {
   const inputStyle = {
     width: "100%",
     boxSizing: "border-box",
-    padding: "12px 14px",
+    padding: isMobile ? "14px 16px" : "12px 14px",
     borderRadius: theme.radius.md,
     border: `1px solid ${colors.border}`,
     background: colors.surface,
@@ -100,8 +101,10 @@ export default function Signup() {
         display: "flex",
         alignItems: "flex-start",
         justifyContent: "center",
-        paddingTop: 48,
-        paddingBottom: 48,
+        paddingTop: isMobile ? 24 : 48,
+paddingBottom: isMobile ? 24 : 48,
+paddingLeft: isMobile ? 16 : 0,
+paddingRight: isMobile ? 16 : 0,
       }}
     >
       <div
@@ -109,12 +112,13 @@ export default function Signup() {
           maxWidth: 900,
           width: "100%",
           display: "grid",
-          gridTemplateColumns: "1.1fr 0.9fr",
-          gap: 48,
+          gridTemplateColumns: isMobile ? "1fr" : "1.1fr 0.9fr",
+gap: isMobile ? 24 : 48,
           alignItems: "start",
         }}
       >
         {/* LEFT */}
+        {!isMobile && (
 <div
   style={{
     background: colors.surface,
@@ -129,6 +133,7 @@ export default function Signup() {
   }}
 >
   {/* Small Label */}
+  
   <div
     style={{
       fontSize: 11,
@@ -173,145 +178,47 @@ export default function Signup() {
 
   {/* Sections */}
   <div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    gap: 24,
+    fontSize: 15,
+    lineHeight: 1.6,
+  }}
+>
+  <div
     style={{
-      display: "flex",
-      flexDirection: "column",
-      gap: 28,
-      fontSize: 15,
-      lineHeight: 1.6,
+      fontSize: 24,
+      fontWeight: 500,
+      color: colors.text,
     }}
   >
-    {/* WHAT YOU CAN DO */}
-    <div>
-      <div
-        style={{
-          fontSize: 12,
-          fontWeight: 600,
-          letterSpacing: 1.5,
-          textTransform: "uppercase",
-          marginBottom: 12,
-          color: colors.primary,
-        }}
-      >
-        What you can do
-      </div>
+    A calmer way to discuss.
+  </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {[
-          "Choose what you see through labels",
-          "Build real communities with shared intention",
-          "Stay aligned with topics that matter",
-          "Experience equal information flow",
-        ].map((text, i) => (
-          <div
-            key={i}
-            style={{
-              display: "flex",
-              gap: 10,
-              alignItems: "flex-start",
-              transition: "transform 0.15s ease",
-              cursor: "default",
-            }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.transform = "translateX(4px)")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.transform = "translateX(0px)")
-            }
-          >
-            <div
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: 999,
-                marginTop: 6,
-                background: colors.primary,
-                flexShrink: 0,
-              }}
-            />
-            <div>{text}</div>
-          </div>
-        ))}
-      </div>
-    </div>
+  <div style={{ color: colors.textMuted }}>
+    Civic is built for thoughtful conversation.  
+    No performance metrics. No artificial reach.
+  </div>
 
-    {/* Divider */}
-    <div
-      style={{
-        height: 1,
-        background: colors.border,
-        opacity: 0.6,
-      }}
-    />
+  <div style={{ color: colors.textMuted }}>
+    You choose what you follow.  
+    You decide what matters.
+  </div>
 
-    {/* WHAT YOU WON'T FIND */}
-    <div>
-      <div
-        style={{
-          fontSize: 12,
-          fontWeight: 600,
-          letterSpacing: 1.5,
-          textTransform: "uppercase",
-          marginBottom: 12,
-          color: colors.textMuted,
-        }}
-      >
-        What you won’t find
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {[
-          "Follower counts or influence hierarchies",
-          "Engagement manipulation",
-          "Hidden ranking systems",
-          "Advertisements shaping perception",
-        ].map((text, i) => (
-          <div
-            key={i}
-            style={{
-              display: "flex",
-              gap: 10,
-              alignItems: "flex-start",
-              transition: "transform 0.15s ease",
-              cursor: "default",
-            }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.transform = "translateX(4px)")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.transform = "translateX(0px)")
-            }
-          >
-            <div
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: 999,
-                marginTop: 6,
-                background: colors.textMuted,
-                flexShrink: 0,
-              }}
-            />
-            <div>{text}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-
-    {/* Closing line */}
-    <div
-      style={{
-        marginTop: 10,
-        fontSize: 14,
-        fontStyle: "italic",
-        color: colors.textMuted,
-      }}
-    >
-      Information is structured & unrestricted.
-    </div>
+  <div
+    style={{
+      fontSize: 14,
+      color: colors.textMuted,
+      marginTop: 8,
+    }}
+  >
+    Structured. Transparent. Intentional.
   </div>
 </div>
 
+</div>
+)}    
 
 
 
@@ -335,23 +242,31 @@ export default function Signup() {
               color: colors.text,
             }}
           >
-            Create your account
+            Join Civic
           </div>
+          <div style={{
+  fontSize: 14,
+  color: colors.textMuted,
+  marginBottom: 20,
+}}>
+  Structured discussion. No manipulation. No noise.
+</div>
 
           {error && (
-            <div
-              style={{
-                marginBottom: 16,
-                padding: 10,
-                borderRadius: 10,
-                background: "#fef2f2",
-                color: colors.danger,
-                fontSize: 14,
-              }}
-            >
-              {error}
-            </div>
-          )}
+  <div
+    style={{
+      marginBottom: 16,
+      padding: 12,
+      borderRadius: theme.radius.md,
+      background: colors.dangerSoft || "#fef2f2",
+      color: colors.danger,
+      fontSize: 14,
+      border: `1px solid ${colors.danger}30`,
+    }}
+  >
+    {error}
+  </div>
+)}
 
           <form onSubmit={submit}>
             <div style={{ marginBottom: 12 }}>
@@ -408,7 +323,7 @@ export default function Signup() {
                 opacity: loading ? 0.6 : 1,
               }}
             >
-              {loading ? "Creating account…" : "Sign up"}
+              {loading ? "Creating account…" : "Create account"}
             </button>
           </form>
 

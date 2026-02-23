@@ -6,7 +6,7 @@ import { useParams } from "react-router-dom"
 /* ================================
    Severity helpers (TOP LEVEL)
 ================================ */
-
+const isMobile = window.innerWidth < 768
 const getSeverity = (report) => {
   if (report.reason === "MINOR_SAFETY") return "CRITICAL"
   if (report.reason === "NSFW_EXPOSURE") return "HIGH"
@@ -143,12 +143,36 @@ const applyAction = async (report, outcome) => {
      Render
   ================================= */
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: 20 }}>
-      <h2 style={{ marginBottom: 16 }}>🏘️ Community Moderation</h2>
+    <div
+  style={{
+    maxWidth: 900,
+    margin: "0 auto",
+    padding: isMobile ? 16 : 24,
+  }}
+>
+      <div style={{ marginBottom: 20 }}>
+  <div
+    style={{
+      fontSize: 20,
+      fontWeight: 600,
+      marginBottom: 4,
+    }}
+  >
+    Community Moderation
+  </div>
+  <div
+    style={{
+      fontSize: 13,
+      opacity: 0.6,
+    }}
+  >
+    Review and resolve reports for this community.
+  </div>
+</div>
 
       {reports.length === 0 && (
         <p style={{ opacity: 0.7 }}>
-  No active reports. The system is quiet — that’s good.
+  No active reports. The system is quiet, that’s good.
 </p>
       )}
 
@@ -162,11 +186,13 @@ const applyAction = async (report, outcome) => {
           <div
             key={r.id}
             style={{
-              border: "1px solid #e5e7eb",
-              borderRadius: 8,
-              padding: 12,
-              marginBottom: 12,
-            }}
+  border: "1px solid #e2e8f0",
+  borderRadius: 12,
+  padding: isMobile ? 14 : 18,
+  marginBottom: 16,
+  background: "#ffffff",
+  boxShadow: "0 4px 14px rgba(0,0,0,0.04)",
+}}
           >
             {/* Severity badge */}
             <div
@@ -175,8 +201,10 @@ const applyAction = async (report, outcome) => {
                 marginBottom: 8,
                 padding: "2px 8px",
                 borderRadius: 999,
-                fontSize: 11,
-                fontWeight: 600,
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
                 background: s.bg,
                 color: s.color,
               }}
@@ -184,9 +212,14 @@ const applyAction = async (report, outcome) => {
               {s.label}
             </div>
 
-            <div style={{ fontSize: 13, marginBottom: 4 }}>
-              <strong>Reason:</strong> {r.reason}
-            </div>
+            <div style={{ marginBottom: 8 }}>
+  <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 2 }}>
+    Report reason
+  </div>
+  <div style={{ fontSize: 14 }}>
+    {r.reason}
+  </div>
+</div>
 
             <div style={{ fontSize: 13, marginBottom: 4 }}>
               <strong>Post:</strong>{" "}
@@ -220,7 +253,7 @@ const applyAction = async (report, outcome) => {
     </div>
   )}
 
-            <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
+            <div style={{ marginTop: 14, display: "flex", gap: 8, flexDirection: isMobile ? "column" : "row" }}>
   {ACTIONS.map((action) => (
     <button
       key={action}

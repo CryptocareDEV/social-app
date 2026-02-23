@@ -52,17 +52,18 @@ export default function Login({ onLogin }) {
   }
 
   const inputStyle = {
-    width: "100%",
-    boxSizing: "border-box",
-    padding: "12px 14px",
-    borderRadius: theme.radius.md,
-    border: `1px solid ${colors.border}`,
-    background: colors.surface,
-    color: colors.text,
-    fontSize: theme.typography.body.size,
-    lineHeight: theme.typography.body.lineHeight,
-    marginBottom: 12,
-  }
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "14px 16px",
+  borderRadius: theme.radius.md,
+  border: `1px solid ${colors.border}`,
+  background: colors.surface,
+  color: colors.text,
+  fontSize: theme.typography.body.size,
+  lineHeight: theme.typography.body.lineHeight,
+  marginBottom: 14,
+  outline: "none",
+}
 
   return (
     <div
@@ -77,9 +78,9 @@ export default function Login({ onLogin }) {
     >
       <div
         style={{
-          maxWidth: 380,
+          maxWidth: 420,
           width: "100%",
-          padding: 24,
+          padding: 32,
           borderRadius: theme.radius.lg,
           background: colors.surface,
           border: `1px solid ${colors.border}`,
@@ -87,16 +88,27 @@ export default function Login({ onLogin }) {
         }}
       >
         <div
-          style={{
-            fontSize: theme.typography.h2.size,
-            fontWeight: 600,
-            marginBottom: 12,
-            textAlign: "center",
-            color: colors.text,
-          }}
-        >
-          Welcome back
-        </div>
+  style={{
+    fontSize: theme.typography.h2.size,
+    fontWeight: 600,
+    marginBottom: 6,
+    textAlign: "center",
+    color: colors.text,
+  }}
+>
+  Welcome back
+</div>
+
+<div
+  style={{
+    fontSize: 14,
+    color: colors.textMuted,
+    marginBottom: 18,
+    textAlign: "center",
+  }}
+>
+  Sign in to continue your conversations.
+</div>
 
         {/* 🟡 Informational message from signup */}
         {infoMessage && (
@@ -118,20 +130,21 @@ export default function Login({ onLogin }) {
 
         {/* 🔴 Error message */}
         {error && (
-          <div
-            style={{
-              marginBottom: 12,
-              padding: "10px 12px",
-              borderRadius: 10,
-              background: "#fef2f2",
-              color: colors.danger,
-              fontSize: 14,
-              textAlign: "center",
-            }}
-          >
-            {error}
-          </div>
-        )}
+  <div
+    style={{
+      marginBottom: 14,
+      padding: "12px 14px",
+      borderRadius: theme.radius.md,
+      background: colors.danger + "10",
+      color: colors.danger,
+      fontSize: 14,
+      textAlign: "center",
+      border: `1px solid ${colors.danger}40`,
+    }}
+  >
+    {error}
+  </div>
+)}
 
         <form onSubmit={submit}>
           <input
@@ -152,6 +165,29 @@ export default function Login({ onLogin }) {
             required
           />
 
+          <div
+  style={{
+    display: "flex",
+    justifyContent: "flex-end",
+    marginBottom: 18,
+  }}
+>
+  <button
+    type="button"
+    onClick={() => navigate("/forgot-password")}
+    style={{
+      background: "transparent",
+      border: "none",
+      padding: 0,
+      fontSize: 13,
+      color: colors.primary,
+      cursor: "pointer",
+    }}
+  >
+    Forgot password?
+  </button>
+</div>
+
           <button
             type="submit"
             disabled={loading}
@@ -165,6 +201,26 @@ export default function Login({ onLogin }) {
             {loading ? "Signing in…" : "Log in"}
           </button>
         </form>
+        <div
+  style={{
+    marginTop: 20,
+    fontSize: 14,
+    color: colors.textMuted,
+    textAlign: "center",
+  }}
+>
+  New here?{" "}
+  <span
+    onClick={() => navigate("/signup")}
+    style={{
+      color: colors.primary,
+      cursor: "pointer",
+      fontWeight: 500,
+    }}
+  >
+    Create an account
+  </span>
+</div>
       </div>
     </div>
   )
