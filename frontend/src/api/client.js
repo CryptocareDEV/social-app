@@ -1,6 +1,7 @@
 // frontend/src/api/client.js
 
-const API_URL = "http://localhost:4000/api/v1"
+const API_URL =
+  import.meta.env.VITE_API_URL || "/api/v1"
 
 export const api = async (path, options = {}) => {
   const token = localStorage.getItem("token")
