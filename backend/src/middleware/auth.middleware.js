@@ -89,6 +89,8 @@ user = await applyReportAccuracyDecayIfEligible(user)
       userId: user.id,
       username: user.username,
       email: user.email,
+      countryCode: user.countryCode,
+      regionCode: user.regionCode,
 
       // safety flags
       isRoot,
