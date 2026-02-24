@@ -26,6 +26,9 @@ import {
   headerSelect, 
 } from "./ui/buttonStyles"
 
+import ForgotPassword from "./pages/ForgotPassword"
+import ResetPassword from "./pages/ResetPassword"
+
 import CommunityPage from "./pages/CommunityPage"
 import RootDashboard from "./pages/RootDashboard"
 
@@ -513,7 +516,19 @@ useEffect(() => {
   }
 />
 
+<Route
+  path="/forgot-password"
+  element={
+    user ? <Navigate to="/" /> : <ForgotPassword theme={theme} isMobile={isMobile} />
+  }
+/>
 
+<Route
+  path="/reset-password"
+  element={
+    user ? <Navigate to="/" /> : <ResetPassword theme={theme} isMobile={isMobile} />
+  }
+/>
 
 <Route
     path="/"
