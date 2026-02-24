@@ -232,10 +232,13 @@ if (
   ipToUse = ""
 }
 
-  const currentIp = ipToUse || "LOCAL_DEV"
+    const currentIp = ipToUse || "LOCAL_DEV"
 
-  // Only check geo if IP changed
-  if (currentIp !== user.lastKnownIp) {
+  const shouldUpdateLocation =
+    currentIp !== user.lastKnownIp ||
+    !user.countryCode
+
+  if (shouldUpdateLocation) {
     console.log("🌍 IP changed. Checking geo...")
 
     const geoRes = await fetch(
