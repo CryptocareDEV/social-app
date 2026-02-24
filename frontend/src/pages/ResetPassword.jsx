@@ -1,6 +1,8 @@
 import { useState } from "react"
 import { useSearchParams, useNavigate } from "react-router-dom"
 import { api } from "../api/client"
+import { theme, getThemeColors } from "../ui/theme"
+import { primaryButton } from "../ui/buttonStyles"
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams()
@@ -44,12 +46,60 @@ export default function ResetPassword() {
   if (!token) {
     return <div>Invalid reset link.</div>
   }
-
+const c = getThemeColors(theme)
   return (
-    <div style={{ maxWidth: 400, margin: "80px auto" }}>
-      <h2>Reset Password</h2>
+  <div
+    style={{
+      background: c.bg,
+      minHeight: "100vh",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: theme.spacing.lg,
+    }}
+  >
+    <div
+      style={{
+        width: "100%",
+        maxWidth: 520,
+        background: c.surface,
+        borderRadius: theme.radius.lg,
+        border: `1px solid ${c.border}`,
+        padding: theme.spacing.xl,
+        boxShadow: theme.shadow.sm,
+      }}
+    >
+      <div style={{ marginBottom: theme.spacing.lg }}>
+        <h1
+          style={{
+            fontSize: theme.typography.h2.size,
+            fontWeight: theme.typography.h2.weight,
+            color: c.text,
+            marginBottom: theme.spacing.sm,
+          }}
+        >
+          Reset Password
+        </h1>
 
-      <form onSubmit={handleSubmit}>
+        <p
+          style={{
+            fontSize: theme.typography.body.size,
+            lineHeight: theme.typography.body.lineHeight,
+            color: c.textMuted,
+          }}
+        >
+          Enter your new password below.
+        </p>
+      </div>
+
+      <form
+        onSubmit={handleSubmit}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: theme.spacing.md,
+        }}
+      >
         <input
           type="password"
           placeholder="New password"
@@ -57,21 +107,41 @@ export default function ResetPassword() {
           onChange={(e) => setPassword(e.target.value)}
           style={{
             width: "100%",
-            padding: 10,
-            marginBottom: 12,
+            padding: "14px 16px",
+            borderRadius: theme.radius.md,
+            border: `1px solid ${c.border}`,
+            fontSize: theme.typography.body.size,
+            fontFamily: theme.typography.fontFamily,
+            background: c.surface,
+            color: c.text,
+            boxSizing: "border-box",
           }}
         />
 
-        <button type="submit" disabled={loading}>
-          {loading ? "Updating..." : "Reset Password"}
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            ...primaryButton(theme),
+            width: "100%",
+          }}
+        >
+          {loading ? "Updating…" : "Reset Password"}
         </button>
       </form>
 
       {message && (
-        <div style={{ marginTop: 16 }}>
+        <div
+          style={{
+            marginTop: theme.spacing.md,
+            fontSize: theme.typography.small.size,
+            color: c.textMuted,
+          }}
+        >
           {message}
         </div>
       )}
     </div>
-  )
+  </div>
+)
 }

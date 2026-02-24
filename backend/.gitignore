@@ -4,3 +4,6 @@ node_modules
 
 /generated/prisma
 uploads/
+
+backend/geo/*.mmdb
+backend/geo/*.tar.gz
