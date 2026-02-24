@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken"
 import prisma from "../lib/prisma.js"
 import crypto from "crypto"
 import { sendEmail } from "../lib/email.js"
-
+import { getGeoFromIP } from "../lib/geo.js"
 /* =========================
    SIGNUP
 ========================= */
@@ -51,44 +51,24 @@ username = username?.trim()
     let countryCode = null
     let regionCode = null
 
-    try {
-      const rawIp =
+    // 🌍 Geo via Cloudflare + MaxMind
+
+const realIp =
+  req.headers["cf-connecting-ip"] ||
   req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
   req.socket.remoteAddress
 
-console.log("Signup IP detected:", rawIp)
+console.log("Signup IP detected:", realIp)
 
-let ipToUse = rawIp
+const geo = getGeoFromIP(realIp)
 
-// If local dev, allow ipapi to auto-detect public IP
-if (
-  rawIp === "::1" ||
-  rawIp === "127.0.0.1" ||
-  rawIp?.startsWith("192.") ||
-  rawIp?.startsWith("10.") ||
-  rawIp?.startsWith("172.")
-) {
-  ipToUse = ""
+if (geo) {
+  countryCode = geo.countryCode
+  regionCode = geo.regionCode
+  console.log("🌍 Signup location detected:", geo)
+} else {
+  console.warn("Geo lookup failed at signup for IP:", realIp)
 }
-
-      const geoRes = await fetch(
-        ipToUse
-          ? `https://ipapi.co/${ipToUse}/json/`
-          : `https://ipapi.co/json/`
-      )
-
-      const geoData = await geoRes.json()
-
-      if (geoData?.country_code) {
-        countryCode = geoData.country_code
-      }
-
-      if (geoData?.region) {
-        regionCode = geoData.region
-      }
-    } catch (geoErr) {
-      console.warn("Geo detection failed:", geoErr.message)
-    }
 
     const user = await prisma.user.create({
   data: {
@@ -216,65 +196,38 @@ const rawIp = forwarded
       return res.status(401).json({ error: "Invalid credentials" })
     }
 
-// 🌍 Geo re-check on login (IP-based)
-try {
-  console.log("Login IP detected:", rawIp)
+// 🌍 Geo update via Cloudflare + MaxMind
 
-let ipToUse = rawIp
+const realIp =
+  req.headers["cf-connecting-ip"] ||
+  req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+  req.socket.remoteAddress
 
-if (
-  rawIp === "::1" ||
-  rawIp === "127.0.0.1" ||
-  rawIp?.startsWith("192.") ||
-  rawIp?.startsWith("10.") ||
-  rawIp?.startsWith("172.")
-) {
-  ipToUse = ""
-}
+console.log("Login IP detected:", realIp)
 
-    const currentIp = ipToUse || "LOCAL_DEV"
+const geo = getGeoFromIP(realIp)
 
-  const shouldUpdateLocation =
-    currentIp !== user.lastKnownIp ||
-    !user.countryCode
+if (geo) {
+  const shouldUpdate =
+    geo.countryCode !== user.countryCode ||
+    geo.regionCode !== user.regionCode ||
+    realIp !== user.lastKnownIp
 
-  if (shouldUpdateLocation) {
-    console.log("🌍 IP changed. Checking geo...")
-
-    const geoRes = await fetch(
-      ipToUse
-        ? `https://ipapi.co/${ipToUse}/json/`
-        : `https://ipapi.co/json/`
-    )
-
-    let geoData = await geoRes.json()
-
-    // Dev fallback (remove or guard in production)
-    if (geoData?.error && process.env.NODE_ENV !== "production") {
-      console.warn("Geo API rate limited — using dev fallback")
-      geoData = {
-        country_code: "NP",
-        region: "Lumbini Province",
-      }
-    }
-
-    const newCountry = geoData?.country_code || null
-    const newRegion = geoData?.region || null
-
+  if (shouldUpdate) {
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        countryCode: newCountry,
-        regionCode: newRegion,
+        countryCode: geo.countryCode,
+        regionCode: geo.regionCode,
         locationUpdatedAt: new Date(),
-        lastKnownIp: currentIp,
+        lastKnownIp: realIp,
       },
     })
 
-    console.log("🌍 User location + IP updated")
+    console.log("🌍 Location updated via MaxMind:", geo)
   }
-} catch (geoErr) {
-  console.warn("Geo update on login failed:", geoErr.message)
+} else {
+  console.warn("Geo lookup failed for IP:", realIp)
 }
 
 

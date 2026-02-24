@@ -22,7 +22,10 @@ import helmet from "helmet"
 import rateLimit from "express-rate-limit"
 import superuserRoutes from "./routes/superuser.routes.js"
 import notificationRoutes from "./routes/notification.routes.js"
+import prisma from "./lib/prisma.js"
+import { initGeo } from "./lib/geo.js"
 import rootAnalyticsRoutes from "./routes/rootAnalytics.routes.js"
+
 
 dotenv.config()
 
@@ -135,33 +138,40 @@ app.get("/", (req, res) => {
 })
 
 const PORT = process.env.PORT || 4000
-const server = app.listen(PORT, () => {
-  console.log(`Backend running on http://localhost:${PORT}`)
-})
 
-import prisma from "./lib/prisma.js"
-
-const shutdown = async (signal) => {
-  console.log(`\nReceived ${signal}. Shutting down gracefully...`)
+const startServer = async () => {
   try {
-    await prisma.$disconnect()
-    server.close(() => {
-      console.log("Server closed.")
-      process.exit(0)
+    await initGeo()
+
+    const server = app.listen(PORT, () => {
+      console.log(`Backend running on http://localhost:${PORT}`)
     })
+
+    // graceful shutdown
+    const shutdown = async (signal) => {
+      console.log(`\nReceived ${signal}. Shutting down gracefully...`)
+      try {
+        await prisma.$disconnect()
+        server.close(() => {
+          console.log("Server closed.")
+          process.exit(0)
+        })
+      } catch (err) {
+        console.error("Shutdown error:", err)
+        process.exit(1)
+      }
+    }
+
+    process.on("SIGINT", () => shutdown("SIGINT"))
+    process.on("SIGTERM", () => shutdown("SIGTERM"))
+
   } catch (err) {
-    console.error("Shutdown error:", err)
+    console.error("Failed to initialize server:", err)
     process.exit(1)
   }
 }
 
-process.on("SIGINT", () => shutdown("SIGINT"))
-process.on("SIGTERM", () => shutdown("SIGTERM"))
+startServer()
 
-process.on("unhandledRejection", (reason) => {
-  console.error("Unhandled Rejection:", reason)
-})
 
-process.on("uncaughtException", (err) => {
-  console.error("Uncaught Exception:", err)
-})
+
