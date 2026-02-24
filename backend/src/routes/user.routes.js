@@ -11,6 +11,7 @@ import {
   changePassword,
 } from "../controllers/user.controller.js"
 import { requireAuth } from "../middleware/auth.middleware.js"
+import { sendEmail } from "../lib/email.js"
 
 const router = express.Router()
 
@@ -26,6 +27,26 @@ router.get(
 )
 router.patch("/me", requireAuth, updateMe)
 router.post("/me/change-password", requireAuth, changePassword)
+
+router.post("/me/test-email", requireAuth, async (req, res) => {
+  try {
+    await sendEmail({
+      to: req.user.email,
+      subject: "CivicHalls Email Infrastructure Test",
+      html: `
+        <div style="font-family:Arial;padding:20px">
+          <h2>Email system working.</h2>
+          <p>If you received this, your production mail setup is correct.</p>
+        </div>
+      `,
+    })
+
+    return res.json({ success: true })
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ error: "Email failed" })
+  }
+})
 
 router.get("/me/invitations", requireAuth, getMyInvitations)
 
