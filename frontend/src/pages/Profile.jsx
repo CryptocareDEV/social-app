@@ -49,6 +49,13 @@ const [showCommunityPosts, setShowCommunityPosts] = useState(true)
   const [postView, setPostView] = useState("PUBLIC")
   const [isOwnProfile, setIsOwnProfile] = useState(false)
   const [showCreateCommunity, setShowCreateCommunity] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState("")
+const [newPassword, setNewPassword] = useState("")
+const [changingPassword, setChangingPassword] = useState(false)
+const [confirmPassword, setConfirmPassword] = useState("")
+const [showPasswords, setShowPasswords] = useState(false)
+const [passwordError, setPasswordError] = useState("")
+const [passwordSuccess, setPasswordSuccess] = useState("")
   const isSuperuser = currentUser?.isSuperuser === true
 
 
@@ -71,6 +78,12 @@ const communityPosts = posts.filter(
   (p) => p.communityId
 )
 
+const passwordStrength = () => {
+  if (newPassword.length < 8) return "Too short"
+  if (!/[A-Z]/.test(newPassword)) return "Add an uppercase letter"
+  if (!/[0-9]/.test(newPassword)) return "Add a number"
+  return "Strong"
+}
 
 const visiblePosts =
   postView === "PUBLIC" ? publicPosts : communityPosts
@@ -1306,10 +1319,180 @@ if (
     </div>
   </div>
 </div>
+{/* Change Password */}
+<div
+  style={{
+    padding: isMobile ? 16 : 20,
+    borderRadius: 16,
+    background: colors.surface,
+    border: `1px solid ${colors.border}`,
+    display: "flex",
+    flexDirection: "column",
+    gap: 18,
+    marginTop: 8,
+  }}
+>
+  <div style={{ fontSize: 16, fontWeight: 600 }}>
+    Security
+  </div>
 
+  <div style={{ fontSize: 13, color: colors.textMuted }}>
+    Change your password to keep your account secure.
+  </div>
+
+  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <input
+      type={showPasswords ? "text" : "password"}
+      placeholder="Current password"
+      value={currentPassword}
+      onChange={(e) => setCurrentPassword(e.target.value)}
+      style={{
+        padding: "12px 14px",
+        borderRadius: 12,
+        border: `1px solid ${colors.border}`,
+        background: colors.surface,
+        fontSize: 14,
+      }}
+    />
+
+    <input
+      type={showPasswords ? "text" : "password"}
+      placeholder="New password"
+      value={newPassword}
+      onChange={(e) => setNewPassword(e.target.value)}
+      style={{
+        padding: "12px 14px",
+        borderRadius: 12,
+        border: `1px solid ${colors.border}`,
+        background: colors.surface,
+        fontSize: 14,
+      }}
+    />
+
+    <input
+      type={showPasswords ? "text" : "password"}
+      placeholder="Confirm new password"
+      value={confirmPassword}
+      onChange={(e) => setConfirmPassword(e.target.value)}
+      style={{
+        padding: "12px 14px",
+        borderRadius: 12,
+        border: `1px solid ${colors.border}`,
+        background: colors.surface,
+        fontSize: 14,
+      }}
+    />
+
+    <label
+      style={{
+        fontSize: 12,
+        color: colors.textMuted,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        cursor: "pointer",
+      }}
+    >
+      <input
+        type="checkbox"
+        checked={showPasswords}
+        onChange={() => setShowPasswords(!showPasswords)}
+      />
+      Show passwords
+    </label>
+
+    {newPassword && (
+      <div
+        style={{
+          fontSize: 12,
+          color:
+            passwordStrength() === "Strong"
+              ? colors.success
+              : colors.textMuted,
+        }}
+      >
+        Strength: {passwordStrength()}
+      </div>
+    )}
+  </div>
+
+  <button
+    onClick={async () => {
+      setPasswordError("")
+      setPasswordSuccess("")
+
+      if (!currentPassword || !newPassword || !confirmPassword) {
+        setPasswordError("All fields are required.")
+        return
+      }
+
+      if (newPassword !== confirmPassword) {
+        setPasswordError("New passwords do not match.")
+        return
+      }
+
+      if (newPassword.length < 8) {
+        setPasswordError("Password must be at least 8 characters.")
+        return
+      }
+
+      try {
+        setChangingPassword(true)
+
+        await api("/users/me/change-password", {
+          method: "POST",
+          body: JSON.stringify({
+            currentPassword,
+            newPassword,
+          }),
+        })
+
+        setPasswordSuccess("Password updated successfully.")
+        setCurrentPassword("")
+        setNewPassword("")
+        setConfirmPassword("")
+      } catch (err) {
+        setPasswordError(
+          err?.error || "Failed to change password"
+        )
+      } finally {
+        setChangingPassword(false)
+      }
+    }}
+    style={{
+      padding: "12px 18px",
+      borderRadius: 999,
+      fontSize: 14,
+      fontWeight: 500,
+      border: "none",
+      background: colors.primary,
+      color: "#fff",
+      cursor: "pointer",
+      opacity: changingPassword ? 0.6 : 1,
+      transition: "all 0.2s ease",
+    }}
+    disabled={changingPassword}
+  >
+    {changingPassword ? "Updating…" : "Update Password"}
+  </button>
+
+  {passwordError && (
+    <div style={{ fontSize: 13, color: colors.danger }}>
+      {passwordError}
+    </div>
+  )}
+
+  {passwordSuccess && (
+    <div style={{ fontSize: 13, color: colors.success }}>
+      {passwordSuccess}
+    </div>
+  )}
+</div>
 
       </div>
     </div>
+
+
 )}
 
 

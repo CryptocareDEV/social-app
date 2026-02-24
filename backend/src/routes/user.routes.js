@@ -8,6 +8,7 @@ import {
   getMyInvitations,
   updateMe,
   getUserCommunities,
+  changePassword,
 } from "../controllers/user.controller.js"
 import { requireAuth } from "../middleware/auth.middleware.js"
 
@@ -24,6 +25,7 @@ router.get(
   getMe
 )
 router.patch("/me", requireAuth, updateMe)
+router.post("/me/change-password", requireAuth, changePassword)
 
 router.get("/me/invitations", requireAuth, getMyInvitations)
 

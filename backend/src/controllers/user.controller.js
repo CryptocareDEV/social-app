@@ -1,4 +1,5 @@
 import prisma from "../lib/prisma.js"
+import bcrypt from "bcryptjs"
 
 export const getUserProfile = async (req, res) => {
   try {
@@ -513,3 +514,55 @@ const memberships = await prisma.communityMember.findMany({
   }
 }
 
+export const changePassword = async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const { currentPassword, newPassword } = req.body
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        error: "Both current and new password are required",
+      })
+    }
+
+    // 1️⃣ Fetch current password hash
+    const user = await prisma.user.findUnique({
+  where: { id: userId },
+  select: { passwordHash: true },
+})
+
+    if (!user || !user.passwordHash) {
+  return res.status(404).json({
+    error: "User not found",
+  })
+}
+
+    // 2️⃣ Validate current password
+    const isValid = await bcrypt.compare(
+  currentPassword,
+  user.passwordHash
+)
+
+    if (!isValid) {
+      return res.status(400).json({
+        error: "Current password is incorrect",
+      })
+    }
+
+    // 3️⃣ Hash new password
+    const hashed = await bcrypt.hash(newPassword, 10)
+
+    // 4️⃣ Update password
+    await prisma.user.update({
+  where: { id: userId },
+  data: { passwordHash: hashed },
+})
+
+    return res.json({ success: true })
+  } catch (err) {
+    console.error("CHANGE PASSWORD ERROR:", err)
+    return res.status(500).json({
+      error: "Failed to change password",
+    })
+  }
+}
