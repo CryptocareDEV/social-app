@@ -53,6 +53,7 @@ model User {
   superuser             Superuser?
   profile               UserProfile?
   actionLogs            UserActionLog[]
+  passwordResetTokens PasswordResetToken[]
 }
 
 model Post {
@@ -124,6 +125,18 @@ model Comment {
   @@index([parentCommentId])
 }
 
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
 
 model Like {
   id        String   @id @default(uuid())
