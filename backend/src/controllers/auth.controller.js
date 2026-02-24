@@ -12,11 +12,7 @@ export const signup = async (req, res) => {
     let { email, username, password, dateOfBirth } = req.body
 email = email?.toLowerCase().trim()
 username = username?.trim()
-    // 🌍 Detect client IP
-    const forwarded = req.headers["x-forwarded-for"]
-    const ip = forwarded
-      ? forwarded.split(",")[0].trim()
-      : req.socket.remoteAddress
+    
 
     if (!dateOfBirth) {
       return res.status(400).json({
@@ -56,18 +52,24 @@ username = username?.trim()
     let regionCode = null
 
     try {
-      const forwarded = req.headers["x-forwarded-for"]
-      const rawIp = forwarded
-        ? forwarded.split(",")[0].trim()
-        : req.socket.remoteAddress
+      const rawIp =
+  req.headers["x-forwarded-for"]?.split(",")[0].trim() ||
+  req.socket.remoteAddress
 
-      // 🧪 If local development IP, fallback to public IP lookup
-      const ipToUse =
-        rawIp === "::1" ||
-        rawIp === "127.0.0.1" ||
-        rawIp?.includes("192.168")
-          ? ""
-          : rawIp
+console.log("Signup IP detected:", rawIp)
+
+let ipToUse = rawIp
+
+// If local dev, allow ipapi to auto-detect public IP
+if (
+  rawIp === "::1" ||
+  rawIp === "127.0.0.1" ||
+  rawIp?.startsWith("192.") ||
+  rawIp?.startsWith("10.") ||
+  rawIp?.startsWith("172.")
+) {
+  ipToUse = ""
+}
 
       const geoRes = await fetch(
         ipToUse
@@ -216,12 +218,19 @@ const rawIp = forwarded
 
 // 🌍 Geo re-check on login (IP-based)
 try {
-  const ipToUse =
-    rawIp === "::1" ||
-    rawIp === "127.0.0.1" ||
-    rawIp?.includes("192.168")
-      ? ""
-      : rawIp
+  console.log("Login IP detected:", rawIp)
+
+let ipToUse = rawIp
+
+if (
+  rawIp === "::1" ||
+  rawIp === "127.0.0.1" ||
+  rawIp?.startsWith("192.") ||
+  rawIp?.startsWith("10.") ||
+  rawIp?.startsWith("172.")
+) {
+  ipToUse = ""
+}
 
   const currentIp = ipToUse || "LOCAL_DEV"
 
