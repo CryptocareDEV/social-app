@@ -94,6 +94,7 @@ const toggleTheme = async () => {
   const [isSwitchingProfile, setIsSwitchingProfile] = useState(false)
   const [showIntegrityBar, setShowIntegrityBar] = useState(false)
   const [feedCache, setFeedCache] = useState({})
+  const [highlightPostId, setHighlightPostId] = useState(null)
   const now = useNow(1000)
 let cooldownRemaining = 0
 
@@ -220,6 +221,7 @@ useEffect(() => {
 
 }, [user])
 
+
   const loadInvitations = async () => {
   try {
     const data = await api("/communities/invitations/my")
@@ -308,17 +310,13 @@ useEffect(() => {
 }, [])
 
 useEffect(() => {
-  const targetId =
-    location.state?.highlightPostId ||
-    sessionStorage.getItem("highlightPostId")
-
-  if (!targetId) return
+  if (!highlightPostId) return
 
   let attempts = 0
-  const maxAttempts = 15
+  const maxAttempts = 20
 
   const tryHighlight = () => {
-    const el = document.getElementById(`post-${targetId}`)
+    const el = document.getElementById(`post-${highlightPostId}`)
 
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "center" })
@@ -329,7 +327,9 @@ useEffect(() => {
         el.style.background = ""
       }, 2000)
 
-      sessionStorage.removeItem("highlightPostId")
+      // 🔥 Consume trigger
+      setHighlightPostId(null)
+
     } else if (attempts < maxAttempts) {
       attempts++
       setTimeout(tryHighlight, 200)
@@ -338,7 +338,7 @@ useEffect(() => {
 
   tryHighlight()
 
-}, [location.pathname, location.state, posts])
+}, [highlightPostId, posts])
 
 useEffect(() => {
   setShowIntegrityBar(true)
@@ -459,6 +459,7 @@ useEffect(() => {
       setShowNotifications={setShowNotifications}
       notifications={notifications}
       loadingNotifications={loadingNotifications}
+      setHighlightPostId={setHighlightPostId}
     />
     <Routes>
 
@@ -570,7 +571,7 @@ useEffect(() => {
                 style={{
                   maxWidth: "min(100%, 720px)",
                   margin: "0 auto",
-                  padding: isMobile ? "16px 0" : "24px 16px",
+                  padding: isMobile ? "8px 0" : "24px 16px",
                   background: theme.colors.bg,
                   minHeight: "100vh",
                 }}

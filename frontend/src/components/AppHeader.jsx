@@ -26,6 +26,7 @@ export default function AppHeader({
   setShowNotifications,
   notifications,
   loadingNotifications,
+  setHighlightPostId,
 }) {
   const colors = getThemeColors(theme)
   const navigate = useNavigate()
@@ -49,27 +50,35 @@ export default function AppHeader({
       return `${actor} interacted with you`
   }
 }
-const handleNotificationClick = (n) => {
+
+const handleNotificationClick = async (n) => {
   setShowNotifications(false)
 
   if (!n.postId) return
 
-  sessionStorage.setItem("highlightPostId", n.postId)
+  try {
+    await fetch(`/api/v1/notifications/${n.id}/read`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    })
+  } catch {}
 
   if (n.communityId) {
-    navigate(`/communities/${n.communityId}`, {
-      state: { highlightPostId: n.postId, fromNotification: true },
-    })
+    navigate(`/communities/${n.communityId}`)
   } else {
-    navigate("/", {
-      state: { highlightPostId: n.postId, fromNotification: true },
-    })
+    navigate("/")
   }
+
+  // 🔥 Directly trigger highlight
+  setHighlightPostId(n.postId)
 }
+
   const handleMarkAllRead = async () => {
   try {
-    await fetch("/notifications/mark-all-read", {
-      method: "POST",
+    await fetch("/api/v1/notifications/read-all", {
+      method: "PATCH",
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
@@ -301,9 +310,11 @@ const handleNotificationClick = (n) => {
   <div ref={notificationRef} style={{ position: "relative" }}>
     <button
       onClick={() => {
-        setShowNotifications((v) => !v)
-        if (!showNotifications) loadNotifications()
-      }}
+  setShowNotifications((prev) => {
+    if (!prev) loadNotifications()
+    return !prev
+  })
+}}
       style={headerGhostButton(theme)}
     >
       🔔
@@ -464,17 +475,19 @@ const handleNotificationClick = (n) => {
     {showUserMenu && (
       <div
   style={{
-    position: "absolute",
-    right: 0,
-    top: 42,
-    minWidth: 220,
-    background: colors.surface,
-    border: `1px solid ${colors.border}`,
-    borderRadius: theme.radius.md,
-    boxShadow: theme.shadow.md,
-    padding: 0,
-    zIndex: 200,
-  }}
+  position: isMobile ? "fixed" : "absolute",
+  right: isMobile ? 12 : 0,
+  left: isMobile ? 12 : "auto",
+  top: isMobile ? 60 : 42,
+  minWidth: isMobile ? "auto" : 220,
+  maxWidth: isMobile ? "calc(100vw - 24px)" : 260,
+  background: colors.surface,
+  border: `1px solid ${colors.border}`,
+  borderRadius: theme.radius.md,
+  boxShadow: theme.shadow.md,
+  padding: 0,
+  zIndex: 200,
+}}
 >
   {/* Profile */}
   <div

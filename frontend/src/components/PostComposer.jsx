@@ -12,6 +12,7 @@ export default function PostComposer({
   theme,
   isMinor = false,
   nsfwEnabled = false,
+  isMobile = false,
 }) {
 
   const colors = getThemeColors(theme)
@@ -75,7 +76,6 @@ const [scope, setScope] = useState("GLOBAL")
   const [loading, setLoading] = useState(false)
   const [rating, setRating] = useState("SAFE")
   const [postInCommunity, setPostInCommunity] = useState(false)
-
   // 🔹 Load global labels
   useEffect(() => {
     let mounted = true
@@ -239,12 +239,12 @@ setScope("GLOBAL")
   return (
   <div
     style={{
-      background: colors.surface,
-      borderRadius: theme.radius.lg,
-      marginBottom: 24,
-      border: `1px solid ${colors.border}`,
-      boxShadow: theme.shadow.sm,
-    }}
+  background: colors.surface,
+  borderRadius: isMobile ? 0 : theme.radius.lg,
+  marginBottom: isMobile ? 8 : 24,
+  border: isMobile ? "none" : `1px solid ${colors.border}`,
+  boxShadow: isMobile ? "none" : theme.shadow.sm,
+}}
   >
 <div
   onClick={() => setOpen((v) => !v)}
@@ -252,7 +252,7 @@ setScope("GLOBAL")
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 16,
+    padding: isMobile ? 12 : 16,
     cursor: "pointer",
     userSelect: "none",
   }}
@@ -273,7 +273,7 @@ setScope("GLOBAL")
   </span>
 </div>
 {open && (
-  <form onSubmit={submit} style={{ padding: 16 }}>
+  <form onSubmit={submit} style={{ padding: isMobile ? 12 : 16 }}>
 
       {error && (
   <div

@@ -55,7 +55,7 @@ function Feed({
   style={{
     display: "flex",
     flexDirection: "column",
-    gap: isMobile ? 12 : theme.spacing.lg,
+    gap: isMobile ? 4 : theme.spacing.lg,
   }}
 >
       {posts.map((post) => (

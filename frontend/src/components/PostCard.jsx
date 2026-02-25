@@ -481,7 +481,7 @@ const handleReplySubmit = async (parentId) => {
       style={{
   background: colors.surface,
   borderRadius: isMobile ? 0 : theme.radius.lg,
-  padding: isMobile ? "12px 0" : theme.spacing.xl + 4,
+  padding: isMobile ? "8px 0" : theme.spacing.xl + 4,
   boxShadow: isMobile ? "none" : theme.shadow.sm,
 
   borderTop: isMobile ? "none" : `1px solid ${colors.border}`,
@@ -496,7 +496,7 @@ const handleReplySubmit = async (parentId) => {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  marginBottom: isMobile ? 6 : 12,
+  marginBottom: isMobile ? 4 : 12,
   fontSize: 13,
 }}
 >
@@ -614,7 +614,7 @@ onMouseLeave={(e) => {
 {!collapsed && imageSrc && (
   <div
     style={{
-      marginTop: isMobile ? 8 : theme.spacing.md,
+      marginTop: isMobile ? 6 : theme.spacing.md,
 borderRadius: isMobile ? 0 : theme.radius.md,
 overflow: "hidden",
 border: isMobile ? "none" : `1px solid ${colors.border}`,
@@ -628,14 +628,14 @@ position: "relative",
     controls
     preload="metadata"
     style={{
-      width: "100%",
-      display: "block",
-      minHeight: isMobile ? "60vh" : undefined,
-      maxHeight: isMobile ? "none" : 520,
-      background: colors.bg,
-      borderRadius: isMobile ? 0 : theme.radius.md,
-      objectFit: isMobile ? "cover" : "contain",
-    }}
+  width: "100%",
+  height: "auto",
+  display: "block",
+  maxHeight: isMobile ? "75vh" : 520,
+  background: colors.bg,
+  borderRadius: isMobile ? 0 : theme.radius.md,
+  objectFit: "contain",
+}}
   />
 ) : (
   <img
@@ -643,14 +643,14 @@ position: "relative",
     alt={post.type === "MEME" ? "Meme image" : "Post media"}
     loading="lazy"
     style={{
-      width: "100%",
-      display: "block",
-      minHeight: isMobile ? "60vh" : undefined,
-      maxHeight: isMobile ? "none" : 520,
-      objectFit: isMobile ? "cover" : "contain",
-      background: colors.bg,
-      borderRadius: isMobile ? 0 : theme.radius.md,
-    }}
+  width: "100%",
+  height: "auto",
+  display: "block",
+  maxHeight: isMobile ? "75vh" : 520,
+  objectFit: "contain",
+  background: colors.bg,
+  borderRadius: isMobile ? 0 : theme.radius.md,
+}}
   />
 )}
 
@@ -944,7 +944,7 @@ paddingTop: 6,
       borderRadius: theme.radius.md,
       background: "transparent",
 border: "none",
-padding: isMobile ? 12 : theme.spacing.md,
+padding: isMobile ? 8 : theme.spacing.md,
     }}
   >
     {commentsLoading && (
