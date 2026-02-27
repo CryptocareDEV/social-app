@@ -4,6 +4,7 @@ import prisma from "../lib/prisma.js"
 import crypto from "crypto"
 import { sendEmail } from "../lib/email.js"
 import { getGeoFromIP } from "../lib/geo.js"
+import { OAuth2Client } from "google-auth-library"
 /* =========================
    SIGNUP
 ========================= */
@@ -427,5 +428,201 @@ export const resetPassword = async (req, res) => {
     return res.status(500).json({
       error: "Failed to reset password",
     })
+  }
+}
+
+export const completeProfile = async (req, res) => {
+  try {
+    const { dateOfBirth } = req.body
+
+    if (!dateOfBirth) {
+      return res.status(400).json({ error: "dateOfBirth required" })
+    }
+
+    const dob = new Date(dateOfBirth)
+
+    if (isNaN(dob.getTime())) {
+      return res.status(400).json({ error: "Invalid date" })
+    }
+
+    const userId = req.user.userId
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { dateOfBirth: dob },
+    })
+
+    return res.json({ success: true })
+  } catch (err) {
+    console.error("COMPLETE PROFILE ERROR:", err)
+    return res.status(500).json({ error: "Failed to update profile" })
+  }
+}
+/* =========================
+   GOOGLE LOGIN
+========================= */
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
+
+export const googleLogin = async (req, res) => {
+  try {
+    const { idToken } = req.body
+
+    if (!idToken) {
+      return res.status(400).json({ error: "Missing Google token" })
+    }
+
+    // Verify Google ID token
+const ticket = await googleClient.verifyIdToken({
+  idToken,
+  audience: process.env.GOOGLE_CLIENT_ID,
+})
+
+const payload = ticket.getPayload()
+
+if (!payload || !payload.email) {
+  return res.status(400).json({ error: "Invalid Google token" })
+}
+
+if (!payload.email_verified) {
+  return res.status(400).json({
+    error: "Google email not verified",
+  })
+}
+
+const email = payload.email.toLowerCase()
+const googleId = payload.sub
+    let baseUsername =
+  payload.name?.replace(/\s+/g, "").toLowerCase() ||
+  `user${Date.now()}`
+
+// ensure uniqueness
+let username = baseUsername
+let counter = 1
+
+while (
+  await prisma.user.findUnique({
+    where: { username },
+  })
+) {
+  username = `${baseUsername}${counter}`
+  counter++
+}
+
+    // 1️⃣ Check if provider already exists
+    const existingProvider = await prisma.authProvider.findUnique({
+      where: {
+        provider_providerUserId: {
+          provider: "GOOGLE",
+          providerUserId: googleId,
+        },
+      },
+      include: { user: true },
+    })
+
+    let user
+
+    if (existingProvider) {
+      user = existingProvider.user
+    } else {
+      // 2️⃣ Check if user exists by email
+      const existingUser = await prisma.user.findUnique({
+        where: { email },
+      })
+
+      if (existingUser) {
+  // check if this user already has GOOGLE linked
+  const alreadyLinked = await prisma.authProvider.findFirst({
+    where: {
+      userId: existingUser.id,
+      provider: "GOOGLE",
+    },
+  })
+
+  if (!alreadyLinked) {
+    await prisma.authProvider.create({
+      data: {
+        userId: existingUser.id,
+        provider: "GOOGLE",
+        providerUserId: googleId,
+      },
+    })
+  }
+
+  user = existingUser
+} else {
+        // 3️⃣ Create new user
+        user = await prisma.user.create({
+  data: {
+    email,
+    username,
+    dateOfBirth: new Date("1900-01-01"),
+  },
+})
+
+        await prisma.authProvider.create({
+          data: {
+            userId: user.id,
+            provider: "GOOGLE",
+            providerUserId: googleId,
+          },
+        })
+
+        await prisma.userProfile.create({
+          data: { userId: user.id },
+        })
+
+        await prisma.feedProfile.create({
+          data: {
+            userId: user.id,
+            name: "Default",
+            isActive: true,
+            preferences: {
+              labels: {
+                GLOBAL: [],
+                COUNTRY: [],
+                LOCAL: [],
+              },
+              nsfw: {
+                posts: "HIDE",
+                communities: {
+                  inFeeds: false,
+                  onProfile: false,
+                },
+              },
+              ordering: "RECENT",
+            },
+          },
+        })
+      }
+    }
+
+    // Issue JWT
+    const token = jwt.sign(
+      {
+        userId: user.id,
+        email: user.email,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "7d",
+        algorithm: "HS256",
+      }
+    )
+
+    const needsDobCompletion =
+  user.dateOfBirth.getFullYear() === 1900
+
+return res.json({
+  token,
+  user: {
+    id: user.id,
+    email: user.email,
+    username: user.username,
+    needsDobCompletion,
+  },
+})
+  } catch (err) {
+    console.error("GOOGLE LOGIN ERROR:", err)
+    return res.status(500).json({ error: "Google login failed" })
   }
 }

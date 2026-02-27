@@ -16,6 +16,7 @@ import MemeEditor from "./components/MemeEditor"
 import CommunityModerationDashboard from "./pages/CommunityModerationDashboard"
 import ModerationDashboard from "./pages/ModerationDashboard"
 import Signup from "./pages/Signup"
+import CompleteProfile from "./pages/CompleteProfile"
 import {
   primaryButton,
   secondaryButton,
@@ -426,6 +427,15 @@ useEffect(() => {
   )
 }, [colors.primary])
 
+// 🔐 Mandatory DOB completion guard
+if (
+  user &&
+  user.needsDobCompletion &&
+  location.pathname !== "/complete-profile"
+) {
+  return <Navigate to="/complete-profile" replace />
+}
+
   if (loading) {
     return <p style={{ textAlign: "center", marginTop: 40 }}>Loading…</p>
   }
@@ -487,6 +497,8 @@ useEffect(() => {
       : <Navigate to="/" />
   }
 />
+
+<Route path="/complete-profile" element={<CompleteProfile />} />
 
 <Route
   path="/superusers"

@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom"
 import { getThemeColors } from "../ui/theme"
 import { theme as baseTheme } from "../ui/theme"
 import { primaryButton } from "../ui/buttonStyles"
+import { GoogleLogin } from "@react-oauth/google"
 
 export default function Login({ onLogin }) {
   const theme = baseTheme
@@ -97,6 +98,52 @@ export default function Login({ onLogin }) {
   }}
 >
   Welcome back
+</div>
+
+<div style={{ marginBottom: 16 }}>
+  <GoogleLogin
+    onSuccess={async (credentialResponse) => {
+      try {
+        setError("")
+        setLoading(true)
+
+        const res = await api("/auth/google", {
+          method: "POST",
+          body: JSON.stringify({
+            idToken: credentialResponse.credential,
+          }),
+        })
+
+        localStorage.setItem("token", res.token)
+        onLogin(res.user)
+
+        if (res.user.needsDobCompletion) {
+          navigate("/complete-profile", { replace: true })
+        } else {
+          navigate("/", { replace: true })
+        }
+      } catch (err) {
+        setError(err?.error || "Google login failed")
+      } finally {
+        setLoading(false)
+      }
+    }}
+    onError={() => {
+      setError("Google login failed")
+    }}
+    useOneTap={false}
+  />
+</div>
+
+<div
+  style={{
+    textAlign: "center",
+    fontSize: 12,
+    color: colors.textMuted,
+    marginBottom: 16,
+  }}
+>
+  — or —
 </div>
 
 <div

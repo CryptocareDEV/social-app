@@ -4,6 +4,7 @@ import { useNavigate, Link } from "react-router-dom"
 import { getThemeColors } from "../ui/theme"
 import { theme as baseTheme } from "../ui/theme"
 import { primaryButton } from "../ui/buttonStyles"
+import { GoogleLogin } from "@react-oauth/google"
 
 export default function Signup() {
   const theme = baseTheme
@@ -252,6 +253,51 @@ gap: isMobile ? 24 : 48,
   Structured discussion. No manipulation. No noise.
 </div>
 
+<div style={{ marginBottom: 16 }}>
+  <GoogleLogin
+    onSuccess={async (credentialResponse) => {
+      try {
+        setError("")
+        setLoading(true)
+
+        const res = await api("/auth/google", {
+          method: "POST",
+          body: JSON.stringify({
+            idToken: credentialResponse.credential,
+          }),
+        })
+
+        localStorage.setItem("token", res.token)
+
+        if (res.user.needsDobCompletion) {
+  navigate("/complete-profile", { replace: true })
+} else {
+  navigate("/", { replace: true })
+}
+      } catch (err) {
+        setError(err?.error || "Google login failed")
+      } finally {
+        setLoading(false)
+      }
+    }}
+    onError={() => {
+      setError("Google login failed")
+    }}
+    useOneTap={false}
+  />
+</div>
+
+<div
+  style={{
+    textAlign: "center",
+    fontSize: 12,
+    color: colors.textMuted,
+    marginBottom: 16,
+  }}
+>
+  — or —
+</div>
+
           {error && (
   <div
     style={{
@@ -291,16 +337,36 @@ gap: isMobile ? 24 : 48,
             </div>
 
             <div style={{ marginBottom: 12 }}>
-              <input
-                type="date"
-                value={dateOfBirth}
-                onChange={(e) => setDateOfBirth(e.target.value)}
-                style={{
-                  ...inputStyle,
-                  colorScheme: theme.mode,
-                }}
-                required
-              />
+              
+              {/* Date of Birth */}
+<div style={{ marginBottom: 16 }}>
+  <div
+    style={{
+      fontSize: 13,
+      marginBottom: 6,
+      color: colors.textMuted,
+    }}
+  >
+    Date of Birth
+  </div>
+
+  <input
+    type="date"
+    value={dateOfBirth}
+    onChange={(e) => setDateOfBirth(e.target.value)}
+    max={new Date().toISOString().split("T")[0]}
+    min="1930-01-01"
+    style={{
+      ...inputStyle,
+      height: 44,
+      appearance: "none",
+      WebkitAppearance: "none",
+    }}
+    required
+  />
+</div>
+
+
             </div>
 
             <div style={{ marginBottom: 16 }}>
