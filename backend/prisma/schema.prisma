@@ -35,6 +35,19 @@ model User {
   regionCode            String?
   lastKnownIp           String?
   comments              Comment[]
+  lastActiveAt          DateTime?
+  lastLoginAt           DateTime?
+  loginCount            Int                   @default(0)
+
+  postCount             Int                   @default(0)
+  commentCount          Int                   @default(0)
+  reactionCount         Int                   @default(0)
+
+  reputationScore       Float                 @default(0.0)
+  shadowBanned          Boolean               @default(false)
+
+  city                  String?
+  timezone              String?
   nsfwEnabled           Boolean                @default(false)
   themeMode             ThemeMode              @default(LIGHT)
   accentTheme           AccentTheme            @default(CALM)
@@ -49,6 +62,7 @@ model User {
   notificationsSent     Notification[] @relation("ActorNotifications")
   likes                 Like[]
   posts                 Post[]
+  reactions             Reaction[]
   reportsMade           Report[]
   superuser             Superuser?
   profile               UserProfile?
@@ -72,13 +86,16 @@ model Post {
   originType         PostOriginType      @default(USER)
   isRemoved          Boolean             @default(false)
   originPostId       String?
+  shareCount         Int                 @default(0)
   memeBottomText     String?
   memeTopText        String?
+  memeMeta           Json?
   countryCode        String?
   regionCode         String?
   comments           Comment[]
   communityFeedItems CommunityFeedItem[]
   likes              Like[]
+  reactions          Reaction[]
   moderationActions  ModerationAction[]
   notifications      Notification[]
   community          Community?          @relation(fields: [communityId], references: [id])
@@ -112,12 +129,14 @@ model Comment {
   removedAt       DateTime?
   removedBy       String?
   removedReason   String?
+  memeMeta        Json?
 
   post            Post              @relation(fields: [postId], references: [id], onDelete: Cascade)
   user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   parent          Comment?          @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
   replies         Comment[]         @relation("CommentReplies")
+  reactions       Reaction[]
   notifications   Notification[]
   @@index([postId])
   @@index([userId])
@@ -148,6 +167,25 @@ model Like {
 
   @@unique([userId, postId])
 }
+
+model Reaction {
+  id        String   @id @default(uuid())
+  userId    String
+  postId    String?
+  commentId String?
+  type      ReactionType
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment   Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId, type])
+  @@unique([userId, commentId, type])
+  @@index([postId])
+  @@index([commentId])
+}
+
 
 model Notification {
   id            String            @id @default(uuid())
@@ -563,4 +601,13 @@ enum ActionType {
   COMMUNITY_JOIN
   COMMUNITY_INVITE
   MODERATION_ACTION
+}
+
+enum ReactionType {
+  LIKE
+  LOVE
+  LAUGH
+  FIRE
+  SAD
+  ANGRY
 }
