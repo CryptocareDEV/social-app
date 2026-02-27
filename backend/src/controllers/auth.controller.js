@@ -593,6 +593,46 @@ while (
             },
           },
         })
+
+
+        try {
+  await sendEmail({
+    to: user.email,
+    subject: "Welcome to CivicHalls",
+    html: `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background:#f8fafc; padding:40px 20px;">
+      <div style="max-width:520px;margin:0 auto;background:white;border-radius:16px;padding:32px;border:1px solid #e2e8f0;">
+        
+        <h2 style="margin:0 0 12px 0;font-size:22px;color:#111827;">
+          Welcome to CivicHalls
+        </h2>
+
+        <p style="margin:0 0 16px 0;color:#475569;font-size:15px;line-height:1.6;">
+          Your account was created using Google.
+        </p>
+
+        <ul style="color:#475569;font-size:14px;line-height:1.8;padding-left:18px;">
+          <li>🌍 Explore Global, Country, and Local feeds</li>
+          <li>🏷️ Filter discussions by categories</li>
+          <li>🏛️ Join or create communities</li>
+          <li>🧠 Shape your feed using Feed Profiles</li>
+        </ul>
+
+        <div style="text-align:center;margin:28px 0;">
+          <a href="${process.env.FRONTEND_URL}"
+             style="display:inline-block;padding:12px 20px;background:#ff4500;color:white;
+             border-radius:10px;text-decoration:none;font-weight:600;font-size:14px;">
+            Start Exploring
+          </a>
+        </div>
+
+      </div>
+    </div>
+    `,
+  })
+} catch (emailErr) {
+  console.error("GOOGLE WELCOME EMAIL FAILED:", emailErr)
+}
       }
     }
 
