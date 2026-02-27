@@ -33,18 +33,17 @@ color: colors.text,
 
 const textareaStyle = {
   width: "100%",
-  minHeight: 90,
-  padding: "10px 12px",
-  borderRadius: 12,
+  minHeight: 110,
+  padding: "14px 16px",
+  borderRadius: 16,
   border: `1px solid ${colors.border}`,
-  fontSize: 14,
-  lineHeight: 1.5,
+  fontSize: 15,
+  lineHeight: 1.6,
   resize: "vertical",
-  marginBottom: 8,
   boxSizing: "border-box",
   color: colors.text,
-background: colors.surface,
-
+  background: colors.surface,
+  outline: "none",
 }
 
 const selectStyle = {
@@ -136,6 +135,84 @@ const [scope, setScope] = useState("GLOBAL")
     setLabelInput("")
   }
 
+const compressImage = async (file) => {
+  // Skip small images
+  if (file.size < 1 * 1024 * 1024) {
+    return file
+  }
+
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.crossOrigin = "anonymous"
+
+    img.onload = () => {
+      const maxWidth = 1920
+
+      let { width, height } = img
+
+      // Resize only if needed
+      if (width > maxWidth) {
+        const scale = maxWidth / width
+        width = maxWidth
+        height = height * scale
+      }
+
+      const canvas = document.createElement("canvas")
+      canvas.width = width
+      canvas.height = height
+
+      const ctx = canvas.getContext("2d")
+      ctx.drawImage(img, 0, 0, width, height)
+
+      // Detect PNG transparency
+      const isPNG = file.type === "image/png"
+
+      let outputType = "image/jpeg"
+      let quality = 0.82
+
+      if (isPNG) {
+        // Check transparency by sampling pixels
+        const imageData = ctx.getImageData(0, 0, width, height).data
+        let hasAlpha = false
+
+        for (let i = 3; i < imageData.length; i += 4) {
+          if (imageData[i] < 255) {
+            hasAlpha = true
+            break
+          }
+        }
+
+        if (hasAlpha) {
+          outputType = "image/png"
+          quality = undefined
+        }
+      }
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error("Compression failed"))
+            return
+          }
+
+          const compressedFile = new File(
+            [blob],
+            file.name,
+            { type: blob.type }
+          )
+
+          resolve(compressedFile)
+        },
+        outputType,
+        quality
+      )
+    }
+
+    img.onerror = reject
+    img.src = URL.createObjectURL(file)
+  })
+}
+
   // 🔹 Submit post
   const submit = async (e) => {
     e.preventDefault()
@@ -186,8 +263,13 @@ if (type !== "TEXT") {
     return
   }
 
-  const formData = new FormData()
-  formData.append("file", file)
+  const processedFile =
+  type === "IMAGE"
+    ? await compressImage(file)
+    : file
+
+const formData = new FormData()
+formData.append("file", processedFile)
   
   const uploadData = await api("/media/upload", {
   method: "POST",
@@ -236,14 +318,23 @@ setScope("GLOBAL")
     }
   }
 
+const scopeMeta = {
+  GLOBAL: { icon: "🌍", label: "Global feed" },
+  COUNTRY: { icon: "🏳️", label: "Country feed" },
+  LOCAL: { icon: "📍", label: "Local feed" },
+}
+
   return (
   <div
     style={{
   background: colors.surface,
-  borderRadius: isMobile ? 0 : theme.radius.lg,
-  marginBottom: isMobile ? 8 : 24,
+  borderRadius: isMobile ? 0 : 20,
+  marginBottom: isMobile ? 4 : 28,
   border: isMobile ? "none" : `1px solid ${colors.border}`,
-  boxShadow: isMobile ? "none" : theme.shadow.sm,
+  boxShadow: isMobile
+    ? "none"
+    : `0 4px 24px rgba(0,0,0,${theme.mode === "dark" ? 0.4 : 0.06})`,
+  overflow: "hidden",
 }}
   >
 <div
@@ -252,28 +343,54 @@ setScope("GLOBAL")
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: isMobile ? 12 : 16,
+    padding: isMobile ? 14 : 18,
     cursor: "pointer",
-    userSelect: "none",
+    borderBottom: open ? `1px solid ${colors.border}` : "none",
   }}
 >
-  <h3
+  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+    <span
+      style={{
+        fontSize: 15,
+        fontWeight: 600,
+        color: colors.text,
+      }}
+    >
+      Create Post
+    </span>
+
+    <span
+      style={{
+        fontSize: 12,
+        color: colors.textMuted,
+      }}
+    >
+      Share something thoughtful
+    </span>
+  </div>
+
+  <span
     style={{
-      margin: 0,
-      fontSize: 15,
-      fontWeight: 600,
-      color: colors.text,
+      fontSize: 14,
+      color: colors.textMuted,
+      transform: open ? "rotate(180deg)" : "rotate(0deg)",
+      transition: "transform 0.2s ease",
     }}
   >
-    Create post
-  </h3>
-
-  <span style={{ fontSize: 13, color: colors.textMuted }}>
-    {open ? "Hide" : "Show"}
+    ⌄
   </span>
+
 </div>
 {open && (
-  <form onSubmit={submit} style={{ padding: isMobile ? 12 : 16 }}>
+  <form
+  onSubmit={submit}
+  style={{
+    padding: isMobile ? 14 : 20,
+    display: "flex",
+    flexDirection: "column",
+    gap: 18,
+  }}
+>
 
       {error && (
   <div
@@ -295,26 +412,94 @@ setScope("GLOBAL")
       
 
       {/* Type */}
-      <select
-        value={type}
-        onChange={(e) => setType(e.target.value)}
-        style={selectStyle}
+      <div
+  style={{
+    display: "flex",
+    gap: 6,
+    marginBottom: 10,
+  }}
+>
+  {[
+    { key: "TEXT", label: "✍️ Text" },
+    { key: "IMAGE", label: "🖼 Image" },
+    { key: "VIDEO", label: "🎥 Video" },
+  ].map((t) => {
+    const active = type === t.key
+
+    return (
+      <button
+        key={t.key}
+        type="button"
+        onClick={() => setType(t.key)}
+        style={{
+          flex: 1,
+          padding: "6px 10px",
+          borderRadius: 999,
+          border: active
+  ? `1px solid ${colors.primary}`
+  : `1px solid ${colors.border}`,
+          background: active
+  ? colors.primary + "15"
+  : colors.surfaceMuted,
+          color: active
+            ? colors.primary
+            : colors.textMuted,
+          fontSize: 13,
+          fontWeight: active ? 600 : 500,
+          cursor: "pointer",
+          transition: "all 0.15s ease",
+        }}
       >
-        <option value="TEXT">✍️ Text</option>
-        <option value="IMAGE">🖼 Image</option>
-        <option value="VIDEO">🎥 Video</option>
-      </select>
+        {t.label}
+      </button>
+    )
+  })}
+</div>
 
       {/* Scope */}
-      <select
-        value={scope}
-        onChange={(e) => setScope(e.target.value)}
-        style={selectStyle}
+      <div
+  style={{
+    display: "flex",
+    gap: 6,
+    marginBottom: 12,
+  }}
+>
+  {[
+    { key: "GLOBAL", label: "🌍 Global" },
+    { key: "COUNTRY", label: "🏳️ Country" },
+    { key: "LOCAL", label: "📍 Local" },
+  ].map((s) => {
+    const active = scope === s.key
+
+    return (
+      <button
+        key={s.key}
+        type="button"
+        onClick={() => setScope(s.key)}
+        style={{
+          flex: 1,
+          padding: "6px 10px",
+          borderRadius: 999,
+          border: active
+  ? `1px solid ${colors.primary}`
+  : `1px solid ${colors.border}`,
+          background: active
+  ? colors.primary + "15"
+  : colors.surfaceMuted,
+          color: active
+            ? colors.primary
+            : colors.textMuted,
+          fontSize: 13,
+          fontWeight: active ? 600 : 500,
+          cursor: "pointer",
+          transition: "all 0.15s ease",
+        }}
       >
-        <option value="GLOBAL">🌍 Global</option>
-        <option value="COUNTRY">🏳️ Country</option>
-        <option value="LOCAL">📍 Local</option>
-      </select>
+        {s.label}
+      </button>
+    )
+  })}
+</div>
 
       {/* NSFW Rating */}
 {!isMinor &&
@@ -354,30 +539,65 @@ setScope("GLOBAL")
 
 
       {/* Caption */}
-      <textarea
-  placeholder="What’s on your mind?"
-  value={caption}
-  onChange={(e) => {
-    setCaption(e.target.value)
-    if (error) setError("")
-  }}
-  style={textareaStyle}
-/>
-
 <div
   style={{
-    textAlign: "right",
-    fontSize: 12,
-    marginTop: 4,
-    color:
-      caption.length > 420
-        ? "#b00020"
-        : caption.length > 380
-        ? "#cc8800"
-        : colors.textMuted,
+    position: "relative",
+    borderRadius: 16,
+    border: `1px solid ${colors.border}`,
+    background: colors.surface,
+    transition: "border 0.15s ease",
   }}
 >
-  {caption.length}/420
+  <textarea
+    placeholder="What’s on your mind?"
+    value={caption}
+    onChange={(e) => {
+      setCaption(e.target.value)
+      if (error) setError("")
+    }}
+    onFocus={(e) => {
+      e.target.parentElement.style.border =
+        `1px solid ${colors.primary}`
+    }}
+    onBlur={(e) => {
+      e.target.parentElement.style.border =
+        `1px solid ${colors.border}`
+    }}
+    style={{
+      width: "100%",
+      minHeight: isMobile ? 100 : 120,
+      padding: "14px 16px 32px 16px",
+      borderRadius: 16,
+      border: "none",
+      fontSize: 15,
+      lineHeight: 1.6,
+      resize: "vertical",
+      boxSizing: "border-box",
+      color: colors.text,
+      background: "transparent",
+      outline: "none",
+    }}
+  />
+
+  {/* Character Counter */}
+  <div
+    style={{
+      position: "absolute",
+      bottom: 8,
+      right: 14,
+      fontSize: 11,
+      fontWeight: 500,
+      color:
+        caption.length > 420
+          ? "#b00020"
+          : caption.length > 380
+          ? "#cc8800"
+          : colors.textMuted,
+      pointerEvents: "none",
+    }}
+  >
+    {caption.length}/420
+  </div>
 </div>
 
 
@@ -431,10 +651,12 @@ setScope("GLOBAL")
       <div
   style={{
     marginTop: 10,
-    padding: 10,
-    borderRadius: 12,
-    background: colors.surfaceMuted,
-    border: `1px solid ${colors.border}`,
+    padding: 14,
+    borderRadius: 16,
+    background: theme.mode === "dark"
+  ? "rgba(255,255,255,0.03)"
+  : "rgba(0,0,0,0.02)",
+border: `1px solid ${colors.border}`,
   }}
 >
         <p style={{ fontSize: 12, color: colors.textMuted, marginBottom: 6 }}>
@@ -489,9 +711,26 @@ setScope("GLOBAL")
       type="file"
       accept={type === "IMAGE" ? "image/*" : "video/*"}
       onChange={(e) => {
-        setFile(e.target.files[0] || null)
-        setUploadedUrl("")
-      }}
+  const selected = e.target.files[0]
+  if (!selected) return
+
+  const maxImageSize = 20 * 1024 * 1024   // 8MB
+  const maxVideoSize = 45 * 1024 * 1024  // 20MB
+
+  if (type === "IMAGE" && selected.size > maxImageSize) {
+    setError("Image must be under 20MB")
+    return
+  }
+
+  if (type === "VIDEO" && selected.size > maxVideoSize) {
+    setError("Video must be under 45MB")
+    return
+  }
+
+  setError("")
+  setFile(selected)
+  setUploadedUrl("")
+}}
       style={inputStyle}
     />
 
@@ -504,6 +743,9 @@ setScope("GLOBAL")
         }}
       >
         Selected: {file.name}
+        <div style={{ fontSize: 11, opacity: 0.6 }}>
+  {(file.size / (1024 * 1024)).toFixed(2)} MB
+</div>
       </div>
     )}
   </div>
@@ -512,6 +754,40 @@ setScope("GLOBAL")
 
       {/* Actions */}
 <div style={{ marginTop: 12 }}>
+  {/* Posting scope indicator */}
+<div
+  style={{
+    marginBottom: 14,
+    padding: "8px 12px",
+    borderRadius: 12,
+    background:
+      theme.mode === "dark"
+        ? "rgba(255,255,255,0.04)"
+        : "rgba(0,0,0,0.03)",
+    border: `1px solid ${colors.border}`,
+    fontSize: 12,
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    color: colors.textMuted,
+  }}
+>
+  <span style={{ fontSize: 13 }}>
+    {scopeMeta[scope].icon}
+  </span>
+
+  <span>
+    Posting to{" "}
+    <span
+      style={{
+        color: colors.primary,
+        fontWeight: 600,
+      }}
+    >
+      {scopeMeta[scope].label}
+    </span>
+  </span>
+</div>
   {feedMode === "COMMUNITY" && activeCommunity && (
     <div
       style={{
@@ -554,18 +830,25 @@ border: `1px solid ${colors.border}`,
 }
 
       style={{
-        padding: "8px 18px",
-        borderRadius: 999,
-        border: "none",
-        background: cooldownInfo ? colors.textMuted : colors.primary,
-        color: "#fff",
-        fontWeight: 500,
-        cursor:
-          loading || cooldownInfo
-            ? "not-allowed"
-            : "pointer",
-        opacity: loading || cooldownInfo ? 0.6 : 1,
-      }}
+  padding: "10px 22px",
+  borderRadius: 999,
+  border: "none",
+  background: loading || cooldownInfo
+    ? colors.textMuted
+    : colors.primary,
+  color: "#fff",
+  fontWeight: 600,
+  fontSize: 14,
+  cursor:
+    loading || cooldownInfo
+      ? "not-allowed"
+      : "pointer",
+  transition: "all 0.15s ease",
+  boxShadow:
+    !loading && !cooldownInfo
+      ? `0 4px 14px ${colors.primary}40`
+      : "none",
+}}
     >
       {loading
   ? "Posting…"

@@ -350,4 +350,70 @@ router.get(
   }
 )
 
+/**
+ * GET /api/v1/root/users
+ * Root-only full user list
+ */
+router.get("/users", requireAuth, async (req, res) => {
+  try {
+    if (!req.user.isRoot) {
+      return res.status(403).json({ error: "Root access only" })
+    }
+
+    const users = await prisma.user.findMany({
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        createdAt: true,
+        isMinor: true,
+        isSuperuser: true,
+        isRoot: true,
+        nsfwEnabled: true,
+      },
+    })
+
+    return res.json(users)
+  } catch (err) {
+    console.error("ROOT USERS LIST ERROR:", err)
+    return res.status(500).json({
+      error: "Failed to load users",
+    })
+  }
+})
+
+router.get("/users/export", requireAuth, async (req, res) => {
+  if (!req.user.isRoot) {
+    return res.status(403).json({ error: "Root access only" })
+  }
+
+  const users = await prisma.user.findMany({
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      createdAt: true,
+    },
+  })
+
+  const header = "ID,Username,Email,CreatedAt\n"
+
+  const rows = users
+    .map((u) =>
+      [u.id, u.username, u.email, u.createdAt.toISOString()].join(",")
+    )
+    .join("\n")
+
+  res.setHeader(
+    "Content-Disposition",
+    "attachment; filename=all-users.csv"
+  )
+  res.setHeader("Content-Type", "text/csv")
+
+  return res.send(header + rows)
+})
+
+
 export default router

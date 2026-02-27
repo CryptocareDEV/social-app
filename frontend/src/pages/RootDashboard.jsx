@@ -12,6 +12,8 @@ function RootDashboard({ theme }) {
   const [userDetails, setUserDetails] = useState(null)
   const [userLoading, setUserLoading] = useState(false)
   const [lastUpdated, setLastUpdated] = useState(null)
+  const [allUsers, setAllUsers] = useState([])
+  const [usersLoading, setUsersLoading] = useState(false)
 
 const loadUserDetails = async (userId) => {
   setUserLoading(true)
@@ -24,6 +26,18 @@ const loadUserDetails = async (userId) => {
     setUserDetails(null)
   } finally {
     setUserLoading(false)
+  }
+}
+
+const loadAllUsers = async () => {
+  try {
+    setUsersLoading(true)
+    const res = await api("/root/users")
+    setAllUsers(res)
+  } catch (err) {
+    alert("Failed to load users")
+  } finally {
+    setUsersLoading(false)
   }
 }
 
@@ -110,6 +124,21 @@ if (hourlyCounts.length >= 2) {
     }}
   >
       <h2 style={{ marginBottom: 20 }}>Root Analytics</h2>
+
+      <button
+  onClick={loadAllUsers}
+  style={{
+    marginBottom: 16,
+    fontSize: 12,
+    padding: "6px 12px",
+    borderRadius: 8,
+    border: `1px solid ${colors.border}`,
+    background: "transparent",
+    cursor: "pointer",
+  }}
+>
+  Load All Users
+</button>
       <div
   style={{
     marginBottom: 24,
@@ -178,6 +207,9 @@ if (hourlyCounts.length >= 2) {
   <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 16 }}>
     Last updated: {lastUpdated.toLocaleTimeString()}
   </div>
+
+
+
 )}
 <button
   onClick={() => window.location.reload()}
@@ -487,9 +519,49 @@ if (hourlyCounts.length >= 2) {
   </div>
 ))}
       </div>
+
+{usersLoading && <div>Loading users...</div>}
+
+{!usersLoading && allUsers.length > 0 && (
+  <div
+    style={{
+      marginTop: 40,
+      padding: 20,
+      background: colors.surface,
+      borderRadius: 12,
+      border: `1px solid ${colors.border}`,
+    }}
+  >
+    <h4>All Registered Users</h4>
+
+    {usersLoading && <div>Loading users...</div>}
+
+    <div style={{ marginTop: 16 }}>
+      {allUsers.map((u) => (
+        <div
+          key={u.id}
+          style={{
+            padding: "8px 0",
+            borderBottom: `1px solid ${colors.border}`,
+            fontSize: 13,
+          }}
+        >
+          <strong>{u.username}</strong>  
+          <div>Email: {u.email}</div>
+          <div>ID: {u.id}</div>
+          <div>Joined: {new Date(u.createdAt).toLocaleString()}</div>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+      
     </div>
   )
 }
+
+
+
 function KPICard({ title, value, colors, trend }) {
   return (
     <div

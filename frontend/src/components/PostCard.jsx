@@ -3,7 +3,7 @@ import { Link } from "react-router-dom"
 import { getThemeColors } from "../ui/theme"
 import { api } from "../api/client"
 import { fetchComments, createComment, fetchReplies } from "../api/comments"
-
+let activeVideo = null
 
 function formatTimeAgo(dateString) {
   const date = new Date(dateString)
@@ -236,6 +236,7 @@ const [commentSubmitError, setCommentSubmitError] = useState(null)
 const [commentsCursor, setCommentsCursor] = useState(null)
 const [hasMoreComments, setHasMoreComments] = useState(false)
 const [loadingMore, setLoadingMore] = useState(false)
+const videoRef = useRef(null)
 const commentInputRef = useRef(null)
 const commentsEndRef = useRef(null)
 const [optimisticCountDelta, setOptimisticCountDelta] = useState(0)
@@ -415,7 +416,11 @@ const [optimisticCountDelta, setOptimisticCountDelta] = useState(0)
   padding: isMobile ? "2px 0" : "6px 12px",
   minHeight: isMobile ? 24 : "auto",
   borderRadius: theme.radius.pill,
-  border: isMobile ? "none" : `1px solid ${colors.border}`,
+
+  borderWidth: isMobile ? 0 : 1,
+  borderStyle: "solid",
+  borderColor: colors.border,
+
   background: "transparent",
   color: colors.textMuted,
   cursor: "pointer",
@@ -481,7 +486,7 @@ const handleReplySubmit = async (parentId) => {
       style={{
   background: colors.surface,
   borderRadius: isMobile ? 0 : theme.radius.lg,
-  padding: isMobile ? "8px 0" : theme.spacing.xl + 4,
+  padding: isMobile ? "8px 12px" : theme.spacing.xl + 4,
   boxShadow: isMobile ? "none" : theme.shadow.sm,
 
   borderTop: isMobile ? "none" : `1px solid ${colors.border}`,
@@ -496,7 +501,7 @@ const handleReplySubmit = async (parentId) => {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  marginBottom: isMobile ? 4 : 12,
+  marginBottom: isMobile ? 2 : 12,
   fontSize: 13,
 }}
 >
@@ -570,7 +575,7 @@ padding: isMobile ? "6px 10px" : "4px 8px",
   style={{
   ...actionButtonStyle,
   color: isOnReportCooldown ? "#94a3b8" : "#64748b",
-  borderStyle: "dashed",
+  borderStyle: isMobile ? "none" : "dashed",
   opacity: 0.75,
   cursor: isOnReportCooldown ? "not-allowed" : "pointer",
 }}
@@ -618,25 +623,32 @@ onMouseLeave={(e) => {
 borderRadius: isMobile ? 0 : theme.radius.md,
 overflow: "hidden",
 border: isMobile ? "none" : `1px solid ${colors.border}`,
-background: colors.surfaceMuted,
+background: isMobile ? "transparent" : colors.surfaceMuted,
 position: "relative",
     }}
   >
     {post.type === "VIDEO" ? (
-  <video
-    src={imageSrc}
-    controls
-    preload="metadata"
-    style={{
-  width: "100%",
-  height: "auto",
-  display: "block",
-  maxHeight: isMobile ? "75vh" : 520,
-  background: colors.bg,
-  borderRadius: isMobile ? 0 : theme.radius.md,
-  objectFit: "contain",
-}}
-  />
+ <video
+  ref={videoRef}
+  src={imageSrc}
+  controls
+  preload="metadata"
+  onPlay={() => {
+    if (activeVideo && activeVideo !== videoRef.current) {
+      activeVideo.pause()
+    }
+    activeVideo = videoRef.current
+  }}
+  style={{
+    width: "100%",
+    height: "auto",
+    display: "block",
+    maxHeight: isMobile ? "75vh" : 420,
+    background: colors.bg,
+    borderRadius: isMobile ? 0 : theme.radius.md,
+    objectFit: "contain",
+  }}
+/>
 ) : (
   <img
     src={imageSrc}
@@ -646,66 +658,11 @@ position: "relative",
   width: "100%",
   height: "auto",
   display: "block",
-  maxHeight: isMobile ? "75vh" : 520,
-  objectFit: "contain",
-  background: colors.bg,
   borderRadius: isMobile ? 0 : theme.radius.md,
 }}
   />
 )}
 
-    {/* 📝 MEME TEXT OVERLAY */}
-    {post.type === "MEME" && post.memeMeta && (
-  <>
-    {/* TOP TEXT */}
-    {post.memeMeta.topText && (
-      <div
-        style={{
-          position: "absolute",
-          top: 12,
-          left: "50%",
-          transform: "translateX(-50%)",
-          maxWidth: "90%",
-          padding: "6px 12px",
-          background: "rgba(0,0,0,0.6)",
-          color: "#fff",
-          borderRadius: 6,
-          fontSize: 16,
-          fontWeight: 700,
-          textAlign: "center",
-          textShadow: "0 1px 2px rgba(0,0,0,0.8)",
-          pointerEvents: "none",
-        }}
-      >
-        {post.memeMeta.topText}
-      </div>
-    )}
-
-    {/* BOTTOM TEXT */}
-    {post.memeMeta.bottomText && (
-      <div
-        style={{
-          position: "absolute",
-          bottom: 12,
-          left: "50%",
-          transform: "translateX(-50%)",
-          maxWidth: "90%",
-          padding: "6px 12px",
-          background: "rgba(0,0,0,0.6)",
-          color: "#fff",
-          borderRadius: 6,
-          fontSize: 16,
-          fontWeight: 700,
-          textAlign: "center",
-          textShadow: "0 1px 2px rgba(0,0,0,0.8)",
-          pointerEvents: "none",
-        }}
-      >
-        {post.memeMeta.bottomText}
-      </div>
-    )}
-  </>
-)}
 
 
   </div>
@@ -789,9 +746,13 @@ position: "relative",
     fontWeight: 500,
     color: post.likedByMe ? colors.primary : colors.textMuted,
     borderColor: post.likedByMe ? colors.primarySoft : colors.border,
-    border: isMobile ? "none" : `1px solid ${colors.border}`,
+    borderWidth: isMobile ? 0 : 1,
+borderStyle: "solid",
+borderColor: post.likedByMe
+  ? colors.primarySoft
+  : colors.border,
   background: isMobile ? "transparent" : "transparent",
-  padding: isMobile ? "6px 4px" : actionButtonStyle.padding,
+  padding: isMobile ? "8px 8px" : actionButtonStyle.padding,
   }}
 >
   {post.likedByMe ? "💙" : "🤍"} {post._count.likes}
@@ -803,7 +764,11 @@ position: "relative",
   style={{
     ...actionButtonStyle,
     fontWeight: 500,
-    border: isMobile ? "none" : `1px solid ${colors.border}`,
+    borderWidth: isMobile ? 0 : 1,
+borderStyle: "solid",
+borderColor: post.likedByMe
+  ? colors.primarySoft
+  : colors.border,
   background: isMobile ? "transparent" : "transparent",
   padding: isMobile ? "6px 4px" : actionButtonStyle.padding,
   }}

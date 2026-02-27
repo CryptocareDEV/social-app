@@ -6,9 +6,11 @@ import {
   ghostButton,
   dangerButton,
 } from "../ui/buttonStyles"
+import { api } from "../api/client"
 
 export default function AppHeader({
   theme,
+  setTheme,
   user,
   isMobile,
   activeFeedProfileName,
@@ -50,6 +52,18 @@ export default function AppHeader({
       return `${actor} interacted with you`
   }
 }
+
+const menuItemStyle = (colors) => ({
+  padding: "8px 10px",
+  borderRadius: 10,
+  border: "none",
+  background: "transparent",
+  fontSize: 13,
+  cursor: "pointer",
+  textAlign: "left",
+  color: colors.text,
+  transition: "background 0.15s ease",
+})
 
 const handleNotificationClick = async (n) => {
   setShowNotifications(false)
@@ -195,54 +209,64 @@ const handleNotificationClick = async (n) => {
           {activeFeedProfileName && (
             <div style={{ position: "relative" }}>
               <div
-                onClick={() => setShowProfileMenu((v) => !v)}
-                style={{
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "4px 10px",
-                  borderRadius: 8,
-                  background: "transparent",
-                  border: `1px solid ${colors.border}`,
-                  fontSize: 12,
-                  fontWeight: 500,
-                  color: colors.textMuted,
-                }}
-              >
-                <span style={{ fontSize: 11 }}>MODE</span>
-                <span
+  onClick={() => setShowProfileMenu((v) => !v)}
   style={{
-    fontWeight: 600,
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: isMobile ? "6px 10px" : "6px 12px",
+    borderRadius: 999,
+    background: colors.surfaceMuted,
+    border: `1px solid ${colors.border}`,
+    fontSize: 13,
+    fontWeight: 500,
     color: colors.text,
-    maxWidth: isMobile ? 80 : 140,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    display: "inline-block",
-    verticalAlign: "bottom",
   }}
 >
-  {activeFeedProfileName}
-</span>
-                <span style={{ fontSize: 11, opacity: 0.5 }}>▾</span>
-              </div>
+  <span style={{ opacity: 0.6 }}>Lens:</span>
+
+  <span
+    style={{
+      fontWeight: 600,
+      maxWidth: isMobile ? 90 : 150,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+    }}
+  >
+    {activeFeedProfileName}
+  </span>
+
+  <span style={{ fontSize: 10, opacity: 0.5 }}>▾</span>
+</div>
 
               {showProfileMenu && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: 40,
-                    left: 0,
-                    minWidth: 200,
-                    background: colors.surface,
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: 10,
-                    boxShadow: theme.shadow.sm,
-                    padding: 8,
-                    zIndex: 100,
-                  }}
-                >
+  <div
+    style={{
+      position: "absolute",
+      top: 46,
+      left: 0,
+      minWidth: 240,
+      background: colors.surface,
+      border: `1px solid ${colors.border}`,
+      borderRadius: 14,
+      boxShadow: theme.shadow.md,
+      padding: 10,
+      zIndex: 100,
+    }}
+  >
+    <div
+  style={{
+    padding: "6px 8px",
+    fontSize: 12,
+    color: colors.textMuted,
+    borderBottom: `1px solid ${colors.border}`,
+    marginBottom: 8,
+  }}
+>
+  Lenses shape what flows into your feed.
+</div>
                   {feedProfiles.map((p) => {
                     const isActive = p.id === activeFeedProfileId
 
@@ -254,15 +278,19 @@ const handleNotificationClick = async (n) => {
                           handleFeedProfileSwitch(p)
                         }}
                         style={{
-                          padding: "8px 12px",
-                          borderRadius: 8,
-                          fontSize: 13,
-                          cursor: "pointer",
-                          background: isActive
-                            ? colors.primary + "15"
-                            : "transparent",
-                          fontWeight: isActive ? 600 : 500,
-                        }}
+  padding: "8px 12px",
+  borderRadius: 10,
+  fontSize: 13,
+  cursor: "pointer",
+  transition: "all 0.15s ease",
+  background: isActive
+    ? theme.mode === "dark"
+      ? colors.primary + "22"
+      : colors.primary + "14"
+    : "transparent",
+  color: isActive ? colors.primary : colors.text,
+  fontWeight: isActive ? 600 : 500,
+}}
                       >
                         {p.name}
                       </div>
@@ -466,94 +494,174 @@ const handleNotificationClick = async (n) => {
   {/* 👤 User Dropdown */}
   <div ref={userMenuRef} style={{ position: "relative" }}>
     <button
-      onClick={() => setShowUserMenu((v) => !v)}
-      style={headerGhostButton(theme)}
-    >
-      @{user.username} ▾
-    </button>
+  onClick={() => setShowUserMenu((v) => !v)}
+  style={{
+    width: 34,
+    height: 34,
+    borderRadius: 999,
+    border: `1px solid ${colors.border}`,
+    background: colors.surfaceMuted,
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  }}
+>
+  {user.username[0].toUpperCase()}
+</button>
 
     {showUserMenu && (
-      <div
+  <div
+    style={{
+      position: isMobile ? "fixed" : "absolute",
+      right: isMobile ? 12 : 0,
+      left: isMobile ? 12 : "auto",
+      top: isMobile ? "auto" : 46,
+      bottom: isMobile ? 12 : "auto",
+      width: isMobile ? "auto" : 260,
+      background: colors.surface,
+      border: `1px solid ${colors.border}`,
+      borderRadius: 16,
+      boxShadow: theme.shadow.md,
+      padding: 12,
+      zIndex: 200,
+      display: "flex",
+      flexDirection: "column",
+      gap: 8,
+    }}
+  >
+    {/* Header */}
+    <div
+      style={{
+        padding: "6px 8px",
+        fontSize: 13,
+        fontWeight: 600,
+        color: colors.text,
+      }}
+    >
+      @{user.username}
+    </div>
+
+    <div
+      style={{
+        height: 1,
+        background: colors.border,
+        margin: "4px 0",
+      }}
+    />
+
+    {/* Profile */}
+    <button
+      onClick={() => {
+        setShowUserMenu(false)
+        navigate(`/profile/${user.id}`)
+      }}
+      style={menuItemStyle(colors)}
+    >
+      👤 Profile
+    </button>
+
+    {/* Create Community */}
+    <button
+      onClick={() => {
+        setShowUserMenu(false)
+        navigate(`/profile/${user.id}`, {
+          state: { openTab: "COMMUNITIES" },
+        })
+      }}
+      style={menuItemStyle(colors)}
+    >
+      🏘 Create Community
+    </button>
+
+    {/* Theme Toggle */}
+    <button
+      onClick={() => {
+        toggleTheme()
+      }}
+      style={menuItemStyle(colors)}
+    >
+      {theme.mode === "dark" ? "🌙 Dark" : "☀️ Light"}
+    </button>
+    <div
   style={{
-  position: isMobile ? "fixed" : "absolute",
-  right: isMobile ? 12 : 0,
-  left: isMobile ? 12 : "auto",
-  top: isMobile ? 60 : 42,
-  minWidth: isMobile ? "auto" : 220,
-  maxWidth: isMobile ? "calc(100vw - 24px)" : 260,
-  background: colors.surface,
-  border: `1px solid ${colors.border}`,
-  borderRadius: theme.radius.md,
-  boxShadow: theme.shadow.md,
-  padding: 0,
-  zIndex: 200,
-}}
+    padding: "10px 12px",
+    borderTop: `1px solid ${colors.border}`,
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+  }}
 >
-  {/* Profile */}
-  <div
-    onClick={() => {
-      setShowUserMenu(false)
-      window.location.href = `/profile/${user.id}`
-    }}
-    style={{
-      padding: "8px 10px",
-      borderRadius: theme.radius.sm,
-      fontSize: theme.typography.small.size,
-      color: colors.text,
-      cursor: "pointer",
-      background: "transparent",
-    }}
-  >
-    View Profile
-  </div>
+  {[
+    "REDDIT",
+    "SUN_ORANGE",
+    "SKY_BLUE",
+    "TURQUOISE",
+    "SOFT_GREEN",
+  ].map((a) => (
+    <button
+      key={a}
+      onClick={async () => {
+        // 🔥 optimistic UI update first
+        setTheme((prev) => ({
+          ...prev,
+          accent: a,
+        }))
 
-  {/* Theme */}
-  <div
-    onClick={() => {
-      toggleTheme()
-      setShowUserMenu(false)
-    }}
-    style={{
-      padding: "8px 10px",
-      borderRadius: theme.radius.sm,
-      fontSize: theme.typography.small.size,
-      color: colors.text,
-      cursor: "pointer",
-      background: "transparent",
-    }}
-  >
-    {theme.mode === "light"
-      ? "Switch to Dark Mode"
-      : "Switch to Light Mode"}
-  </div>
-
-  <div
-    style={{
-      height: 1,
-      background: colors.border,
-      margin: `${theme.spacing.sm}px 0`,
-    }}
-  />
-
-  {/* Logout */}
-  <div
-    onClick={() => {
-      setShowUserMenu(false)
-      handleLogout()
-    }}
-    style={{
-      padding: "8px 10px",
-      borderRadius: theme.radius.sm,
-      fontSize: theme.typography.small.size,
-      color: colors.danger,
-      cursor: "pointer",
-      background: "transparent",
-    }}
-  >
-    Logout
-  </div>
+        try {
+          await api("/users/me", {
+            method: "PATCH",
+            body: JSON.stringify({ accentTheme: a }),
+          })
+        } catch (err) {
+          console.error("Accent update failed")
+        }
+      }}
+      style={{
+        width: 20,
+        height: 20,
+        borderRadius: 999,
+        border:
+          theme.accent === a
+            ? `2px solid ${colors.text}`
+            : `1px solid ${colors.border}`,
+        background:
+          getThemeColors({
+            ...theme,
+            accent: a,
+          }).primary,
+        cursor: "pointer",
+      }}
+    />
+  ))}
 </div>
-    )}
+
+    <div
+      style={{
+        height: 1,
+        background: colors.border,
+        margin: "4px 0",
+      }}
+    />
+
+    {/* Logout */}
+    <button
+      onClick={() => {
+        setShowUserMenu(false)
+        handleLogout()
+      }}
+      style={{
+        ...menuItemStyle(colors),
+        color: colors.danger,
+      }}
+    >
+      Logout
+    </button>
+  </div>
+)}
   </div>
 </div>
       </div>

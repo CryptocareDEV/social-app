@@ -3,14 +3,28 @@ import { api } from "../api/client"
 import { getThemeColors } from "../ui/theme"
 
 
-export default function MemeEditor({ post, theme, onClose, onPosted }) {
+export default function MemeEditor({
+  post,
+  theme,
+  onClose,
+  onPosted,
+  refreshUserState,
+}) {
 
-  const [topText, setTopText] = useState("")
-  const [bottomText, setBottomText] = useState("")
+  const [textBlocks, setTextBlocks] = useState([
+  { id: "top", text: "", x: 0.5, y: 0.16 },
+  { id: "bottom", text: "", x: 0.5, y: 0.85 },
+])
   const [caption, setCaption] = useState("")
   const [saving, setSaving] = useState(false)
   const [baseImageUrl, setBaseImageUrl] = useState(null)
+  const [fontFamily, setFontFamily] = useState("Impact")
+  const [isItalic, setIsItalic] = useState(false)
+  const [activeBlockId, setActiveBlockId] = useState(null)
+  const isDraggingRef = useRef(false)
   const colors = getThemeColors(theme)
+  const previewCanvasRef = useRef(null)
+  const loadedImageRef = useRef(null)
 
 
 useEffect(() => {
@@ -30,6 +44,7 @@ useEffect(() => {
 
       if (mounted) {
         setBaseImageUrl(res.mediaUrl)
+        loadedImageRef.current = null
       }
     } catch (err) {
   console.error("Failed to load base image", err)
@@ -54,12 +69,42 @@ useEffect(() => {
   }
 }, [post.id])
 
+useEffect(() => {
+  if (!baseImageUrl) return
+  if (!previewCanvasRef.current) return
+
+  const setupAndDraw = async () => {
+    const img = await loadImageDirect()
+    const canvas = previewCanvasRef.current
+
+    const maxPreviewWidth = 900
+    const scale = Math.min(1, maxPreviewWidth / img.naturalWidth)
+
+    canvas.width = img.naturalWidth * scale
+    canvas.height = img.naturalHeight * scale
+
+    // 🔥 Immediately draw after sizing
+    await drawIntoCanvas(canvas)
+  }
+
+  setupAndDraw()
+}, [baseImageUrl])
+
+useEffect(() => {
+  if (!previewCanvasRef.current) return
+  if (!baseImageUrl) return
+
+  drawIntoCanvas(previewCanvasRef.current)
+}, [textBlocks, fontFamily, isItalic])
 
 
-
-  // 🔐 SAFE IMAGE LOADER (avoids CORS-tainted canvas)
   const loadImageDirect = () => {
   return new Promise((resolve, reject) => {
+    if (loadedImageRef.current) {
+      resolve(loadedImageRef.current)
+      return
+    }
+
     if (!baseImageUrl) {
       reject("No base image URL")
       return
@@ -69,7 +114,11 @@ useEffect(() => {
     img.crossOrigin = "anonymous"
     img.src = baseImageUrl
 
-    img.onload = () => resolve(img)
+    img.onload = () => {
+      loadedImageRef.current = img
+      resolve(img)
+    }
+
     img.onerror = (e) => reject(e)
   })
 }
@@ -94,71 +143,120 @@ const wrapText = (ctx, text, maxWidth) => {
   return lines
 }
 
-const drawIntoCanvas = async (canvas, top, bottom) => {
+const drawIntoCanvas = async (canvas) => {
   if (!canvas) {
-  throw new Error("Canvas not available")
-}
-
-const ctx = canvas.getContext("2d")
-if (!ctx) {
-  throw new Error("Failed to get canvas context")
-}
-  const img = await loadImageDirect()
-
-  canvas.width = img.naturalWidth
-  canvas.height = img.naturalHeight
-
-  const padding = canvas.height * 0.05
-  const maxWidth = canvas.width * 0.9
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height)
-  ctx.drawImage(img, 0, 0)
-
-  ctx.fillStyle = "white"
-  ctx.strokeStyle = "black"
-  ctx.lineWidth = 4
-  ctx.textAlign = "center"
-
-  const drawTextBlock = (text, position) => {
-    if (!text) return
-
-    let fontSize = Math.floor(canvas.width / 12)
-
-    let lines
-    do {
-      ctx.font = `bold ${fontSize}px Impact`
-      lines = wrapText(ctx, text.toUpperCase(), maxWidth)
-      fontSize -= 2
-    } while (
-      lines.some(line => ctx.measureText(line).width > maxWidth) &&
-      fontSize > 24
-    )
-
-    const lineHeight = fontSize * 1.2
-
-    if (position === "top") {
-      let y = padding
-      ctx.textBaseline = "top"
-      lines.forEach(line => {
-        ctx.strokeText(line, canvas.width / 2, y)
-        ctx.fillText(line, canvas.width / 2, y)
-        y += lineHeight
-      })
-    }
-
-    if (position === "bottom") {
-      let y = canvas.height - padding - (lines.length * lineHeight)
-      ctx.textBaseline = "top"
-      lines.forEach(line => {
-        ctx.strokeText(line, canvas.width / 2, y)
-        ctx.fillText(line, canvas.width / 2, y)
-        y += lineHeight
-      })
-    }
+    throw new Error("Canvas not available")
   }
 
-  drawTextBlock(top, "top")
-  drawTextBlock(bottom, "bottom")
+  const ctx = canvas.getContext("2d")
+  if (!ctx) {
+    throw new Error("Failed to get canvas context")
+  }
+
+  const img = await loadImageDirect()
+const scaleX = canvas.width / img.naturalWidth
+const scaleY = canvas.height / img.naturalHeight
+
+  
+
+  // 🔥 Improved padding logic (aspect-aware)
+  const basePadding = Math.max(canvas.height * 0.06, canvas.width * 0.04)
+  const maxWidth = canvas.width * 0.88
+  const maxTextHeight = canvas.height * 0.4 // each block max 40% height
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+  ctx.textAlign = "center"
+  ctx.fillStyle = "white"
+  ctx.strokeStyle = "black"
+
+  // Ensure selected font is loaded before measuring
+if (document.fonts && fontFamily) {
+  try {
+    await document.fonts.load(
+      `${isItalic ? "italic" : "normal"} 900 40px ${fontFamily}`
+    )
+  } catch (e) {
+    // ignore font load errors
+  }
+}
+
+  const drawTextBlock = (block) => {
+    if (!block.text) return
+
+    const content = block.text.toUpperCase().trim()
+
+    let fontSize = Math.floor(canvas.width / 10)
+    let lines = []
+    let lineHeight = 0
+    let blockHeight = 0
+
+    // 🔥 Height + width aware shrink loop
+    
+    while (fontSize > 22) {
+      ctx.font = `${isItalic ? "italic" : "normal"} 900 ${fontSize}px ${fontFamily}, Arial Black, sans-serif`
+      lines = wrapText(ctx, content, maxWidth)
+      lineHeight = fontSize * 1.15
+      blockHeight = lines.length * lineHeight
+
+      const widestLine = Math.max(
+        ...lines.map(line => ctx.measureText(line).width)
+      )
+
+      if (
+        widestLine <= maxWidth &&
+        blockHeight <= maxTextHeight
+      ) {
+        break
+      }
+
+      fontSize -= 2
+    }
+
+    // 🔥 Dynamic stroke thickness
+    ctx.lineWidth = Math.max(canvas.width / 250, 3)
+
+    const centerX = block.x * canvas.width
+const centerY = block.y * canvas.height
+
+const startY = centerY - blockHeight / 2
+
+    ctx.textBaseline = "top"
+
+    lines.forEach((line, index) => {
+      const y = startY + index * lineHeight
+
+      // Layered stroke for cleaner outline
+      ctx.strokeText(line, centerX, y)
+ctx.fillText(line, centerX, y)
+    })
+  }
+
+  textBlocks.forEach(block => {
+  if (!block.text?.trim()) return
+  drawTextBlock(block)
+})
+
+  // 🔥 Hybrid Watermark (Subtle CivicHalls branding)
+  const watermark = "CivicHalls.com"
+  const watermarkSize = Math.max(canvas.width / 40, 18)
+
+  ctx.font = `600 ${watermarkSize}px Inter, sans-serif`
+  ctx.textAlign = "right"
+  ctx.textBaseline = "bottom"
+  ctx.globalAlpha = 0.6
+  ctx.fillStyle = "white"
+  ctx.strokeStyle = "black"
+  ctx.lineWidth = Math.max(canvas.width / 500, 2)
+
+  const wmX = canvas.width - basePadding * 0.6
+  const wmY = canvas.height - basePadding * 0.6
+
+  ctx.strokeText(watermark, wmX, wmY)
+  ctx.fillText(watermark, wmX, wmY)
+
+  ctx.globalAlpha = 1
 }
 
 
@@ -166,11 +264,13 @@ if (!ctx) {
   const downloadMeme = async () => {
     const exportCanvas = document.createElement("canvas")
 
-await drawIntoCanvas(
-  exportCanvas,
-  topText,
-  bottomText
-)
+const img = await loadImageDirect()
+
+// Full resolution export
+exportCanvas.width = img.naturalWidth
+exportCanvas.height = img.naturalHeight
+
+await drawIntoCanvas(exportCanvas)
 
 exportCanvas.toBlob((blob) => {
   const link = document.createElement("a")
@@ -192,11 +292,13 @@ exportCanvas.toBlob((blob) => {
   try {
     const exportCanvas = document.createElement("canvas")
 
-    await drawIntoCanvas(
-      exportCanvas,
-      topText,
-      bottomText
-    )
+const img = await loadImageDirect()
+
+// Full resolution export
+exportCanvas.width = img.naturalWidth
+exportCanvas.height = img.naturalHeight
+
+await drawIntoCanvas(exportCanvas)
 
     // ✅ Convert canvas to Blob (NOT base64)
     const blob = await new Promise((resolve) =>
@@ -264,7 +366,59 @@ const inputStyle = {
   marginBottom: 10,
 }
 
+const startDrag = (clientX, clientY) => {
+  const canvas = previewCanvasRef.current
+  if (!canvas) return
 
+  const rect = canvas.getBoundingClientRect()
+  const scaleY = canvas.height / rect.height
+  const mouseY = (clientY - rect.top) * scaleY
+
+  const clicked = textBlocks.find(block => {
+    const blockY = block.y * canvas.height
+    return Math.abs(blockY - mouseY) < canvas.height * 0.08
+  })
+
+  if (clicked) {
+    setActiveBlockId(clicked.id)
+    isDraggingRef.current = true
+  }
+}
+
+const moveDrag = (clientX, clientY) => {
+  if (!isDraggingRef.current || !activeBlockId) return
+
+  const canvas = previewCanvasRef.current
+  if (!canvas) return
+
+  const rect = canvas.getBoundingClientRect()
+
+  const scaleX = canvas.width / rect.width
+  const scaleY = canvas.height / rect.height
+
+  const mouseX = (clientX - rect.left) * scaleX
+  const mouseY = (clientY - rect.top) * scaleY
+
+  const normalizedX = mouseX / canvas.width
+  const normalizedY = mouseY / canvas.height
+
+  setTextBlocks(prev =>
+    prev.map(b =>
+      b.id === activeBlockId
+        ? {
+            ...b,
+            x: Math.min(Math.max(normalizedX, 0.05), 0.95),
+            y: Math.min(Math.max(normalizedY, 0.05), 0.95),
+          }
+        : b
+    )
+  )
+}
+
+const endDrag = () => {
+  isDraggingRef.current = false
+  setActiveBlockId(null)
+}
 
   return (
     <div
@@ -339,17 +493,38 @@ const inputStyle = {
 
           
           {baseImageUrl ? (
-  <img
-  src={baseImageUrl}
-  alt=""
+  <canvas
+  ref={previewCanvasRef}
   style={{
-  maxWidth: "100%",
-  maxHeight: "65vh",
-  objectFit: "contain",
-  borderRadius: 12,
-  display: "block",
-}}
+    maxWidth: "100%",
+    maxHeight: "65vh",
+    borderRadius: 12,
+    display: "block",
+    cursor: activeBlockId ? "grabbing" : "grab",
+    touchAction: "none", // 🔥 critical for mobile drag
+  }}
 
+  // -------------------
+  // DESKTOP
+  // -------------------
+  onMouseDown={(e) => startDrag(e.clientX, e.clientY)}
+  onMouseMove={(e) => moveDrag(e.clientX, e.clientY)}
+  onMouseUp={endDrag}
+  onMouseLeave={endDrag}
+
+  // -------------------
+  // MOBILE
+  // -------------------
+  onTouchStart={(e) => {
+    const touch = e.touches[0]
+    startDrag(touch.clientX, touch.clientY)
+  }}
+  onTouchMove={(e) => {
+    e.preventDefault() // 🔥 prevents scroll interference
+    const touch = e.touches[0]
+    moveDrag(touch.clientX, touch.clientY)
+  }}
+  onTouchEnd={endDrag}
 />
 
 ) : (
@@ -359,58 +534,52 @@ const inputStyle = {
 )}
 
 
-          <div
-  style={{
-    position: "absolute",
-    top: 10,
-    left: "50%",
-    transform: "translateX(-50%)",
-    width: "90%",
-    textAlign: "center",
-    fontSize: "clamp(14px, 3vw, 26px)",
-    fontWeight: 800,
-    color: "white",
-    textShadow: "2px 2px 4px black",
-    wordBreak: "break-word",
-    lineHeight: 1.2,
-  }}
->
-  {topText.toUpperCase()}
-</div>
-
-
-          <div
-  style={{
-    position: "absolute",
-    bottom: 10,
-    left: "50%",
-    transform: "translateX(-50%)",
-    width: "90%",
-    textAlign: "center",
-    fontSize: "clamp(14px, 3vw, 26px)",
-    fontWeight: 800,
-    color: "white",
-    textShadow: "2px 2px 4px black",
-    wordBreak: "break-word",
-    lineHeight: 1.2,
-  }}
->
-  {bottomText.toUpperCase()}
-</div>
-
         </div>
-
+<select
+  value={fontFamily}
+  onChange={(e) => setFontFamily(e.target.value)}
+  style={{
+    ...inputStyle,
+    cursor: "pointer",
+  }}
+>
+  <option value="Impact">Impact (Classic)</option>
+  <option value="Arial Black">Arial Black</option>
+  <option value="Anton">Anton</option>
+  <option value="Bebas Neue">Bebas Neue</option>
+  <option value="Montserrat">Montserrat</option>
+</select>
+<label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+  <input
+    type="checkbox"
+    checked={isItalic}
+    onChange={(e) => setIsItalic(e.target.checked)}
+  />
+  Italic style
+</label>
         <input
           placeholder="Top text"
-          value={topText}
-          onChange={(e) => setTopText(e.target.value)}
+          value={textBlocks[0].text}
+onChange={(e) =>
+  setTextBlocks(prev =>
+    prev.map(b =>
+      b.id === "top" ? { ...b, text: e.target.value } : b
+    )
+  )
+}
           style={inputStyle}
         />
 
         <input
   placeholder="Bottom text"
-  value={bottomText}
-  onChange={(e) => setBottomText(e.target.value)}
+  value={textBlocks[1].text}
+onChange={(e) =>
+  setTextBlocks(prev =>
+    prev.map(b =>
+      b.id === "bottom" ? { ...b, text: e.target.value } : b
+    )
+  )
+}
   style={inputStyle}
 />
 

@@ -51,7 +51,7 @@ export default function App() {
   // 🎨 Theme (Phase 1 foundation)
   const [theme, setTheme] = useState({
   ...baseTheme,
-  mode: "light",
+  mode: "dark", // default dark
   accent: "CALM",
 })
 
@@ -442,6 +442,7 @@ useEffect(() => {
 >
    <AppHeader
       theme={theme}
+      setTheme={setTheme}
       user={user}
       isMobile={isMobile}
       activeFeedProfileName={activeFeedProfileName}
@@ -651,7 +652,7 @@ color: colors.textMuted
   marginBottom: 20,
   padding: isMobile ? "8px 12px" : "10px 16px",
   borderRadius: 10,
-  background: colors.surface,
+  background: isMobile ? "transparent" : colors.surface,
   border: `1px solid ${colors.border}`,
   fontSize: 12,
   color: colors.textMuted,
@@ -776,11 +777,10 @@ color: colors.textMuted
                 )}
 <div
   style={{
-    background: colors.surface,
+    background: isMobile ? "transparent" : colors.surface,
     borderRadius: isMobile ? 0 : 16,
     padding: isMobile ? 0 : 16,
-    boxShadow: theme.shadow.sm,
-    opacity: 1,
+    boxShadow: isMobile ? "none" : theme.shadow.sm,
   }}
 >
                 <Feed
