@@ -21,6 +21,19 @@ export default function Profile({
   const location = useLocation()
   const colors = getThemeColors(theme)
   const [activeTab, setActiveTab] = useState("POSTS")
+  const fetchPostsForProfile = async (userId, cursor = null) => {
+  const res = await api(
+    `/users/${userId}/posts${cursor ? `?cursor=${cursor}` : ""}`
+  )
+
+  if (!cursor) {
+    setPosts(res?.posts || [])
+  } else {
+    setPosts(prev => [...prev, ...(res.posts || [])])
+  }
+
+  setNextCursor(res?.nextCursor || null)
+}
   useEffect(() => {
   if (location.state?.openTab) {
     setActiveTab(location.state.openTab)
@@ -145,10 +158,6 @@ const u = await api(`/users/${id}`)
 const viewingOwnProfile = u.id === currentUser?.id
 
 
-
-// 4️⃣ Load posts for profile owner
-const postRes = await api(`/users/${u.id}/posts`)
-
 // 5️⃣ Load my feed profiles (ONLY mine)
 const fps = viewingOwnProfile
         ? await api("/me/feed-profiles")
@@ -158,8 +167,7 @@ const fps = viewingOwnProfile
       if (!mounted) return
 
       setUser(u)
-      setPosts(postRes?.posts || [])
-setNextCursor(postRes?.nextCursor || null)
+      await fetchPostsForProfile(u.id)
       setProfiles(fps || [])
       setBio(u.bio || "")
       setShowCommunities(
@@ -264,12 +272,7 @@ const loadMorePosts = async () => {
   setLoadingMore(true)
 
   try {
-    const res = await api(
-      `/users/${user.id}/posts?cursor=${nextCursor}`
-    )
-
-    setPosts((prev) => [...prev, ...(res.posts || [])])
-    setNextCursor(res.nextCursor || null)
+    await fetchPostsForProfile(user.id, nextCursor)
   } catch (err) {
     console.error("Failed loading more posts")
   } finally {

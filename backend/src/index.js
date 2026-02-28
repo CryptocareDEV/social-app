@@ -25,7 +25,7 @@ import notificationRoutes from "./routes/notification.routes.js"
 import prisma from "./lib/prisma.js"
 import { initGeo } from "./lib/geo.js"
 import rootAnalyticsRoutes from "./routes/rootAnalytics.routes.js"
-
+import publicRoutes from "./routes/public.routes.js"
 
 dotenv.config()
 
@@ -113,7 +113,7 @@ app.use("/api/v1/superusers", superuserRoutes)
 
 
 
-
+app.use("/api/v1/public", publicRoutes)
 app.use("/api/v1/auth/signup", signupLimiter)
 app.use("/api/v1/auth/login", loginLimiter)
 

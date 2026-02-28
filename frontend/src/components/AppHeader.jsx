@@ -138,7 +138,7 @@ const handleNotificationClick = async (n) => {
     document.removeEventListener("mousedown", handleClickOutside)
 }, [])
 
-  if (!user) return null
+  const isPublic = !user
 
   return (
     <header
@@ -335,6 +335,7 @@ const handleNotificationClick = async (n) => {
   }}
 >
   {/* 🔔 Notifications */}
+  {user && (
   <div ref={notificationRef} style={{ position: "relative" }}>
     <button
       onClick={() => {
@@ -490,8 +491,10 @@ const handleNotificationClick = async (n) => {
   </div>
     )}
   </div>
+  )}
 
   {/* 👤 User Dropdown */}
+  {user && (
   <div ref={userMenuRef} style={{ position: "relative" }}>
     <button
   onClick={() => setShowUserMenu((v) => !v)}
@@ -663,6 +666,45 @@ const handleNotificationClick = async (n) => {
   </div>
 )}
   </div>
+  )}
+
+  {isPublic && (
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+    }}
+  >
+    {!isMobile && (
+      <button
+        onClick={() => navigate("/login")}
+        style={{
+          ...headerGhostButton(theme),
+          fontSize: 13,
+        }}
+      >
+        Log in
+      </button>
+    )}
+
+    <button
+      onClick={() => navigate("/signup")}
+      style={{
+        padding: isMobile ? "6px 10px" : "8px 14px",
+        borderRadius: 999,
+        border: "none",
+        background: colors.primary,
+        color: "#fff",
+        cursor: "pointer",
+        fontWeight: 600,
+        fontSize: 13,
+      }}
+    >
+      Join
+    </button>
+  </div>
+)}
 </div>
       </div>
     </header>

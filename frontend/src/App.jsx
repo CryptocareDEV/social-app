@@ -6,6 +6,7 @@ import useNow from "./hooks/useNow"
 import useFeed from "./hooks/useFeed"
 import useBreakpoint from "./hooks/useBreakpoint"
 import AppHeader from "./components/AppHeader"
+import PublicLanding from "./pages/PublicLanding"
 
 
 import Login from "./pages/Login"
@@ -439,6 +440,20 @@ if (
   if (loading) {
     return <p style={{ textAlign: "center", marginTop: 40 }}>Loading…</p>
   }
+
+  const hideHeaderRoutes = [
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+]
+
+const isPublicLanding = location.pathname === "/"
+
+const shouldShowHeader =
+  user &&
+  !hideHeaderRoutes.includes(location.pathname) &&
+  !isPublicLanding
   
   return (
   <div
@@ -450,6 +465,7 @@ if (
     overflowX: "clip",
   }}
 >
+  {shouldShowHeader && (
    <AppHeader
       theme={theme}
       setTheme={setTheme}
@@ -472,6 +488,7 @@ if (
       loadingNotifications={loadingNotifications}
       setHighlightPostId={setHighlightPostId}
     />
+  )}
     <Routes>
 
       <Route
@@ -545,15 +562,18 @@ if (
 />
 
 <Route
-    path="/"
-    element={
-      !user ? (
-        <Navigate to="/login" />
-      ) : (
-        <>
+  path="/"
+  element={
+    user ? <Navigate to="/home" /> : <PublicLanding />
+  }
+/>
 
-
-{cooldownInfo?.type === "REPORT" && isOnCooldown && (
+<Route
+  path="/home"
+  element={
+    user ? (
+      <>
+        {cooldownInfo?.type === "REPORT" && isOnCooldown && (
   <div
     style={{
       background: "#fff7ed",
@@ -842,14 +862,12 @@ color: colors.textMuted
                   }}
                 />
               )}
-
-              
-            </>
-          )
-        }
-      />
-
-
+      </>
+    ) : (
+      <Navigate to="/login" />
+    )
+  }
+/>
 
       <Route
   path="/profile/:id"

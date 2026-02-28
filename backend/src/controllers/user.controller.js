@@ -90,6 +90,7 @@ const isMinor = req.user?.isMinor === true
 const posts = await prisma.post.findMany({
   where: {
     userId: id,
+    isRemoved: false,
 
     ...(hideCommunityPosts && {
       communityId: null,
