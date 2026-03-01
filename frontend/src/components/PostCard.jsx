@@ -3,6 +3,7 @@ import { Link } from "react-router-dom"
 import { getThemeColors } from "../ui/theme"
 import { api } from "../api/client"
 import { fetchComments, createComment, fetchReplies } from "../api/comments"
+import EmojiPicker from "emoji-picker-react"
 let activeVideo = null
 
 function formatTimeAgo(dateString) {
@@ -57,7 +58,7 @@ function CommentNode({
     marginTop: theme.spacing.sm,
     paddingTop: theme.spacing.sm,
     borderTop: `1px solid ${colors.border}`,
-    marginLeft: isMobile ? depth * 10 : depth * 16,
+    marginLeft: isMobile ? Math.min(depth * 8, 16) : depth * 16,
     maxWidth: "100%",
     boxSizing: "border-box",
   }}
@@ -147,38 +148,60 @@ function CommentNode({
 
 
       {activeReplyBox === comment.id && (
-        <div style={{ marginTop: 6 }}>
-          <input
-  type="text"
-  value={replyBodies[comment.id] || ""}
-  onClick={(e) => e.stopPropagation()}
-  onChange={(e) =>
-    setReplyBodies((prev) => ({
-      ...prev,
-      [comment.id]: e.target.value,
-    }))
-  }
-  onKeyDown={(e) => {
-    e.stopPropagation()
-    if (e.key === "Enter") {
-      e.preventDefault()
-      handleReplySubmit(comment.id)
-    }
-  }}
-  placeholder="Write a reply…"
-  style={{
-  width: "100%",
-  padding: "6px 10px",
-  borderRadius: theme.radius.md,
-  border: `1px solid ${colors.border}`,
-  fontSize: 13,
-  boxSizing: "border-box",
-  maxWidth: "100%",
-}}
-/>
+  <div
+    style={{
+      marginTop: 6,
+      display: "flex",
+      gap: 6,
+    }}
+  >
+    <input
+      type="text"
+      value={replyBodies[comment.id] || ""}
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) =>
+        setReplyBodies((prev) => ({
+          ...prev,
+          [comment.id]: e.target.value,
+        }))
+      }
+      onKeyDown={(e) => {
+        e.stopPropagation()
+        if (e.key === "Enter") {
+          e.preventDefault()
+          handleReplySubmit(comment.id)
+        }
+      }}
+      placeholder="Write a reply…"
+      style={{
+        flex: 1,
+        padding: "8px 10px",
+        borderRadius: theme.radius.md,
+        border: `1px solid ${colors.border}`,
+        fontSize: 13,
+        boxSizing: "border-box",
+      }}
+    />
 
-        </div>
-      )}
+    {isMobile && (
+      <button
+        onClick={() => handleReplySubmit(comment.id)}
+        disabled={!replyBodies[comment.id]?.trim()}
+        style={{
+          fontSize: 12,
+          padding: "6px 10px",
+          borderRadius: theme.radius.pill,
+          border: `1px solid ${colors.border}`,
+          background: "transparent",
+          color: colors.textMuted,
+          cursor: "pointer",
+        }}
+      >
+        Send
+      </button>
+    )}
+  </div>
+)}
 
       {replies.map((reply) => (
         <CommentNode
@@ -225,6 +248,7 @@ const [repliesMap, setRepliesMap] = useState({})
 const [replyCursors, setReplyCursors] = useState({})
 const [hasMoreReplies, setHasMoreReplies] = useState({})
 const reason = post.reason || null
+const [showEmojiPicker, setShowEmojiPicker] = useState(false)
 
 
 const [commentsLoading, setCommentsLoading] = useState(false)
@@ -237,6 +261,7 @@ const [commentsCursor, setCommentsCursor] = useState(null)
 const [hasMoreComments, setHasMoreComments] = useState(false)
 const [loadingMore, setLoadingMore] = useState(false)
 const videoRef = useRef(null)
+const containerRef = useRef(null)
 const commentInputRef = useRef(null)
 const commentsEndRef = useRef(null)
 const [optimisticCountDelta, setOptimisticCountDelta] = useState(0)
@@ -246,6 +271,11 @@ const [optimisticCountDelta, setOptimisticCountDelta] = useState(0)
 
   const colors = getThemeColors(theme)
   const imageSrc = post.mediaUrl || null
+  const isGif =
+  imageSrc &&
+  imageSrc.toLowerCase().endsWith(".gif")
+
+
 
   const severityCopy = {
     LOW: { tone: "#64748b", text: "Content may be low quality or off-topic" },
@@ -319,6 +349,46 @@ const [optimisticCountDelta, setOptimisticCountDelta] = useState(0)
     commentInputRef.current.focus()
   }
 }, [showComments])
+
+useEffect(() => {
+  const video = videoRef.current
+  const container = containerRef.current
+
+  if (!video || !container) return
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) {
+          video.pause()
+        }
+      })
+    },
+    {
+      threshold: 0.4, // pauses if less than 40% visible
+    }
+  )
+
+  observer.observe(container)
+
+  return () => {
+    observer.disconnect()
+  }
+}, [])
+
+useEffect(() => {
+  const handleVisibility = () => {
+    if (document.hidden && videoRef.current) {
+      videoRef.current.pause()
+    }
+  }
+
+  document.addEventListener("visibilitychange", handleVisibility)
+
+  return () => {
+    document.removeEventListener("visibilitychange", handleVisibility)
+  }
+}, [])
 
 
 
@@ -482,8 +552,9 @@ const handleReplySubmit = async (parentId) => {
   return (
 
     <article
-      id={`post-${post.id}`}
-      style={{
+  ref={containerRef}
+  id={`post-${post.id}`}
+  style={{
   background: colors.surface,
   borderRadius: isMobile ? 0 : theme.radius.lg,
   padding: isMobile ? "8px 12px" : theme.spacing.xl + 4,
@@ -544,7 +615,12 @@ display: "block",
 
 <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
 <button
-  onClick={() => setCollapsed((c) => !c)}
+  onClick={() => {
+    if (!collapsed && videoRef.current) {
+      videoRef.current.pause()
+    }
+    setCollapsed((c) => !c)
+  }}
   style={{
     ...actionButtonStyle,
     fontSize: isMobile ? 13 : 12,
@@ -628,42 +704,40 @@ position: "relative",
     }}
   >
     {post.type === "VIDEO" ? (
- <video
-  ref={videoRef}
-  src={imageSrc}
-  controls
-  preload="metadata"
-  onPlay={() => {
-    if (activeVideo && activeVideo !== videoRef.current) {
-      activeVideo.pause()
-    }
-    activeVideo = videoRef.current
-  }}
-  style={{
-    width: "100%",
-    height: "auto",
-    display: "block",
-    maxHeight: isMobile ? "75vh" : 420,
-    background: colors.bg,
-    borderRadius: isMobile ? 0 : theme.radius.md,
-    objectFit: "contain",
-  }}
-/>
+  <video
+    ref={videoRef}
+    src={imageSrc}
+    controls
+    preload="metadata"
+    onPlay={() => {
+      if (activeVideo && activeVideo !== videoRef.current) {
+        activeVideo.pause()
+      }
+      activeVideo = videoRef.current
+    }}
+    style={{
+      width: "100%",
+      height: "auto",
+      display: "block",
+      maxHeight: isMobile ? "75vh" : 420,
+      background: colors.bg,
+      borderRadius: isMobile ? 0 : theme.radius.md,
+      objectFit: "contain",
+    }}
+  />
 ) : (
   <img
     src={imageSrc}
     alt={post.type === "MEME" ? "Meme image" : "Post media"}
     loading="lazy"
     style={{
-  width: "100%",
-  height: "auto",
-  display: "block",
-  borderRadius: isMobile ? 0 : theme.radius.md,
-}}
+      width: "100%",
+      height: "auto",
+      display: "block",
+      borderRadius: isMobile ? 0 : theme.radius.md,
+    }}
   />
 )}
-
-
 
   </div>
 )}
@@ -725,9 +799,9 @@ position: "relative",
         style={{
   marginTop: 10,
   display: "flex",
-  flexDirection: isMobile ? "column" : "row",
-  alignItems: isMobile ? "flex-start" : "center",
-  gap: isMobile ? 6 : 0,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 0,
   justifyContent: "space-between",
 }}
       >
@@ -778,7 +852,7 @@ borderColor: post.likedByMe
 </button>
 
 {/* MEME (image-only) */}
-  {["IMAGE", "MEME"].includes(post.type) && imageSrc && (
+  {["IMAGE", "MEME"].includes(post.type) && imageSrc && !isGif && (
   <button
     onClick={() => onMeme(post)}
     style={{
@@ -811,6 +885,7 @@ padding: isMobile ? "4px 2px" : "6px 10px",
       display: "flex",
       flexDirection: "column",
       alignItems: "flex-end",
+      marginLeft: "auto",
     }}
   >
     <button
@@ -978,53 +1053,87 @@ padding: isMobile ? 8 : theme.spacing.md,
   style={{
     marginTop: theme.spacing.md,
     display: "flex",
-    gap: isMobile ? 10 : 8,
+    flexDirection: "column",
+    gap: 8,
   }}
 >
-  <input
-    ref={commentInputRef}
-    value={commentBody}
-    onClick={(e) => e.stopPropagation()}
-    onChange={(e) => {
-      setCommentBody(e.target.value)
-      if (commentSubmitError) setCommentSubmitError(null)
-    }}
-    onKeyDown={(e) => {
-      e.stopPropagation()
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault()
-        handleSubmitComment()
-      }
-    }}
-    placeholder="Add a thoughtful response…"
-    style={{
-      flex: 1,
-      padding: isMobile ? "12px 14px" : "10px 12px",
-      borderRadius: theme.radius.md,
-      border: `1px solid ${colors.border}`,
-      background: colors.surface,
-      fontSize: 13,
-      color: colors.text,
-    }}
-    disabled={commentSubmitting}
-  />
+  {/* Top Row */}
+  <div style={{ display: "flex", gap: 8 }}>
+    {/* Emoji Toggle */}
+    <button
+      type="button"
+      onClick={() => setShowEmojiPicker((v) => !v)}
+      style={{
+        border: "none",
+        background: "transparent",
+        fontSize: 18,
+        cursor: "pointer",
+        padding: 0,
+      }}
+    >
+      😀
+    </button>
 
-  <button
-    onClick={handleSubmitComment}
-    disabled={commentSubmitting || !commentBody.trim()}
-    style={{
-      fontSize: 12,
-      padding: "6px 12px",
-      borderRadius: theme.radius.pill,
-      border: `1px solid ${colors.border}`,
-      background: "transparent",
-      color: colors.textMuted,
-      cursor: commentSubmitting ? "not-allowed" : "pointer",
-      opacity: commentSubmitting ? 0.6 : 1,
-    }}
-  >
-    {commentSubmitting ? "Posting…" : "Post"}
-  </button>
+    {/* Input */}
+    <input
+      ref={commentInputRef}
+      value={commentBody}
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) => {
+        setCommentBody(e.target.value)
+        if (commentSubmitError) setCommentSubmitError(null)
+      }}
+      onKeyDown={(e) => {
+        e.stopPropagation()
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault()
+          handleSubmitComment()
+        }
+      }}
+      placeholder="Add a thoughtful response…"
+      style={{
+        flex: 1,
+        padding: isMobile ? "12px 14px" : "10px 12px",
+        borderRadius: theme.radius.md,
+        border: `1px solid ${colors.border}`,
+        background: colors.surface,
+        fontSize: 13,
+        color: colors.text,
+      }}
+      disabled={commentSubmitting}
+    />
+
+    {/* Post Button */}
+    <button
+      onClick={handleSubmitComment}
+      disabled={commentSubmitting || !commentBody.trim()}
+      style={{
+        fontSize: 12,
+        padding: "6px 12px",
+        borderRadius: theme.radius.pill,
+        border: `1px solid ${colors.border}`,
+        background: "transparent",
+        color: colors.textMuted,
+        cursor: commentSubmitting ? "not-allowed" : "pointer",
+        opacity: commentSubmitting ? 0.6 : 1,
+      }}
+    >
+      {commentSubmitting ? "Posting…" : "Post"}
+    </button>
+  </div>
+
+  {/* Emoji Picker */}
+  {showEmojiPicker && (
+    <div style={{ marginTop: 6 }}>
+      <EmojiPicker
+        onEmojiClick={(emojiData) => {
+          setCommentBody((prev) => prev + emojiData.emoji)
+        }}
+        theme={theme.mode}
+        width="100%"
+      />
+    </div>
+  )}
 </div>
 
 

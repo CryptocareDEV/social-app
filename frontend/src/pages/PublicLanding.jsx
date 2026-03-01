@@ -195,7 +195,7 @@ setShowProfileMenu={setShowProfileMenu}
     borderBottom: `1px solid ${colors.border}`,
   }}
 >
-  Viewing Global scope. Country, Local, and custom lenses activate after signup.
+  Viewing Global scope. Country, Local, Custom lenses and Communitites activate after signup.
 </div>
 
       {/* FEED */}

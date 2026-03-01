@@ -11,6 +11,7 @@ function Feed({
   reportCooldownUntil,
   refreshUserState,
   isMobile,
+  isCommunityFeed = false,
 }) {
 
   const colors = getThemeColors(theme)
@@ -68,6 +69,8 @@ function Feed({
   theme={theme}
   reportCooldownUntil={reportCooldownUntil}
   refreshUserState={refreshUserState}
+  isMobile={isMobile}
+  isCommunityFeed={isCommunityFeed}
 />
 
       ))}

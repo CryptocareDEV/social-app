@@ -1310,7 +1310,12 @@ setPosts(items)
     padding: isMobile ? "0 0 40px 0" : "0 0 60px 0",
   }}
 >
-  <Feed posts={posts} theme={theme} />
+  <Feed
+  posts={posts}
+  theme={theme}
+  isMobile={isMobile}
+  isCommunityFeed={true}
+/>
 </div>
     )}
   </div>

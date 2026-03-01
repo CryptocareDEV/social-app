@@ -338,6 +338,37 @@ regionCode:
       },
     })
 
+    /* ============================================================
+   🔁 Re-materialize importing communities (EXTERNAL POSTS)
+============================================================ */
+
+if (!communityId) {
+  // Find communities that import at least one of the post's labels
+  const labelKeys = categoryRecords.map(c => c.categoryKey)
+
+  const importingCommunities = await prisma.communityLabelImport.findMany({
+    where: {
+      categoryKey: { in: labelKeys },
+      OR: [
+        { global: scope === "GLOBAL" },
+        { country: scope === "COUNTRY" },
+        { local: scope === "LOCAL" },
+      ],
+    },
+    select: {
+      communityId: true,
+    },
+  })
+
+  const uniqueCommunityIds = [
+    ...new Set(importingCommunities.map(c => c.communityId)),
+  ]
+
+  for (const cid of uniqueCommunityIds) {
+    await materializeCommunityFeed(cid)
+  }
+}
+
     if (communityId) {
   await materializeCommunityFeed(communityId)
 
@@ -587,13 +618,12 @@ const totalCount = await prisma.post.count({
     originPost: p.originPost ?? null,
     likedByMe: p.likes.length > 0,
     reason: {
-      scope,
-      profileName: feedProfile?.name ?? "Default",
-      isDefaultProfile,
-      matchedCategories: categoryKeys,
-      scopeCeiling: scope,
-      likes: p._count?.likes ?? 0,
-    },
+  scope,
+  profileName: feedProfile?.name ?? "Default",
+  isDefaultProfile,
+  matchedCategories: categoryKeys,
+  likes: p._count?.likes ?? 0,
+},
     
   }
   
