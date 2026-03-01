@@ -619,7 +619,6 @@ const scopeMeta = {
             background: colors.surface,
             borderRadius: 12,
             padding: 6,
-            background: colors.surface,
             boxShadow: "0 6px 20px rgba(0,0,0,0.08)",
           }}
         >

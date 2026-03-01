@@ -819,7 +819,6 @@ position: "relative",
     ...actionButtonStyle,
     fontWeight: 500,
     color: post.likedByMe ? colors.primary : colors.textMuted,
-    borderColor: post.likedByMe ? colors.primarySoft : colors.border,
     borderWidth: isMobile ? 0 : 1,
 borderStyle: "solid",
 borderColor: post.likedByMe
@@ -980,7 +979,6 @@ paddingTop: 6,
   <div
     style={{
       marginTop: theme.spacing.md,
-      padding: theme.spacing.md,
       borderRadius: theme.radius.md,
       background: "transparent",
 border: "none",
